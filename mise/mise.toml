@@ -1,0 +1,16 @@
+[tools]
+# global tool versions go here
+# you can set these with `mise use -g`
+node = 'lts'
+python = ['3.11', 'latest']
+
+java = ['corretto-17.0.12.7.1']
+kotlin = 'latest'
+gradle = ['8.11']
+
+kubectl = ['1.31.0', 'latest']
+kustomize = 'latest'
+helm = 'latest'
+
+zig = 'latest'
+golang = 'latest'

@@ -1,0 +1,15 @@
+.*
+!.config
+
+!.gitignore
+!.stowrc
+
+!.gitconfig
+!.gitconfig-workspace
+!.gitconfig-privatespace
+!.gitconfig-platform-specific
+
+!.git-crypt
+
+!.zprofile
+!.zshrc

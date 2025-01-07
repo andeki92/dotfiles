@@ -1,0 +1,44 @@
+[color]
+ui = auto
+
+[commit]
+gpgsign = true
+
+[core]
+editor = vim
+autocrlf = input
+eol = lf
+pager = delta
+
+[delta]
+# use n and N to move between diff sections
+navigate = true
+side-by-side = true
+
+[diff]
+colorMoved = default
+
+[init]
+defaultBranch = main
+
+[interactive]
+diffFilter = delta --color-only
+
+[include]
+path = .gitconfig-platform-specific
+
+[includeIf "gitdir:~/"]
+path = .gitconfig-privatespace
+
+[includeIf "gitdir:~/workspace/"]
+path = .gitconfig-workspace
+
+[safe]
+directory = *
+
+[push]
+autoSetupRemote = true
+
+[credential]
+helper = "!f() { if [ \"$(uname -s)\" = Linux ]; then /mnt/c/Users/anderski1/AppData/Local/Programs/Git/mingw64/bin/git-credential-manager.exe \"$@\"; else git credential-osxkeychain \"$@\"; fi; };f"
+
