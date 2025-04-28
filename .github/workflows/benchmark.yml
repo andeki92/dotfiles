@@ -8,10 +8,20 @@ on:
       - '.github/workflows/benchmark.yml'
       - 'docs/benchmarks.md'
 
+# Add workflow permissions
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+# Reusable workflow for environment setup
 jobs:
   benchmark-pr:
     name: Benchmark PR Branch
     runs-on: ubuntu-latest
+    outputs:
+      pr-median: ${{ steps.extract-values.outputs.pr-median }}
+      pr-average: ${{ steps.extract-values.outputs.pr-average }}
     
     steps:
       - name: Checkout PR Branch
@@ -19,11 +29,35 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
-          
+    
       - name: Install required packages
         run: |
-          sudo apt-get update
-          sudo apt-get install -y zsh bc stow
+          # Use multiple mirrors to be more resilient
+          echo "Updating apt sources to use multiple mirrors"
+          sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list
+          
+          # Add retry logic for apt operations
+          for i in {1..3}; do
+            echo "Attempt $i: Running apt-get update"
+            if sudo apt-get update; then break; fi
+            sleep 5
+          done
+          
+          # Install packages with retry
+          for i in {1..3}; do
+            echo "Attempt $i: Installing packages"
+            if sudo apt-get install -y zsh bc stow time; then
+              echo "✅ Package installation successful"
+              break
+            fi
+            sleep 5
+          done
+          
+          # Verify installations
+          which zsh
+          which bc
+          which stow
+          which time
       
       - name: Setup home environment
         run: |
@@ -38,28 +72,83 @@ jobs:
             echo "⚠️ No zsh configuration found in PR branch"
             exit 1
           fi
-          
+      
+      - name: Get PR Title
+        id: pr-info
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            
+            console.log(`PR Title: ${pullRequest.title}`);
+            core.setOutput('title', pullRequest.title);
+            return pullRequest.title;
+          result-encoding: string
+      
       - name: Run benchmark on PR branch
         id: benchmark-pr
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_DESCRIPTION: ${{ steps.pr-info.outputs.title }}
         run: |
-          # Run benchmark with save option
-          ./scripts/benchmark.sh --save
+          # Use PR title as description
+          echo "Using PR #$PR_NUMBER with description: $PR_DESCRIPTION"
           
-          # Extract the average time from output for later comparison
-          PR_TIME=$(grep -A 10 "^## CI Benchmarks" docs/benchmarks.md | grep -oE '[0-9]+\.[0-9]+s' | tail -1 | tr -d 's')
-          echo "PR_TIME=$PR_TIME" > /tmp/pr_time.txt
+          # Run benchmark with save option
+          CI=true ./scripts/benchmark.sh --save
+          
+          # Print file contents for debugging
+          echo "=== Benchmark MD file contents ==="
+          cat docs/benchmarks.md
+          echo "=== End of benchmark file ==="
+          
+          # Extract values directly from script output
+          ./scripts/benchmark.sh > benchmark_output.txt
+          cat benchmark_output.txt
+          
+          # Save results to file for artifact
+          mkdir -p /tmp/pr-results
+          cp benchmark_output.txt /tmp/pr-results/
+          cp docs/benchmarks.md /tmp/pr-results/
+      
+      - name: Extract benchmark values
+        id: extract-values
+        run: |
+          # Extract values from benchmark output
+          PR_MEDIAN=$(grep "Median startup time" benchmark_output.txt | awk '{print $4}' | tr -d 's')
+          PR_AVERAGE=$(grep "Average startup time" benchmark_output.txt | awk '{print $4}' | tr -d 's')
+          
+          echo "PR_MEDIAN=$PR_MEDIAN"
+          echo "PR_AVERAGE=$PR_AVERAGE"
+          
+          # Make sure we have values
+          PR_MEDIAN="${PR_MEDIAN:-0.000}"
+          PR_AVERAGE="${PR_AVERAGE:-0.000}"
+          
+          # Store as outputs
+          echo "pr-median=$PR_MEDIAN" >> $GITHUB_OUTPUT
+          echo "pr-average=$PR_AVERAGE" >> $GITHUB_OUTPUT
       
       - name: Upload PR benchmark results
         uses: actions/upload-artifact@v4
         with:
           name: pr-benchmark
           path: |
-            /tmp/pr_time.txt
+            /tmp/pr-results
+            benchmark_output.txt
             docs/benchmarks.md
   
   benchmark-main:
     name: Benchmark Main Branch
     runs-on: ubuntu-latest
+    outputs:
+      main-median: ${{ steps.extract-values.outputs.main-median }}
+      main-average: ${{ steps.extract-values.outputs.main-average }}
     
     steps:
       - name: Checkout Main Branch
@@ -70,8 +159,32 @@ jobs:
           
       - name: Install required packages
         run: |
-          sudo apt-get update
-          sudo apt-get install -y zsh bc stow
+          # Use multiple mirrors to be more resilient
+          echo "Updating apt sources to use multiple mirrors"
+          sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list
+          
+          # Add retry logic for apt operations
+          for i in {1..3}; do
+            echo "Attempt $i: Running apt-get update"
+            if sudo apt-get update; then break; fi
+            sleep 5
+          done
+          
+          # Install packages with retry
+          for i in {1..3}; do
+            echo "Attempt $i: Installing packages"
+            if sudo apt-get install -y zsh bc stow time; then
+              echo "✅ Package installation successful"
+              break
+            fi
+            sleep 5
+          done
+          
+          # Verify installations
+          which zsh
+          which bc
+          which stow
+          which time
       
       - name: Setup home environment
         run: |
@@ -90,49 +203,146 @@ jobs:
       - name: Run benchmark on main branch
         id: benchmark-main
         run: |
-          # Run benchmark
-          OUTPUT=$(./scripts/benchmark.sh)
+          # Run benchmark and save output to file
+          ./scripts/benchmark.sh > main_benchmark_output.txt
+          cat main_benchmark_output.txt
           
-          # Extract the average time from output
-          MAIN_TIME=$(echo "$OUTPUT" | grep "Average startup time" | awk '{print $4}' | tr -d 's')
-          echo "MAIN_TIME=$MAIN_TIME" > /tmp/main_time.txt
+          # Save results to file for artifact
+          mkdir -p /tmp/main-results
+          cp main_benchmark_output.txt /tmp/main-results/
+      
+      - name: Extract benchmark values
+        id: extract-values
+        run: |
+          MAIN_MEDIAN=$(grep "Median startup time" main_benchmark_output.txt | awk '{print $4}' | tr -d 's')
+          MAIN_AVERAGE=$(grep "Average startup time" main_benchmark_output.txt | awk '{print $4}' | tr -d 's')
           
-      - name: Upload main benchmark results
+          # Make sure we have values
+          MAIN_MEDIAN="${MAIN_MEDIAN:-0.000}"
+          MAIN_AVERAGE="${MAIN_AVERAGE:-0.000}"
+          
+          echo "MAIN_MEDIAN=$MAIN_MEDIAN"
+          echo "MAIN_AVERAGE=$MAIN_AVERAGE"
+          
+          # Save to file for artifact
+          echo "MAIN_MEDIAN=$MAIN_MEDIAN" > /tmp/main-results/times.txt
+          echo "MAIN_AVERAGE=$MAIN_AVERAGE" >> /tmp/main-results/times.txt
+          
+          # Store as outputs
+          echo "main-median=$MAIN_MEDIAN" >> $GITHUB_OUTPUT
+          echo "main-average=$MAIN_AVERAGE" >> $GITHUB_OUTPUT
+      
+      - name: Upload Main benchmark results
         uses: actions/upload-artifact@v4
         with:
           name: main-benchmark
-          path: /tmp/main_time.txt
-
-  compare-and-comment:
-    name: Compare Results and Comment
+          path: /tmp/main-results
+  
+  compare-results:
+    name: Compare Benchmark Results
     needs: [benchmark-pr, benchmark-main]
     runs-on: ubuntu-latest
     
     steps:
-      - name: Download artifacts
+      - name: Checkout PR Branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      
+      - name: Download PR benchmark results
         uses: actions/download-artifact@v4
-        
-      - name: Compare benchmark results
+        with:
+          name: pr-benchmark
+          path: /tmp/pr-results
+      
+      - name: Download Main benchmark results
+        uses: actions/download-artifact@v4
+        with:
+          name: main-benchmark
+          path: /tmp/main-results
+      
+      - name: Compare results
+        id: compare
         run: |
-          PR_TIME=$(cat pr-benchmark/pr_time.txt | grep "PR_TIME" | cut -d= -f2)
-          MAIN_TIME=$(cat main-benchmark/main_time.txt | grep "MAIN_TIME" | cut -d= -f2)
+          PR_MEDIAN="${{ needs.benchmark-pr.outputs.pr-median }}"
+          PR_AVERAGE="${{ needs.benchmark-pr.outputs.pr-average }}"
+          MAIN_MEDIAN="${{ needs.benchmark-main.outputs.main-median }}"
+          MAIN_AVERAGE="${{ needs.benchmark-main.outputs.main-average }}"
           
-          # Calculate the difference
-          DIFF=$(echo "scale=3; $PR_TIME - $MAIN_TIME" | bc)
-          echo "DIFF=$DIFF" >> $GITHUB_ENV
+          echo "PR_MEDIAN=$PR_MEDIAN"
+          echo "PR_AVERAGE=$PR_AVERAGE"
+          echo "MAIN_MEDIAN=$MAIN_MEDIAN"
+          echo "MAIN_AVERAGE=$MAIN_AVERAGE"
           
-          # Determine if it's faster or slower
-          if (( $(echo "$DIFF < 0" | bc -l) )); then
-            echo "FASTER=true" >> $GITHUB_ENV
-            echo "DIFF_ABS=${DIFF#-}" >> $GITHUB_ENV
+          # Calculate difference
+          if command -v bc &> /dev/null; then
+            MEDIAN_DIFF=$(echo "scale=3; $MAIN_MEDIAN - $PR_MEDIAN" | bc)
+            AVERAGE_DIFF=$(echo "scale=3; $MAIN_AVERAGE - $PR_AVERAGE" | bc)
+            
+            if [[ $(echo "$MEDIAN_DIFF > 0" | bc -l) -eq 1 ]]; then
+              MEDIAN_STATUS="faster ✅"
+            elif [[ $(echo "$MEDIAN_DIFF < 0" | bc -l) -eq 1 ]]; then
+              MEDIAN_DIFF=$(echo "scale=3; $MEDIAN_DIFF * -1" | bc)
+              MEDIAN_STATUS="slower ❌"
+            else
+              MEDIAN_STATUS="unchanged ⚠️"
+            fi
+            
+            if [[ $(echo "$AVERAGE_DIFF > 0" | bc -l) -eq 1 ]]; then
+              AVERAGE_STATUS="faster ✅"
+            elif [[ $(echo "$AVERAGE_DIFF < 0" | bc -l) -eq 1 ]]; then
+              AVERAGE_DIFF=$(echo "scale=3; $AVERAGE_DIFF * -1" | bc)
+              AVERAGE_STATUS="slower ❌"
+            else
+              AVERAGE_STATUS="unchanged ⚠️"
+            fi
+            
+            # Calculate percentage difference for thresholds
+            if [[ "$MAIN_MEDIAN" != "0.000" && "$PR_MEDIAN" != "0.000" ]]; then
+              PERCENT_CHANGE=$(echo "scale=1; ($PR_MEDIAN - $MAIN_MEDIAN) / $MAIN_MEDIAN * 100" | bc)
+              echo "PERCENT_CHANGE=$PERCENT_CHANGE%"
+            else
+              PERCENT_CHANGE="0.0"
+              echo "Cannot calculate percentage change, using default of $PERCENT_CHANGE%"
+            fi
           else
-            echo "FASTER=false" >> $GITHUB_ENV
-            echo "DIFF_ABS=$DIFF" >> $GITHUB_ENV
+            MEDIAN_DIFF="0.000"
+            AVERAGE_DIFF="0.000"
+            MEDIAN_STATUS="unknown ⚠️"
+            AVERAGE_STATUS="unknown ⚠️"
+            PERCENT_CHANGE="0.0"
           fi
           
-          # Store times for comment
-          echo "PR_TIME=$PR_TIME" >> $GITHUB_ENV
-          echo "MAIN_TIME=$MAIN_TIME" >> $GITHUB_ENV
+          echo "MEDIAN_DIFF=$MEDIAN_DIFF"
+          echo "AVERAGE_DIFF=$AVERAGE_DIFF"
+          echo "MEDIAN_STATUS=$MEDIAN_STATUS"
+          echo "AVERAGE_STATUS=$AVERAGE_STATUS"
+          echo "PERCENT_CHANGE=$PERCENT_CHANGE"
+          
+          # Store as outputs
+          echo "median-diff=$MEDIAN_DIFF" >> $GITHUB_OUTPUT
+          echo "average-diff=$AVERAGE_DIFF" >> $GITHUB_OUTPUT
+          echo "median-status=$MEDIAN_STATUS" >> $GITHUB_OUTPUT
+          echo "average-status=$AVERAGE_STATUS" >> $GITHUB_OUTPUT
+          echo "percent-change=$PERCENT_CHANGE" >> $GITHUB_OUTPUT
+      
+      - name: Get PR Details
+        id: pr-details
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            
+            return {
+              title: pullRequest.title,
+              number: pullRequest.number
+            };
+          result-encoding: json
       
       - name: Comment on PR
         uses: actions/github-script@v7
@@ -140,32 +350,111 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
+            const prDetails = ${{ steps.pr-details.outputs.result }};
             
-            const mainTime = process.env.MAIN_TIME;
-            const prTime = process.env.PR_TIME;
-            const diffAbs = process.env.DIFF_ABS;
-            const faster = process.env.FASTER === 'true';
+            const prMedian = '${{ needs.benchmark-pr.outputs.pr-median }}';
+            const prAverage = '${{ needs.benchmark-pr.outputs.pr-average }}';
+            const mainMedian = '${{ needs.benchmark-main.outputs.main-median }}';
+            const mainAverage = '${{ needs.benchmark-main.outputs.main-average }}';
+            const medianDiff = '${{ steps.compare.outputs.median-diff }}';
+            const averageDiff = '${{ steps.compare.outputs.average-diff }}';
+            const medianStatus = '${{ steps.compare.outputs.median-status }}';
+            const averageStatus = '${{ steps.compare.outputs.average-status }}';
+            const percentChange = '${{ steps.compare.outputs.percent-change }}';
             
-            let performanceEmoji = faster ? '🚀' : '⚠️';
-            let performanceText = faster ? 
-              `This PR is **${diffAbs}s faster** than main (${prTime}s vs ${mainTime}s)` :
-              `This PR is **${diffAbs}s slower** than main (${prTime}s vs ${mainTime}s)`;
-            
-            // Read the benchmarks.md file to show the history
-            let benchmarkHistory = '';
+            let historySection = '';
             try {
-              const benchmarkFile = fs.readFileSync('pr-benchmark/benchmarks.md', 'utf8');
-              const ciSection = benchmarkFile.split('## CI Benchmarks')[1].split('##')[0];
-              benchmarkHistory = ciSection;
+              // Try different paths to find the benchmark file
+              let benchmarkContent = '';
+              let benchmarkPath = '';
+              
+              // Check possible paths
+              const possiblePaths = [
+                '/tmp/pr-results/docs/benchmarks.md',
+                '/tmp/pr-results/benchmarks.md',
+                'docs/benchmarks.md'
+              ];
+              
+              for (const path of possiblePaths) {
+                try {
+                  if (fs.existsSync(path)) {
+                    benchmarkContent = fs.readFileSync(path, 'utf8');
+                    benchmarkPath = path;
+                    console.log(`Found benchmark file at: ${path}`);
+                    break;
+                  }
+                } catch (err) {
+                  console.log(`Error checking path ${path}: ${err.message}`);
+                }
+              }
+              
+              if (benchmarkContent) {
+                const ciSection = benchmarkContent.split('## CI Benchmarks')[1];
+                if (ciSection) {
+                  historySection = ciSection.split('##')[0].trim();
+                } else {
+                  historySection = 'No CI benchmark history found in the file.';
+                }
+              } else {
+                historySection = 'Could not locate the benchmark history file.';
+              }
             } catch (error) {
-              benchmarkHistory = '> Error reading benchmark history';
+              historySection = `Error reading benchmark history: ${error.message}`;
+              console.log(`Error details: ${error.stack}`);
             }
             
-            const comment = `## Zsh Startup Benchmark Results\n\n${performanceEmoji} ${performanceText}\n\n<details>\n<summary>Benchmark History</summary>\n\n${benchmarkHistory}\n</details>\n\n> **Note:** Both configurations were properly installed with stow in clean environments.\n> For the most accurate results, run \`./scripts/benchmark.sh\` locally both before and after your changes.`;
+            // Construct comment text
+            let commentText = '## Zsh Startup Benchmark Results\n\n';
+            
+            if (medianDiff === '0.000') {
+              commentText += '⚠️ Could not determine performance difference due to missing or invalid measurements.\n\n';
+            } else if (percentChange && percentChange.startsWith('-') && parseFloat(percentChange) < -25) {
+              // PR is significantly slower (>25%)
+              commentText += `⚠️ **Warning**: This PR is ${percentChange}% slower than the main branch.\n\n`;
+            } else if (percentChange && !percentChange.startsWith('-') && parseFloat(percentChange) > 25) {
+              // PR is significantly faster (>25%)
+              commentText += `🚀 **Great improvement**: This PR is ${percentChange}% faster than the main branch.\n\n`;
+            }
+            
+            commentText += '### Detailed Results\n\n';
+            commentText += '|        | PR | Main | Change |\n';
+            commentText += '|--------|-----|------|--------|\n';
+            commentText += `| Median | ${prMedian}s | ${mainMedian}s | ${medianDiff}s ${medianStatus} |\n`;
+            commentText += `| Average | ${prAverage}s | ${mainAverage}s | ${averageDiff}s ${averageStatus} |\n\n`;
+            
+            commentText += '#### Benchmark History\n';
+            commentText += historySection + '\n\n';
+            
+            commentText += '> Note: Both configurations were properly installed with stow in clean environments.\n';
+            commentText += '> For the most accurate results, run `./scripts/benchmark.sh` locally both before and after your changes.';
             
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
+              issue_number: prDetails.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: comment
-            }); 
+              body: commentText
+            });
+      
+      - name: Check performance regression
+        if: success()
+        run: |
+          PERCENT_CHANGE="${{ steps.compare.outputs.percent-change }}"
+          
+          # Strip % sign if present
+          PERCENT_CHANGE="${PERCENT_CHANGE/\%/}"
+          
+          echo "Performance change: $PERCENT_CHANGE%"
+          
+          # Fail on significant regressions (>25% slower)
+          # Negative percentage means PR is slower than main
+          if [[ "$PERCENT_CHANGE" =~ ^- && $(echo "${PERCENT_CHANGE#-} > 25" | bc -l) -eq 1 ]]; then
+            echo "::error::Performance regression detected: $PERCENT_CHANGE% slower than main branch!"
+            echo "This exceeds the threshold of 25% regression."
+            
+            # Exit with error - this will make the GitHub check fail
+            # To override, use the GitHub UI to bypass this check if needed
+            exit 1
+          else
+            echo "::notice::Performance check passed! Change: $PERCENT_CHANGE%"
+          fi
+     
