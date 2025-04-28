@@ -45,6 +45,13 @@ jobs:
             // Exclude this workflow's own check from the list
             const filteredChecks = checks.filter(c => c.name !== 'All Checks Green');
 
+            // If any check is still in progress, wait (do not fail)
+            const anyInProgress = filteredChecks.some(c => c.status !== 'completed');
+            if (anyInProgress) {
+              console.log('⏳ Some checks are still in progress. Waiting...');
+              return;
+            }
+
             // Determine if all checks are green
             const allStatusesGreen = statuses.every(s => s.state === 'success');
             const allChecksGreen = filteredChecks.every(c => c.status === 'completed' && c.conclusion === 'success');

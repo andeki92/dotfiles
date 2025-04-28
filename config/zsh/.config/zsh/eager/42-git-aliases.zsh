@@ -25,7 +25,7 @@ alias gpr='git pull --rebase'
 alias gb='git branch'
 alias gco='git checkout'
 alias gcb='git checkout -b'
-alias gcm='git checkout main'
+alias gcom='git checkout main'
 
 # Stash
 alias gst='git stash'
