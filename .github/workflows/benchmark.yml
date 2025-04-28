@@ -25,6 +25,7 @@ jobs:
     steps:
       - name: Check out PR branch
         uses: actions/checkout@v4
+<<<<<<< HEAD
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
@@ -59,6 +60,14 @@ jobs:
           which stow
           which time
       
+=======
+      
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh time bc
+      
+>>>>>>> 47aecdc (feat(ci): update docs in PR workflow)
       - name: Set up environment
         run: |
           # Create clean home directory structure for test
@@ -478,3 +487,7 @@ jobs:
           else
             echo "::notice::Performance check passed! Change: $PERCENT_CHANGE%"
           fi
+<<<<<<< HEAD
+=======
+     
+>>>>>>> 47aecdc (feat(ci): update docs in PR workflow)

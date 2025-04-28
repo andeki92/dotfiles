@@ -103,39 +103,8 @@ fi
 
 # Save PR time for GitHub Actions
 if [[ "$CI" == "true" ]]; then
-  echo "PR_TIME=${median}" > /tmp/pr_time.txt
+  echo "PR_TIME=${average}" > /tmp/pr_time.txt
 fi
-
-# Ensure benchmark file exists with proper structure
-ensure_benchmark_file() {
-  if [[ ! -f "$BENCHMARK_FILE" ]]; then
-    echo "Creating new benchmark file at $BENCHMARK_FILE"
-    mkdir -p "$(dirname "$BENCHMARK_FILE")"
-    
-    cat > "$BENCHMARK_FILE" << EOF
-# Zsh Startup Benchmarks
-
-## CI Benchmarks
-
-| Date | PR | Description | Median | Average |
-|------|----|----|--------|--------|
-
-## Local Benchmarks
-
-| Date | Description | Median | Average |
-|------|------------|--------|--------|
-EOF
-  else
-    # Check if file has the right sections, add them if missing
-    if ! grep -q "^## CI Benchmarks" "$BENCHMARK_FILE"; then
-      echo -e "\n## CI Benchmarks\n\n| Date | PR | Description | Median | Average |\n|------|----|----|--------|--------|" >> "$BENCHMARK_FILE"
-    fi
-    
-    if ! grep -q "^## Local Benchmarks" "$BENCHMARK_FILE"; then
-      echo -e "\n## Local Benchmarks\n\n| Date | Description | Median | Average |\n|------|------------|--------|--------|" >> "$BENCHMARK_FILE"
-    fi
-  fi
-}
 
 # Save results if requested
 if [[ "$SAVE_RESULTS" == "true" ]]; then
