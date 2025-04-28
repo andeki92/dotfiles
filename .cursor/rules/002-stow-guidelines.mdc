@@ -7,12 +7,11 @@ alwaysApply: true
 
 ## Overview
 
-GNU Stow is a symlink farm manager that creates and manages symlinks from a central repository to their appropriate locations in the filesystem. For dotfiles management, it allows us to:
+GNU Stow is a symlink farm manager that creates symlinks from a central repository to their appropriate locations in the filesystem. It enables:
 
-- Keep all configuration files in a single version-controlled repository
-- Symlink them to their appropriate locations in the home directory
-- Selectively enable/disable configurations for specific applications
-- Easily sync configurations between machines
+- Centralized management of dotfiles in version control
+- Selective enabling/disabling of specific applications
+- Seamless syncing between machines
 
 ## Installation
 
@@ -27,51 +26,34 @@ sudo apt install stow
 sudo dnf install stow
 ```
 
-## Configuration
+## Repository Structure
 
-### .stowrc File
-
-We use a `.stowrc` file at the repository root that contains default settings:
-
-```
---dir=./config
---target=~/
---ignore=.stowrc
---ignore=DS_Store
-```
-
-This configuration:
-- Sets the source directory to `./config`
-- Sets the target directory to the home directory (`~/`)
-- Prevents stow from symlinking `.stowrc` and `.DS_Store` files
-
-### Repository Structure
-
-Our dotfiles repository follows an application-based structure:
+Our dotfiles follow this application-based structure:
 
 ```
 .dotfiles/
 ├── .stowrc              # Stow configuration
 └── config/              # All configuration files
-    ├── zsh/             # Zsh configuration
-    │   ├── .config/     # Goes to ~/.config
-    │   │   └── zsh/     # Goes to ~/.config/zsh
-    │   └── .zshrc       # Goes to ~/.zshrc
-    └── git/             # Git configuration
-        └── .config/     # Goes to ~/.config
-            └── git/     # Goes to ~/.config/git
+    ├── zsh/             # Zsh configuration (stow zsh)
+    ├── git/             # Git configuration (stow git)
+    ├── nvim/            # Neovim configuration (stow nvim)
+    └── brew/            # Homebrew configuration (stow brew)
 ```
 
-Each application has its own directory in `config/` that mirrors the structure needed in the home directory.
+Each application directory mirrors the structure needed in your home directory:
+
+```
+config/zsh/
+├── .config/         # Goes to ~/.config/
+│   └── zsh/         # Goes to ~/.config/zsh/
+└── .zshrc           # Goes to ~/.zshrc
+```
 
 ## Basic Commands
 
-With the `.stowrc` file in place, stow commands become simpler:
+With our `.stowrc` file in place:
 
 ```bash
-# Navigate to dotfiles repository
-cd ~/.dotfiles
-
 # Stow all configurations
 stow .
 
@@ -87,118 +69,21 @@ stow -D zsh
 
 ## Best Practices
 
-### Application Organization
-
-Each application should be its own stow "package" with its own directory:
-
-```
-config/
-├── zsh/      # Can be stowed with: stow zsh
-├── git/      # Can be stowed with: stow git
-├── nvim/     # Can be stowed with: stow nvim
-├── tmux/     # Can be stowed with: stow tmux
-└── brew/     # Can be stowed with: stow brew
-```
-
-### Directory Structure Within Packages
-
-Within each application directory, mirror the structure needed in your home directory:
-
-```
-config/zsh/
-├── .config/         # Goes to ~/.config/
-│   └── zsh/         # Goes to ~/.config/zsh/
-│       ├── aliases  # Goes to ~/.config/zsh/aliases
-│       └── plugins  # Goes to ~/.config/zsh/plugins
-└── .zshrc           # Goes to ~/.zshrc
-```
-
 ### XDG Compliance
 
-- Place configuration files in `.config/` directories within each application package
-- For example:
-  ```
-  config/git/.config/git/config  # Becomes ~/.config/git/config
-  ```
+Place configuration files in `.config/` directories:
 
-### Platform-Specific Configurations
+```
+config/git/.config/git/config  # Becomes ~/.config/git/config
+```
+
+### Platform-Specific Configs
 
 For platform-specific settings, create separate packages:
 
 ```
 config/
-├── zsh-common/     # Shared zsh configuration
-├── zsh-macos/      # macOS-specific zsh configuration
-└── zsh-wsl/        # WSL-specific zsh configuration
+├── git-common/     # Shared git configuration
+├── git-macos/      # macOS-specific git configuration
+└── git-wsl/        # WSL-specific git configuration
 ```
-
-## Advanced Usage
-
-### Handling Pre-existing Files
-
-When a file already exists at the target location:
-
-```bash
-# Backup existing file
-mv ~/.zshrc ~/.zshrc.backup
-
-# Then stow
-stow zsh
-```
-
-### Adopting Existing Configurations
-
-To add an existing configuration to your dotfiles:
-
-1. Create the appropriate directory structure in `config/`
-2. Copy the file to its location in the `config/` directory
-3. Remove the original file
-4. Stow to create the symlink
-
-```bash
-# Example: Adding existing SSH config
-mkdir -p ~/.dotfiles/config/ssh/.ssh
-cp ~/.ssh/config ~/.dotfiles/config/ssh/.ssh/
-rm ~/.ssh/config
-stow ssh
-```
-
-### Testing Changes
-
-Before applying changes to your main environment:
-
-```bash
-# Create a test directory
-mkdir ~/stow-test
-
-# Test stow
-stow --target=~/stow-test zsh
-
-# Check the results
-ls -la ~/stow-test
-```
-
-### Overriding .stowrc
-
-You can override `.stowrc` settings when needed:
-
-```bash
-# Override the target directory
-stow --target=/tmp/test zsh
-
-# Override the source directory
-stow --dir=./special-config git
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Conflicts**: When stow can't create a symlink because a file already exists
-   - Solution: Move or remove the existing file
-
-2. **Missing parent directories**: Stow won't create parent directories
-   - Solution: Create necessary directories before stowing
-
-3. **Incorrect symlinks**: Symlinks point to wrong locations
-   - Solution: Check your application directory structure matches the expected home directory structure

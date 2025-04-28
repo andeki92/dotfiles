@@ -33,41 +33,41 @@ Example content:
 - Added platform detection for cross-platform support
 ```
 
-## Comments in Config Files
+## Code Comments
 
-Add context as code comments when making significant choices:
+Add context when making significant configuration choices:
 
 ```bash
 # Using this approach instead of alternative because:
-# 1. Better performance (tested 2023-12)
+# 1. Better performance (tested 2025-04)
 # 2. Works across macOS and Linux
 # 3. Easier to maintain
 ```
 
-## Changelog Notes
+## Changelog
 
 For significant changes, add a brief note in a changelog file:
 
 ```markdown
 # Changelog
 
-## 2023-12-15
+## 2025-04-28
 - Switched from oh-my-zsh to zinit for better startup time
 - Benchmark: Reduced shell startup from 0.8s to 0.4s
 
-## 2023-11-20
+## 2025-04-20
 - Migrated vim config to XDG structure
 - Added WSL compatibility for git credentials
 ```
 
-## Benchmark Results
+## Benchmark Notes
 
 For performance-related changes, include simple benchmark results:
 
 ```bash
 # Before: 0.45s startup
 # After: 0.32s startup
-# Tested: macOS 12.5, 2023-12-15
+# Tested: macOS 14.4, 2025-04-28
 ```
 
 This lightweight approach provides context for your decisions without the formality of full architecture decision records, which are better suited for team projects.

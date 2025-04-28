@@ -7,22 +7,19 @@ alwaysApply: false
 
 ## Overview
 
-This document describes the structure and best practices for managing Zsh configuration in a modular, XDG-compliant dotfiles repository. It follows the ](mdc:999-mdc-format.mdc) for clarity and maintainability.
+This document describes the structure and best practices for managing Zsh configuration in a modular, XDG-compliant dotfiles repository. **Speed is a key priority** - we strongly prefer lazy loading for all non-essential functionality.
 
 ## File Structure and Load Order
 
-Zsh config files are organized by directory and numeric prefix to clarify which files are loaded eagerly (base), lazily (lazy/), or as aliases:
-
-- **Base directory**: Eager configs, plugin loaders, functions, and aliases (with numeric prefixes for order)
-- **lazy/**: All deferred/lazy-loaded configs (with numeric prefixes for order)
+Zsh config files are organized by directory and numeric prefix to clarify load order:
 
 | Number | Purpose/Type                | Example Filename(s)           | Description                                 |
 |--------|-----------------------------|-------------------------------|---------------------------------------------|
-| 00-09  | Core/Eager (always loaded)  | 00-platform.zsh, 05-env.zsh   | Platform, env, XDG, path, no-defer, etc.    |
+| 00-09  | Core/Eager (always loaded)  | 00-platform.zsh, 05-env.zsh   | Platform, env, XDG, path, no-defer          |
 | 10-19  | Plugin Loader(s)            | 10-brew.zsh, 15-defer.zsh     | Homebrew, zsh-defer, plugin managers        |
 | 20-39  | Eager Shell Features        | 20-history.zsh, 30-prompt.zsh | History, prompt, minimal completions        |
-| 40-69  | Lazy/Deferred Plugins       | lazy/40-completion.zsh        | fzf, starship, zsh-completions, etc.        |
-| 90-99  | Aliases (always last)       | 90-aliases.zsh, 91-brew-aliases.zsh | Aliases, must be loaded after everything    |
+| 40-69  | Lazy/Deferred Plugins       | lazy/40-completion.zsh        | fzf, starship, zsh-completions             |
+| 90-99  | Aliases (always last)       | 90-aliases.zsh                | Aliases, loaded after everything else       |
 
 ## Example Directory Structure
 
@@ -33,15 +30,14 @@ config/zsh/
 │       ├── 00-platform.zsh
 │       ├── 05-no-defer.zsh
 │       ├── 10-brew.zsh
-│       ├── 15-defer.zsh
+│       ├── 15-defer.zsh             # Loads zsh-defer plugin
 │       ├── 20-history.zsh
 │       ├── 30-prompt.zsh
 │       ├── 90-aliases.zsh
-│       ├── 91-brew-aliases.zsh
 │       ├── plugins/
-│       │   └── zsh-defer/
+│       │   └── zsh-defer/           # The defer plugin itself
 │       │       └── zsh-defer.zsh
-│       └── lazy/
+│       └── lazy/                    # Directory for all deferred loading
 │           ├── 40-completion.zsh
 │           └── ...
 └── README.md
@@ -49,32 +45,66 @@ config/zsh/
 
 ## Loader Example
 
-In your `.zshrc` or main entrypoint, use this to source everything in order:
+In your `.zshrc` or main entrypoint:
 
 ```zsh
+# Load eager files
 for file in $XDG_CONFIG_HOME/zsh/*.zsh(N); do
   source "$file"
 done
+
+# Load lazy files
 for file in $XDG_CONFIG_HOME/zsh/lazy/*.zsh(N); do
   source "$file"
 done
 ```
 
+## Lazy Loading for Speed
+
+Zsh startup time is critical for a responsive terminal experience. We use [zsh-defer](mdc:https:/github.com/romkatv/zsh-defer) to postpone loading non-essential functionality until after the prompt appears:
+
+```zsh
+# In 15-defer.zsh
+source $ZDOTDIR/plugins/zsh-defer/zsh-defer.zsh
+
+# In lazy/40-completion.zsh
+zsh-defer source $ZDOTDIR/completions/_docker
+zsh-defer -c 'eval "$(starship init zsh)"'
+```
+
+### What to Defer/Lazy Load
+
+- **Completions**: All completion systems and individual completions
+- **Prompts**: Complex prompt systems like starship, powerlevel10k
+- **Directory navigation**: Tools like z, zoxide, autojump
+- **Syntax highlighting**: zsh-syntax-highlighting, fast-syntax-highlighting
+- **History management**: Advanced history tools
+- **Any plugin that doesn't affect core shell behavior**
+
+### What NOT to Defer
+
+- **Environment variables**: PATH, XDG_*, etc.
+- **Core aliases** needed immediately
+- **Platform detection** logic
+- **Critical functions** used by other startup scripts
+
 ## Best Practices
 
-- **Eager files**: Only include what is needed for shell startup, platform detection, and environment setup.
-- **Lazy files**: Use `zsh-defer` to load heavy plugins and completions after prompt appears.
-- **Aliases**: Always load last, after all functions and plugins.
-- **XDG compliance**: All config files should live under `$XDG_CONFIG_HOME/zsh/`.
-- **Version control**: All plugins and custom scripts should be tracked in the dotfiles repo.
-- **Modularity**: Each file shouldonsd clear numeric prefix.
+- **Eager files**: Only include what's absolutely needed for shell startup
+- **Lazy files**: Use `zsh-defer` for everything else to improve startup time
+- **Aliases**: Always load last, after all functions and plugins
+- **XDG compliance**: All config files under `$XDG_CONFIG_HOME/zsh/`
+- **Version control**: All plugins and custom scripts in dotfiles repo
+- **Modularity**: Each file has clear numeric prefix
+- **Benchmarking**: Regularly test startup time (see [006-benchmarking.mdc](mdc:.cursor/rules/006-benchmarking.mdc))
 
 ## Updating the Configuration
 
-- When adding a new config file, choose a numeric prefix based on its type (see table above).
-- For new plugins, add them to `plugins/` and load them with `zsh-defer` in a `lazy/` file.
-- Keep this README up to date with any structural changes.
+- Choose numeric prefixes based on file type (see table above)
+- Add new plugins to `plugins/` and load with `zsh-defer` in a `lazy/` file
+- Keep README up to date with structural changes
+- Always consider if new functionality can be deferred
 
 ## References
-- [999-mdc-format.mdc](mdc:999-mdc-format.mdc)
-- [zsh-defer](https://github.com/romkatv/zsh-defer)
+- [zsh-defer on GitHub](mdc:https:/github.com/romkatv/zsh-defer)
+- [Fast Zsh Startup Guide](mdc:https:/htr3n.github.io/2018/07/faster-zsh)
