@@ -1,0 +1,58 @@
+# Brewfile for dotfiles setup
+# Based on the Brewfile Guidelines from our dotfiles philosophy
+
+# Taps
+tap "homebrew/bundle"
+tap "homebrew/cask"
+tap "homebrew/cask-fonts"
+tap "homebrew/core"
+
+# Development Tools
+brew "fd"                # Fast find alternative
+brew "fzf"               # Fuzzy finder
+brew "gh"                # GitHub CLI
+brew "git"               # Version control
+brew "git-lfs"           # Git extension for versioning large files
+brew "jq"                # JSON processor
+brew "mise"              # Tool version manager (replacing asdf, nvm, etc)
+brew "neovim"            # Improved vim
+brew "ripgrep"           # Fast grep alternative
+brew "stow"              # Symlink farm manager for dotfiles
+brew "tree"              # Display directory structure
+brew "yq"                # YAML processor
+
+# Shells and CLI Utilities
+brew "bat"               # Cat with syntax highlighting
+brew "bottom"            # System monitor
+brew "curl"              # URL transfer tool
+brew "exa"               # Modern ls replacement
+brew "grep"              # GNU grep
+brew "htop"              # Interactive process viewer
+brew "mas"               # Mac App Store CLI
+brew "starship"          # Cross-shell prompt
+brew "wget"              # Internet file retriever
+brew "zsh"               # Improved shell
+brew "zsh-completions"   # Additional completions for zsh
+
+# Applications
+cask "firefox"           # Browser
+cask "discord"           # Communication platform
+cask "ghostty"           # Terminal emulator
+cask "hammerspoon"       # Automation tool
+cask "karabiner-elements" # Keyboard customizer
+cask "raycast"           # Productivity launcher
+cask "slack"             # Team communication
+cask "spotify"           # Music streaming
+
+# Development Applications
+cask "cursor"            # AI editor
+cask "intellij-idea"     # IDE for JVM languages
+
+# Fonts
+cask "font-hack-nerd-font"             # Clean monospaced font with icons
+cask "font-jetbrains-mono-nerd-font"   # Developer font with programming ligatures and icons
+
+# Mac App Store applications
+# Uncomment and run 'brew install mas' first if you want to use these
+# mas "Amphetamine", id: 937984704      # Keep Mac awake
+# mas "The Unarchiver", id: 425424353   # Archive extractor 
