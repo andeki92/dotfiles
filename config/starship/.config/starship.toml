@@ -1,0 +1,30 @@
+# Starship Configuration - Minimal version
+# See https://starship.rs/config/ for reference
+
+# Basic settings
+add_newline = true
+command_timeout = 1000
+
+# Define the prompt format
+format = """
+$directory\
+$git_branch\
+$character
+"""
+
+# Character prompt symbol
+[character]
+success_symbol = "[→](bold green)"
+error_symbol = "[→](bold red)"
+
+# Directory display
+[directory]
+truncation_length = 3
+truncate_to_repo = true
+style = "bold blue"
+
+# Git branch display
+[git_branch]
+style = "bold purple"
+format = "[$symbol$branch]($style) "
+symbol = "git:"
