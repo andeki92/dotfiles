@@ -103,16 +103,13 @@ fi
 
 # Save PR time for GitHub Actions
 if [[ "$CI" == "true" ]]; then
-  echo "PR_TIME=${average}" > /tmp/pr_time.txt
+  echo "PR_TIME=${median}" > /tmp/pr_time.txt
 fi
 
 # Save results if requested
 if [[ "$SAVE_RESULTS" == "true" ]]; then
   echo
   echo "💾 Saving results to $BENCHMARK_FILE"
-  
-  # Ensure benchmark file exists with proper structure
-  ensure_benchmark_file
   
   # Get the current date
   current_date=$(date +%Y-%m-%d)

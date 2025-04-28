@@ -45,12 +45,12 @@ setup_branch_protection() {
   "required_status_checks": {
     "strict": true,
     "contexts": [
-      "Benchmark PR Branch",
-      "Benchmark Main Branch",
-      "Compare Benchmark Results"
+      "benchmark",
+      "benchmark-main",
+      "compare-results"
     ]
   },
-  "enforce_admins": true,
+  "enforce_admins": false,
   "required_pull_request_reviews": null,
   "restrictions": null,
   "allow_force_pushes": false,
@@ -69,7 +69,7 @@ EOF
   
   echo -e "${GREEN}✅ Branch protection rules configured successfully!${NC}"
   echo "The main branch now requires:"
-  echo "  - All benchmark checks to pass"
+  echo "  - All benchmark checks to pass (but admins can bypass)"
   echo "  - No pull request reviews required (anyone can merge)"
 }
 
