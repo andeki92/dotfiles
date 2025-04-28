@@ -1,0 +1,54 @@
+# Best-practice Git configuration options
+[user]
+	name = Anders Kirkeby
+	email = anders@klever-kirkeby.com
+
+[init]
+	defaultBranch = main
+
+[push]
+	autoSetupRemote = true
+	followTags = true
+
+[fetch]
+	prune = true
+	pruneTags = true
+
+[pull]
+	rebase = true
+
+[merge]
+	conflictstyle = zdiff3
+
+[diff]
+	algorithm = histogram
+	colorMoved = plain
+	mnemonicPrefix = true
+	renames = true
+
+[branch]
+	sort = -committerdate
+
+[tag]
+	sort = version:refname
+
+[column]
+	ui = auto
+
+[commit]
+	verbose = true
+
+[rerere]
+	enabled = true
+	autoupdate = true
+
+[core]
+	excludesfile = ~/.config/git/ignore
+
+[rebase]
+	autoSquash = true
+	autoStash = true
+	updateRefs = true
+
+[help]
+	autocorrect = prompt 

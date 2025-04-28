@@ -1,0 +1,41 @@
+# Global .gitignore
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Logs
+*.log
+
+# Build output
+/dist/
+/build/
+/.next/
+
+# Misc
+.env
+.env.*
+*.local
+*.bak
+*.tmp 
