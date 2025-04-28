@@ -7,29 +7,29 @@ alwaysApply: true
 
 ## Purpose
 
-This rule provides guidance on researching and adopting best practices from the dotfiles community.
+Provide guidance on researching and adopting best practices from the dotfiles community.
 
-## Research Approach
-
-### Key Repositories to Reference
+## Key Resources
 
 Before implementing major changes, research popular dotfiles repositories:
 
 - [GitHub Topic: Dotfiles](mdc:https:/github.com/topics/dotfiles)
 - [GitHub Topic: GNU Stow](mdc:https:/github.com/topics/gnu-stow)
 - [Awesome Dotfiles](mdc:https:/github.com/webpro/awesome-dotfiles)
+- [r/unixporn](mdc:https:/www.reddit.com/r/unixporn)
+- [r/commandline](mdc:https:/www.reddit.com/r/commandline)
 
-### Research Focus Areas
+## Focus Areas
 
 When studying community repositories, focus on:
 
 1. **Organizational Patterns**
    - Directory structures
    - Naming conventions
-   - Stow usage patterns
+   - Stow/chezmoi/mise usage patterns
 
 2. **Cross-Platform Solutions**
-   - How others handle macOS vs Linux differences
+   - macOS vs Linux differences
    - WSL-specific considerations
 
 3. **Tool-Specific Configurations**
@@ -65,13 +65,12 @@ When adopting community patterns:
 
 For enhancing Neovim configuration:
 
-```
+```bash
+# Search for inspiration
 web_search "dotfiles neovim XDG stow"
-```
 
-Follow promising repositories:
-```
+# Follow promising repositories
 mcp_fetch_fetch {url: "https://github.com/username/dotfiles/tree/main/nvim"}
-```
 
-Extract and adapt patterns that align with our philosophy.
+# Extract patterns that align with our philosophy
+```

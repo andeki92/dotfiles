@@ -7,11 +7,9 @@ alwaysApply: true
 
 ## Purpose
 
-This rule provides guidance on measuring zsh startup time to ensure configuration changes don't negatively impact performance.
+Measure zsh startup time to ensure configuration changes don't negatively impact performance.
 
-## Simple Benchmarking
-
-We use a single benchmark script that focuses on measuring zsh startup time:
+## Basic Usage
 
 ```bash
 # Run a benchmark
@@ -23,7 +21,7 @@ We use a single benchmark script that focuses on measuring zsh startup time:
 
 ## Benchmark Results
 
-The script runs multiple tests and calculates an average for more consistent results:
+The script runs multiple tests and calculates an average:
 
 ```
 ⏱️  Measuring zsh startup time
@@ -36,25 +34,23 @@ Running 5 tests...
   Test 5: 0.129s
 
 🔍 Results:
-  Date: 2025-01-03
+  Date: 2025-04-28
   Average startup time: 0.129s
   Compared to last: 0.024s faster ✅
 ```
 
-## Recording Benchmarks
+## Recording History
 
-When using the `--save` option, benchmark results are saved to `docs/benchmarks.md` in a table format:
+With the `--save` option, results are added to `docs/benchmarks.md`:
 
 ```markdown
 # Zsh Startup Benchmarks
 
 | Date | Description | Time |
-|------|-------------|------|
-| 2025-01-01 | Initial configuration | 0.153s |
-| 2025-01-03 | After cleanup | 0.129s |
+|---|----|---|
+| 2025-04-25 | Initial configuration | 0.153s |
+| 2025-04-28 | After cleanup | 0.129s |
 ```
-
-This provides a historical record of zsh performance as configurations change.
 
 ## When to Benchmark
 
@@ -66,7 +62,7 @@ Run benchmarks:
 
 ## Best Practices
 
-1. Run benchmarks multiple times for consistency
-2. Always add descriptive comments when saving benchmarks
-3. Be mindful of other processes that might affect benchmark results
-4. Document significant improvements or regressions in commit messages
+- Run benchmarks multiple times for consistency
+- Always add descriptive comments when saving benchmarks
+- Be mindful of other processes that might affect results
+- Document significant improvements or regressions in commit messages
