@@ -1,0 +1,8 @@
+# Ignore mise shims, binaries, and caches
+.local/share/mise/shims/
+.local/share/mise/installs/
+.local/bin/
+.cache/mise/
+
+# Ignore log files
+*.log 

@@ -1,0 +1,17 @@
+# mise configuration
+# See: https://mise.jdx.dev/configuration.html
+
+[tools]
+python = "3.12"
+node = "lts"
+go = "latest"
+rust = "stable"
+kubectl = "latest"
+helm = "latest"
+
+[settings]
+experimental = true
+
+[env]
+# Virtual environment config
+_.python.venv = { path = ".venv", create = true }
