@@ -78,56 +78,67 @@ if [[ ! -z "$comparison" ]]; then
   echo "  Compared to last: $comparison"
 fi
 
+# Save PR time for GitHub Actions
+if [[ "$CI" == "true" ]]; then
+  echo "PR_TIME=${average}" > /tmp/pr_time.txt
+fi
+
 # Save results if requested
 if [[ "$SAVE_RESULTS" == "true" ]]; then
   echo
   echo "💾 Saving results to $BENCHMARK_FILE"
   
-  if [[ "$CI" == "true" ]]; then
-    # Get PR number from GitHub environment
-    PR_NUMBER=${GITHUB_REF#refs/pull/}
-    PR_NUMBER=${PR_NUMBER%/merge}
-    
-    # Use automated description in CI
-    description="CI Run"
-    
-    # Format for insertion into markdown table
-    entry="| $(date +%Y-%m-%d) | #${PR_NUMBER:-N/A} | $description | ${average}s |"
-    
-    # Insert into CI section of benchmark file
-    awk -v entry="$entry" '
-      /\| +\| +\| +\|/ {
-        if (NF == 0) {
-          print entry
-        } else {
-          print entry
-          next
-        }
-      }
-      { print }
-    ' "$BENCHMARK_FILE" > "${BENCHMARK_FILE}.tmp"
-  else
-    # Get description from user for local benchmark
-    read -p "Enter a description for this benchmark: " description
-    
-    # Format for insertion into markdown table
-    entry="| $(date +%Y-%m-%d) | $description | ${average}s |"
-    
-    # Insert into local section of benchmark file
-    awk -v entry="$entry" '
-      /\| +\| +Minimal baseline configuration/ {
-        if (NF == 0) {
-          print entry
-        } else {
-          print entry
-          next
-        }
-      }
-      { print }
-    ' "$BENCHMARK_FILE" > "${BENCHMARK_FILE}.tmp"
-  fi
+  # Get the current date
+  current_date=$(date +%Y-%m-%d)
   
-  mv "${BENCHMARK_FILE}.tmp" "$BENCHMARK_FILE"
+  # Get description
+  if [[ "$CI" == "true" ]]; then
+    # Get PR number and description from environment variables
+    PR_NUMBER=${PR_NUMBER:-"N/A"}
+    description=${PR_DESCRIPTION:-"CI Run"}
+    echo "Using PR #${PR_NUMBER} with description: ${description}"
+    
+    entry="| ${current_date} | #${PR_NUMBER} | ${description} | ${average}s |"
+    
+    # First check if an entry for this PR already exists
+    existing_line=$(grep -n "\| #${PR_NUMBER} \|" "$BENCHMARK_FILE" | cut -d: -f1)
+    
+    if [[ -n "$existing_line" ]]; then
+      echo "Found existing entry for PR #${PR_NUMBER} at line ${existing_line}, updating it"
+      # Replace the existing line with the new entry
+      # Use platform-independent approach for sed
+      awk -v line="$existing_line" -v new_entry="$entry" 'NR==line {print new_entry; next} {print}' "$BENCHMARK_FILE" > "$BENCHMARK_FILE.tmp"
+      mv "$BENCHMARK_FILE.tmp" "$BENCHMARK_FILE"
+    else
+      echo "No existing entry found for PR #${PR_NUMBER}, adding new entry"
+      # Find the CI section line number
+      ci_line=$(grep -n "^## CI Benchmarks" "$BENCHMARK_FILE" | cut -d: -f1)
+      header_line=$((ci_line + 3))  # Headers are 3 lines after section title
+      
+      # Insert after header line
+      head -n $header_line "$BENCHMARK_FILE" > "$BENCHMARK_FILE.tmp"
+      echo "$entry" >> "$BENCHMARK_FILE.tmp"
+      tail -n +$((header_line + 1)) "$BENCHMARK_FILE" >> "$BENCHMARK_FILE.tmp"
+      
+      # Replace original with new file
+      mv "$BENCHMARK_FILE.tmp" "$BENCHMARK_FILE"
+    fi
+  else
+    read -p "Enter a description for this benchmark: " description
+    entry="| ${current_date} | ${description} | ${average}s |"
+    
+    # Find the Local section line number
+    local_line=$(grep -n "^## Local Benchmarks" "$BENCHMARK_FILE" | cut -d: -f1)
+    header_line=$((local_line + 3))  # Headers are 3 lines after section title
+    
+    # Insert after header line
+    head -n $header_line "$BENCHMARK_FILE" > "$BENCHMARK_FILE.tmp"
+    echo "$entry" >> "$BENCHMARK_FILE.tmp"
+    tail -n +$((header_line + 1)) "$BENCHMARK_FILE" >> "$BENCHMARK_FILE.tmp"
+    
+    # Replace original with new file
+    mv "$BENCHMARK_FILE.tmp" "$BENCHMARK_FILE"
+  fi
   
   echo "Results saved! ✓"
 fi
