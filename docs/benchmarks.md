@@ -6,6 +6,8 @@ This file tracks zsh startup time as configuration changes are made.
 
 | Date | Description | Median | Average |
 |------|-------------|--------|---------|
+| 2025-04-28 | Add defered setups | .060s | .061s |
+| 2025-04-28 | Introduce homebrew | .060s | .060s |
 | 2025-04-28 | Update hist settings | .050s | .050s |
 | 2025-04-28 | Initial setup | .042s | .042s |
 
@@ -13,6 +15,7 @@ This file tracks zsh startup time as configuration changes are made.
 
 | Date | PR | Description | Median | Average |
 |------|-------|-------------|--------|---------|
+| 2025-04-28 | #5 | feat: add brew setup and deferred loading | .030s | .031s |
 | 2025-04-28 | #3 | feat: update workflow with docs | .020s | .024s |
 | 2025-04-28 | #0 | Test PR Updated | .040s | .041s |
 

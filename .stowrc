@@ -2,3 +2,4 @@
 --target=~/
 --ignore=.stowrc
 --ignore=DS_Store
+--ignore=.*.md
