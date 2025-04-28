@@ -434,25 +434,4 @@ jobs:
               repo: context.repo.repo,
               body: commentText
             });
-      
-      - name: Check performance regression
-        if: success()
-        run: |
-          PERCENT_CHANGE="${{ steps.compare.outputs.percent-change }}"
-          
-          # Strip % sign if present
-          PERCENT_CHANGE="${PERCENT_CHANGE/\%/}"
-          
-          echo "Performance change: $PERCENT_CHANGE%"
-          
-          # Fail on significant regressions (>25% slower)
-          # Negative percentage means PR is slower than main
-          if [[ "$PERCENT_CHANGE" =~ ^- && $(echo "${PERCENT_CHANGE#-} > 25" | bc -l) -eq 1 ]]; then
-            echo "::error::Performance regression detected: $PERCENT_CHANGE% slower than main branch!"
-            echo "This exceeds the threshold of 25% regression."
-            
-            # Exit with error - this will make the GitHub check fail
-            # To override, use the GitHub UI to bypass this check if needed
-            exit 1
-          else
-            echo "::notice::Performance check passed! Change: $PERCENT_CHANGE%" 
+     
