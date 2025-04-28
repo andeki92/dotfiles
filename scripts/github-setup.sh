@@ -44,7 +44,9 @@ setup_branch_protection() {
 {
   "required_status_checks": {
     "strict": true,
-    "contexts": []
+    "contexts": [
+      "All Checks Green"
+    ]
   },
   "enforce_admins": false,
   "required_pull_request_reviews": null,

@@ -1,0 +1,65 @@
+name: All Checks Green
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  all-checks-green:
+    name: All Checks Green
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all status checks
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const owner = pr.base.repo.owner.login;
+            const repo = pr.base.repo.name;
+            const ref = pr.head.sha;
+
+            // Get all status checks (legacy and GitHub Actions)
+            const combinedStatus = await github.rest.repos.getCombinedStatusForRef({
+              owner,
+              repo,
+              ref,
+            });
+            const checkRuns = await github.rest.checks.listForRef({
+              owner,
+              repo,
+              ref,
+            });
+
+            // Collect all statuses and check runs
+            const statuses = combinedStatus.data.statuses.map(s => ({
+              context: s.context,
+              state: s.state,
+            }));
+            const checks = checkRuns.data.check_runs.map(c => ({
+              name: c.name,
+              status: c.status,
+              conclusion: c.conclusion,
+            }));
+
+            // Exclude this workflow's own check from the list
+            const filteredChecks = checks.filter(c => c.name !== 'All Checks Green');
+
+            // Determine if all checks are green
+            const allStatusesGreen = statuses.every(s => s.state === 'success');
+            const allChecksGreen = filteredChecks.every(c => c.status === 'completed' && c.conclusion === 'success');
+
+            if (allStatusesGreen && allChecksGreen) {
+              core.setOutput('all-green', 'true');
+              console.log('✅ All checks are green!');
+            } else {
+              core.setOutput('all-green', 'false');
+              console.log('❌ Not all checks are green.');
+              if (!allStatusesGreen) {
+                console.log('Failing statuses:', statuses.filter(s => s.state !== 'success'));
+              }
+              if (!allChecksGreen) {
+                console.log('Failing checks:', filteredChecks.filter(c => c.status !== 'completed' || c.conclusion !== 'success'));
+              }
+              core.setFailed('Not all checks are green.');
+            } 
