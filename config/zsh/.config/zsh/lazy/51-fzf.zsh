@@ -36,61 +36,6 @@ fcd() {
   [[ -n "$dir" ]] && cd "$dir"
 }
 
-# Search file contents (requires ripgrep)
-fif() {
-  if [ ! "$(command -v rg)" ]; then
-    echo "Error: ripgrep (rg) is required for this function"
-    return 1
-  fi
-  
-  # Require a search term
-  if [[ -z "$*" ]]; then
-    echo "Usage: fif <search_term>"
-    return 1
-  fi
-  
-  local selected
-  selected=$(
-    # Add safeguards to prevent crashes
-    rg --color=always --line-number --no-heading --smart-case "$*" 2>/dev/null |
-      fzf --ansi \
-          --color "hl:-1:underline,hl+:-1:underline:reverse" \
-          --preview 'file=$(echo {} | cut -d: -f1); 
-                    line=$(echo {} | cut -d: -f2);
-                    if [[ -f "$file" ]]; then
-                      bat --style=numbers --color=always --highlight-line $line "$file" 2>/dev/null || 
-                      cat "$file" 2>/dev/null || 
-                      echo "Cannot display file"
-                    else
-                      echo "File not found: $file"
-                    fi' \
-          --preview-window "up,60%,border-bottom,~3" \
-          --height=70% \
-          --layout=reverse \
-          --border=rounded \
-          --prompt="Find > " \
-          --pointer="→" \
-          --header="Search results for \"$*\" (ESC=exit, Enter=open file at line)" \
-          --bind='ctrl-/:toggle-preview'
-  )
-  
-  # Only try to open a file if something was selected
-  if [[ -n "$selected" ]]; then
-    # Extract file and line with more error checking
-    local file line
-    file=$(echo "$selected" | cut -d: -f1)
-    line=$(echo "$selected" | cut -d: -f2)
-    
-    # Verify file exists before trying to open it
-    if [[ -f "$file" && -n "$line" ]]; then
-      ${EDITOR:-vim} "$file" +$line
-    else
-      echo "Cannot open file: $file at line $line"
-      return 1
-    fi
-  fi
-}
-
 # Kill process
 fkill() {
   local pid
