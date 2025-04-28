@@ -101,12 +101,16 @@ if [[ ! -z "$comparison" ]]; then
   echo "  Compared to last: $comparison"
 fi
 
+# If running in CI, save PR time for GitHub Actions
+if [[ "$CI" == "true" ]]; then
+  echo "PR_TIME=${average}" > /tmp/pr_time.txt
+fi
+
 # Save results if requested
 if [[ "$SAVE_RESULTS" == "true" ]]; then
   echo
   echo "💾 Saving results to $BENCHMARK_FILE"
   
-  # Simple but effective approach: use line numbers
   # Get the current date
   current_date=$(date +%Y-%m-%d)
   
@@ -119,14 +123,28 @@ if [[ "$SAVE_RESULTS" == "true" ]]; then
     
     entry="| ${current_date} | #${PR_NUMBER} | ${description} | ${median}s | ${average}s |"
     
-    # Find the CI section line number
-    ci_line=$(grep -n "^## CI Benchmarks" "$BENCHMARK_FILE" | cut -d: -f1)
-    header_line=$((ci_line + 3))  # Headers are 3 lines after section title
-    
-    # Insert after header line
-    head -n $header_line "$BENCHMARK_FILE" > "$BENCHMARK_FILE.tmp"
-    echo "$entry" >> "$BENCHMARK_FILE.tmp"
-    tail -n +$((header_line + 1)) "$BENCHMARK_FILE" >> "$BENCHMARK_FILE.tmp"
+    # Check if an entry for this PR already exists
+    if grep -q "#${PR_NUMBER}" "$BENCHMARK_FILE"; then
+      echo "Updating existing entry for PR #${PR_NUMBER}"
+      # Use awk to replace the existing line with the new entry
+      # This is more portable than sed across different platforms
+      awk -v pr="#${PR_NUMBER}" -v new_entry="$entry" '
+        $0 ~ pr {print new_entry; next}
+        {print}
+      ' "$BENCHMARK_FILE" > "$BENCHMARK_FILE.tmp"
+      mv "$BENCHMARK_FILE.tmp" "$BENCHMARK_FILE"
+    else
+      echo "Adding new entry for PR #${PR_NUMBER}"
+      # Find the CI section line number
+      ci_line=$(grep -n "^## CI Benchmarks" "$BENCHMARK_FILE" | cut -d: -f1)
+      header_line=$((ci_line + 3))  # Headers are 3 lines after section title
+      
+      # Insert after header line
+      head -n $header_line "$BENCHMARK_FILE" > "$BENCHMARK_FILE.tmp"
+      echo "$entry" >> "$BENCHMARK_FILE.tmp"
+      tail -n +$((header_line + 1)) "$BENCHMARK_FILE" >> "$BENCHMARK_FILE.tmp"
+      mv "$BENCHMARK_FILE.tmp" "$BENCHMARK_FILE"
+    fi
   else
     read -p "Enter a description for this benchmark: " description
     entry="| ${current_date} | ${description} | ${median}s | ${average}s |"
@@ -139,10 +157,8 @@ if [[ "$SAVE_RESULTS" == "true" ]]; then
     head -n $header_line "$BENCHMARK_FILE" > "$BENCHMARK_FILE.tmp"
     echo "$entry" >> "$BENCHMARK_FILE.tmp"
     tail -n +$((header_line + 1)) "$BENCHMARK_FILE" >> "$BENCHMARK_FILE.tmp"
+    mv "$BENCHMARK_FILE.tmp" "$BENCHMARK_FILE"
   fi
-  
-  # Replace original with new file
-  mv "$BENCHMARK_FILE.tmp" "$BENCHMARK_FILE"
   
   echo "Results saved! ✓"
 fi

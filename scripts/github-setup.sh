@@ -50,7 +50,7 @@ setup_branch_protection() {
       "Compare Benchmark Results"
     ]
   },
-  "enforce_admins": true,
+  "enforce_admins": false,
   "required_pull_request_reviews": null,
   "restrictions": null,
   "allow_force_pushes": false,
