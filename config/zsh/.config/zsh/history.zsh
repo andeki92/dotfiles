@@ -14,9 +14,14 @@ export SAVEHIST=1000
 
 # Don't save duplicates
 setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_IGNORE_SPACE
 
 # Append to history file
 setopt APPEND_HISTORY
 
 # Add timestamps to history
-setopt EXTENDED_HISTORY 
+setopt EXTENDED_HISTORY
+
+# Share history between different instances
+setopt SHARE_HISTORY 
