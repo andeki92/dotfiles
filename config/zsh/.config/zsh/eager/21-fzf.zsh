@@ -9,7 +9,7 @@ if command -v fd &> /dev/null; then
   # Search files (respecting .gitignore)
   export FZF_DEFAULT_COMMAND='fd --type file --color=always --follow --hidden --exclude .git --exclude node_modules 2>/dev/null'
   # For Ctrl+T, use relative paths and no color codes
-  export FZF_CTRL_T_COMMAND="cd \$PWD && fd --type file --color=never --follow --hidden --exclude .git --exclude node_modules --strip-cwd-prefix 2>/dev/null"
+  export FZF_CTRL_T_COMMAND="fd --type file --color=never --follow --hidden --exclude .git --exclude node_modules --strip-cwd-prefix 2>/dev/null"
   # Search directories
   export FZF_ALT_C_COMMAND='fd --type directory --color=never --follow --hidden --exclude .git --exclude node_modules --strip-cwd-prefix 2>/dev/null'
 else
@@ -19,8 +19,9 @@ else
   export FZF_ALT_C_COMMAND='find . -type d -not -path "*/\.git/*" -not -path "*/node_modules/*" -printf "%P\n" 2>/dev/null'
 fi
 
-# Add preview capabilities with better error handling and formatting
-export FZF_CTRL_T_OPTS="--ansi --prompt='File > ' --header='Select files (TAB=multi-select, ESC=exit)' --marker='✓' --preview='f=\"\$PWD/{}\"
+# Add preview capabilities with better error handling and formatting - uses explicit quoting for Ghostty
+export FZF_CTRL_T_OPTS="--ansi --prompt='File > ' --header='Select files (Ctrl+T, TAB=multi-select)' --marker='✓' --preview='
+f=\"\$PWD/{}\"
 if [[ -f \"\$f\" ]]; then
   if [[ \"\$f\" == *.md || \"\$f\" == *.txt ]]; then
     bat --style=numbers --color=always --line-range :300 \"\$f\" 2>/dev/null
@@ -33,21 +34,30 @@ else
   echo \"Not found: \$f\"
 fi'"
 
-export FZF_ALT_C_OPTS="--ansi --prompt='CD > ' --header='Select directory to cd into (⌥C or ESC-c)' --preview='d=\"\$PWD/{}\"
+export FZF_ALT_C_OPTS="--ansi --prompt='CD > ' --header='Select directory (Ctrl+O)' --preview='
+d=\"\$PWD/{}\"
 if [[ -d \"\$d\" ]]; then
   ls -la --color=always \"\$d\" | head -30 2>/dev/null
 else
   echo \"Not a directory: \$d\"
 fi'"
 
-export FZF_CTRL_R_OPTS="--ansi --prompt='History > ' --header='Command history (ESC=exit, Enter=execute)' --preview 'echo {}' --preview-window down:3:wrap --bind 'ctrl-y:execute-silent(echo -n {2..} | pbcopy)'"
+export FZF_CTRL_R_OPTS="--ansi --prompt='History > ' --header='Command history (Ctrl+R, Enter=execute)' --preview='echo {}' --preview-window=down:3:wrap --bind='ctrl-y:execute-silent(echo -n {2..} | pbcopy)'"
 
 # Add key bindings if in interactive mode
 if [[ $- == *i* ]]; then
- 
-  # Ctrl+P - Quick project switching
+  # Ctrl+P - Quick project switching (fp function must be defined in another file)
   bindkey -s '^p' 'fp^M'
   
-  # Ctrl+O - Directory navigation
+  # Ctrl+O - Directory navigation (fcd function must be defined in another file)
   bindkey -s '^o' 'fcd^M'
+  
+  # Ctrl+F - File navigation with fe() 
+  bindkey -s '^f' 'fe^M'
+  
+  # Ctrl+H - History search
+  bindkey -s '^h' 'fh^M'
 fi
+
+# Note: Standard FZF keybindings (Ctrl+T, Ctrl+R) are defined in the lazy-loaded file
+# They are implemented with ZLE widgets for better Ghostty compatibility
