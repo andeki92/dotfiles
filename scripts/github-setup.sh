@@ -45,7 +45,7 @@ setup_branch_protection() {
   "required_status_checks": {
     "strict": true,
     "contexts": [
-      "alls-green-benchmark"
+      "All Benchmark Jobs Green"
     ]
   },
   "enforce_admins": false,
