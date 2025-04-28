@@ -5,7 +5,7 @@
 python = "3.12"
 node = "lts"
 go = "latest"
-rust = "stable"
+rust = "latest"
 kubectl = "latest"
 helm = "latest"
 
