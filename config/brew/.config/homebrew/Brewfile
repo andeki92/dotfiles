@@ -4,6 +4,7 @@
 # Taps
 tap "homebrew/bundle"
 tap "homebrew/cask-fonts"
+tap "siderolabs/tap"
 
 # Development Tools
 brew "fd"                # Fast find alternative
@@ -16,6 +17,7 @@ brew "mise"              # Tool version manager (replacing asdf, nvm, etc)
 brew "neovim"            # Improved vim
 brew "ripgrep"           # Fast grep alternative
 brew "stow"              # Symlink farm manager for dotfiles
+brew "talosctl"          # Talos CLI
 brew "tree"              # Display directory structure
 brew "yq"                # YAML processor
 
@@ -33,25 +35,26 @@ brew "zsh"               # Improved shell
 brew "zsh-completions"   # Additional completions for zsh
 
 # Applications
-cask "firefox"           # Browser
-cask "discord"           # Communication platform
-cask "ghostty"           # Terminal emulator
-cask "hammerspoon"       # Automation tool
+cask "firefox"            # Browser
+cask "discord"            # Communication platform
+cask "ghostty"            # Terminal emulator
+cask "hammerspoon"        # Automation tool
 cask "karabiner-elements" # Keyboard customizer
-cask "raycast"           # Productivity launcher
-cask "slack"             # Team communication
-cask "spotify"           # Music streaming
+cask "raycast"            # Productivity launcher
+cask "slack"              # Team communication
+cask "spotify"            # Music streaming
 
 # Development Applications
 cask "cursor"            # AI editor
 cask "intellij-idea"     # IDE for JVM languages
 
 # Fonts
-cask "font-hack-nerd-font"             # Clean monospaced font with icons
 cask "font-jetbrains-mono-nerd-font"   # Developer font with programming ligatures and icons
-cask "font-iosevka-nerd-font"          # Highly customizable coding font
 
 # Mac App Store applications
-# Uncomment and run 'brew install mas' first if you want to use these
-# mas "Amphetamine", id: 937984704      # Keep Mac awake
-# mas "The Unarchiver", id: 425424353   # Archive extractor 
+mas "Amphetamine", id: 937984704
+mas "Bitwarden", id: 1352778147
+mas "Gemini 2", id: 1090488118
+mas "Steam Link", id: 1246969117
+mas "The Unarchiver", id: 425424353
+mas "Xcode", id: 497799835
