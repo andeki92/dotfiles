@@ -45,16 +45,18 @@ jobs:
           # Run benchmark with save option
           ./scripts/benchmark.sh --save
           
-          # Extract the average time from output for later comparison
-          PR_TIME=$(grep -A 10 "^## CI Benchmarks" docs/benchmarks.md | grep -oE '[0-9]+\.[0-9]+s' | tail -1 | tr -d 's')
-          echo "PR_TIME=$PR_TIME" > /tmp/pr_time.txt
+          # Extract the median and average from the CI benchmarks section
+          PR_MEDIAN=$(grep -A 10 "^## CI Benchmarks" docs/benchmarks.md | grep -m1 -E '\|.*\|.*\|.*\|.*\|.*\|' | grep -v 'Median \| Average' | awk -F '|' '{print $5}' | tr -d ' s')
+          PR_AVERAGE=$(grep -A 10 "^## CI Benchmarks" docs/benchmarks.md | grep -m1 -E '\|.*\|.*\|.*\|.*\|.*\|' | grep -v 'Median \| Average' | awk -F '|' '{print $6}' | tr -d ' s')
+          echo "PR_MEDIAN=$PR_MEDIAN" > /tmp/pr_times.txt
+          echo "PR_AVERAGE=$PR_AVERAGE" >> /tmp/pr_times.txt
       
       - name: Upload PR benchmark results
         uses: actions/upload-artifact@v4
         with:
           name: pr-benchmark
           path: |
-            /tmp/pr_time.txt
+            /tmp/pr_times.txt
             docs/benchmarks.md
   
   benchmark-main:
@@ -93,15 +95,17 @@ jobs:
           # Run benchmark
           OUTPUT=$(./scripts/benchmark.sh)
           
-          # Extract the average time from output
-          MAIN_TIME=$(echo "$OUTPUT" | grep "Average startup time" | awk '{print $4}' | tr -d 's')
-          echo "MAIN_TIME=$MAIN_TIME" > /tmp/main_time.txt
+          # Extract the median and average from output
+          MAIN_MEDIAN=$(echo "$OUTPUT" | grep "Median startup time" | awk '{print $4}' | tr -d 's')
+          MAIN_AVERAGE=$(echo "$OUTPUT" | grep "Average startup time" | awk '{print $4}' | tr -d 's')
+          echo "MAIN_MEDIAN=$MAIN_MEDIAN" > /tmp/main_times.txt
+          echo "MAIN_AVERAGE=$MAIN_AVERAGE" >> /tmp/main_times.txt
           
       - name: Upload main benchmark results
         uses: actions/upload-artifact@v4
         with:
           name: main-benchmark
-          path: /tmp/main_time.txt
+          path: /tmp/main_times.txt
 
   compare-and-comment:
     name: Compare Results and Comment
@@ -114,25 +118,29 @@ jobs:
         
       - name: Compare benchmark results
         run: |
-          PR_TIME=$(cat pr-benchmark/pr_time.txt | grep "PR_TIME" | cut -d= -f2)
-          MAIN_TIME=$(cat main-benchmark/main_time.txt | grep "MAIN_TIME" | cut -d= -f2)
+          PR_MEDIAN=$(grep "PR_MEDIAN" pr-benchmark/pr_times.txt | cut -d= -f2)
+          PR_AVERAGE=$(grep "PR_AVERAGE" pr-benchmark/pr_times.txt | cut -d= -f2)
+          MAIN_MEDIAN=$(grep "MAIN_MEDIAN" main-benchmark/main_times.txt | cut -d= -f2)
+          MAIN_AVERAGE=$(grep "MAIN_AVERAGE" main-benchmark/main_times.txt | cut -d= -f2)
           
-          # Calculate the difference
-          DIFF=$(echo "scale=3; $PR_TIME - $MAIN_TIME" | bc)
-          echo "DIFF=$DIFF" >> $GITHUB_ENV
+          # Calculate the median difference
+          MEDIAN_DIFF=$(echo "scale=3; $PR_MEDIAN - $MAIN_MEDIAN" | bc)
+          echo "MEDIAN_DIFF=$MEDIAN_DIFF" >> $GITHUB_ENV
           
-          # Determine if it's faster or slower
-          if (( $(echo "$DIFF < 0" | bc -l) )); then
+          # Determine if the median is faster or slower
+          if (( $(echo "$MEDIAN_DIFF < 0" | bc -l) )); then
             echo "FASTER=true" >> $GITHUB_ENV
-            echo "DIFF_ABS=${DIFF#-}" >> $GITHUB_ENV
+            echo "MEDIAN_DIFF_ABS=${MEDIAN_DIFF#-}" >> $GITHUB_ENV
           else
             echo "FASTER=false" >> $GITHUB_ENV
-            echo "DIFF_ABS=$DIFF" >> $GITHUB_ENV
+            echo "MEDIAN_DIFF_ABS=$MEDIAN_DIFF" >> $GITHUB_ENV
           fi
           
           # Store times for comment
-          echo "PR_TIME=$PR_TIME" >> $GITHUB_ENV
-          echo "MAIN_TIME=$MAIN_TIME" >> $GITHUB_ENV
+          echo "PR_MEDIAN=$PR_MEDIAN" >> $GITHUB_ENV
+          echo "PR_AVERAGE=$PR_AVERAGE" >> $GITHUB_ENV
+          echo "MAIN_MEDIAN=$MAIN_MEDIAN" >> $GITHUB_ENV
+          echo "MAIN_AVERAGE=$MAIN_AVERAGE" >> $GITHUB_ENV
       
       - name: Comment on PR
         uses: actions/github-script@v7
@@ -141,15 +149,17 @@ jobs:
           script: |
             const fs = require('fs');
             
-            const mainTime = process.env.MAIN_TIME;
-            const prTime = process.env.PR_TIME;
-            const diffAbs = process.env.DIFF_ABS;
+            const mainMedian = process.env.MAIN_MEDIAN;
+            const mainAvg = process.env.MAIN_AVERAGE;
+            const prMedian = process.env.PR_MEDIAN;
+            const prAvg = process.env.PR_AVERAGE;
+            const medianDiffAbs = process.env.MEDIAN_DIFF_ABS;
             const faster = process.env.FASTER === 'true';
             
             let performanceEmoji = faster ? '🚀' : '⚠️';
             let performanceText = faster ? 
-              `This PR is **${diffAbs}s faster** than main (${prTime}s vs ${mainTime}s)` :
-              `This PR is **${diffAbs}s slower** than main (${prTime}s vs ${mainTime}s)`;
+              `This PR is **${medianDiffAbs}s faster** than main (median: ${prMedian}s vs ${mainMedian}s)` :
+              `This PR is **${medianDiffAbs}s slower** than main (median: ${prMedian}s vs ${mainMedian}s)`;
             
             // Read the benchmarks.md file to show the history
             let benchmarkHistory = '';
@@ -161,7 +171,7 @@ jobs:
               benchmarkHistory = '> Error reading benchmark history';
             }
             
-            const comment = `## Zsh Startup Benchmark Results\n\n${performanceEmoji} ${performanceText}\n\n<details>\n<summary>Benchmark History</summary>\n\n${benchmarkHistory}\n</details>\n\n> **Note:** Both configurations were properly installed with stow in clean environments.\n> For the most accurate results, run \`./scripts/benchmark.sh\` locally both before and after your changes.`;
+            const comment = `## Zsh Startup Benchmark Results\n\n${performanceEmoji} ${performanceText}\n\n### Detailed Results\n\n| | PR | Main |\n|--|--|--|\n| Median | ${prMedian}s | ${mainMedian}s |\n| Average | ${prAvg}s | ${mainAvg}s |\n\n<details>\n<summary>Benchmark History</summary>\n\n${benchmarkHistory}\n</details>\n\n> **Note:** Both configurations were properly installed with stow in clean environments.\n> For the most accurate results, run \`./scripts/benchmark.sh\` locally both before and after your changes.`;
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
