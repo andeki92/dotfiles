@@ -13,6 +13,7 @@ This file tracks zsh startup time as configuration changes are made.
 
 | Date | PR | Description | Median | Average |
 |------|-------|-------------|--------|---------|
+| 2025-04-28 | #3 | feat: update workflow with docs | .020s | .024s |
 | 2025-04-28 | #0 | Test PR Updated | .040s | .041s |
 
 ## Methodology
