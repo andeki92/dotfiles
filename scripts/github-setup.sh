@@ -45,7 +45,7 @@ setup_branch_protection() {
   "required_status_checks": {
     "strict": true,
     "contexts": [
-      "All Checks Green"
+      "alls-green-benchmark"
     ]
   },
   "enforce_admins": false,

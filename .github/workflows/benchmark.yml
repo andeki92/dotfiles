@@ -2,11 +2,6 @@ name: Zsh Startup Benchmark
 
 on:
   pull_request:
-    paths:
-      - 'config/zsh/**'
-      - 'scripts/benchmark.sh'
-      - '.github/workflows/benchmark.yml'
-      - 'docs/benchmarks.md'
 
 # Add workflow permissions
 permissions:
@@ -24,158 +19,173 @@ jobs:
       pr-average: ${{ steps.extract-values.outputs.pr-average }}
     
     steps:
-      - name: Checkout PR Branch
-        uses: actions/checkout@v4
+      - name: Check if relevant files changed
+        id: changes
+        uses: dorny/paths-filter@v3
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
+          filters: |
+            zsh:
+              - 'config/zsh/**'
+              - 'scripts/benchmark.sh'
+              - '.github/workflows/benchmark.yml'
+      - name: Run benchmark steps
+        if: steps.changes.outputs.zsh == 'true'
+        run: |
+          - name: Checkout PR Branch
+            uses: actions/checkout@v4
+            with:
+              ref: ${{ github.event.pull_request.head.ref }}
+              fetch-depth: 0
     
-      - name: Install required packages
-        run: |
-          # Use multiple mirrors to be more resilient
-          echo "Updating apt sources to use multiple mirrors"
-          sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list
-          
-          # Add retry logic for apt operations
-          for i in {1..3}; do
-            echo "Attempt $i: Running apt-get update"
-            if sudo apt-get update; then break; fi
-            sleep 5
-          done
-          
-          # Install packages with retry
-          for i in {1..3}; do
-            echo "Attempt $i: Installing packages"
-            if sudo apt-get install -y zsh bc stow time; then
-              echo "✅ Package installation successful"
-              break
-            fi
-            sleep 5
-          done
-          
-          # Verify installations
-          which zsh
-          which bc
-          which stow
-          which time
+          - name: Install required packages
+            run: |
+              # Use multiple mirrors to be more resilient
+              echo "Updating apt sources to use multiple mirrors"
+              sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list
+              
+              # Add retry logic for apt operations
+              for i in {1..3}; do
+                echo "Attempt $i: Running apt-get update"
+                if sudo apt-get update; then break; fi
+                sleep 5
+              done
+              
+              # Install packages with retry
+              for i in {1..3}; do
+                echo "Attempt $i: Installing packages"
+                if sudo apt-get install -y zsh bc stow time; then
+                  echo "✅ Package installation successful"
+                  break
+                fi
+                sleep 5
+              done
+              
+              # Verify installations
+              which zsh
+              which bc
+              which stow
+              which time
       
-      - name: Setup home environment
-        run: |
-          # Create clean home directory structure for test
-          mkdir -p $HOME/.config $HOME/.local/share $HOME/.cache
-          
-          # Install the dotfiles using stow
-          if [ -d "config/zsh" ]; then
-            stow -d ./config -t $HOME zsh
-            echo "✅ Applied zsh configuration from PR branch"
-          else
-            echo "⚠️ No zsh configuration found in PR branch"
-            exit 1
-          fi
+          - name: Setup home environment
+            run: |
+              # Create clean home directory structure for test
+              mkdir -p $HOME/.config $HOME/.local/share $HOME/.cache
+              
+              # Install the dotfiles using stow
+              if [ -d "config/zsh" ]; then
+                stow -d ./config -t $HOME zsh
+                echo "✅ Applied zsh configuration from PR branch"
+              else
+                echo "⚠️ No zsh configuration found in PR branch"
+                exit 1
+              fi
       
-      - name: Get PR Title
-        id: pr-info
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const { data: pullRequest } = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
-            
-            console.log(`PR Title: ${pullRequest.title}`);
-            core.setOutput('title', pullRequest.title);
-            return pullRequest.title;
-          result-encoding: string
+          - name: Get PR Title
+            id: pr-info
+            uses: actions/github-script@v7
+            with:
+              github-token: ${{ secrets.GITHUB_TOKEN }}
+              script: |
+                const { data: pullRequest } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.issue.number
+                });
+                
+                console.log(`PR Title: ${pullRequest.title}`);
+                core.setOutput('title', pullRequest.title);
+                return pullRequest.title;
+              result-encoding: string
       
-      - name: Run benchmark on PR branch
-        id: benchmark-pr
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_DESCRIPTION: ${{ steps.pr-info.outputs.title }}
-        run: |
-          # Use PR title as description
-          echo "Using PR #$PR_NUMBER with description: $PR_DESCRIPTION"
-          
-          # Run benchmark with save option
-          CI=true ./scripts/benchmark.sh --save
-          
-          # Print file contents for debugging
-          echo "=== Benchmark MD file contents ==="
-          cat docs/benchmarks.md
-          echo "=== End of benchmark file ==="
-          
-          # Extract values directly from script output
-          ./scripts/benchmark.sh > benchmark_output.txt
-          cat benchmark_output.txt
-          
-          # Save results to file for artifact
-          mkdir -p /tmp/pr-results
-          cp benchmark_output.txt /tmp/pr-results/
-          cp docs/benchmarks.md /tmp/pr-results/
+          - name: Run benchmark on PR branch
+            id: benchmark-pr
+            env:
+              PR_NUMBER: ${{ github.event.pull_request.number }}
+              PR_DESCRIPTION: ${{ steps.pr-info.outputs.title }}
+            run: |
+              # Use PR title as description
+              echo "Using PR #$PR_NUMBER with description: $PR_DESCRIPTION"
+              
+              # Run benchmark with save option
+              CI=true ./scripts/benchmark.sh --save
+              
+              # Print file contents for debugging
+              echo "=== Benchmark MD file contents ==="
+              cat docs/benchmarks.md
+              echo "=== End of benchmark file ==="
+              
+              # Extract values directly from script output
+              ./scripts/benchmark.sh > benchmark_output.txt
+              cat benchmark_output.txt
+              
+              # Save results to file for artifact
+              mkdir -p /tmp/pr-results
+              cp benchmark_output.txt /tmp/pr-results/
+              cp docs/benchmarks.md /tmp/pr-results/
       
-      - name: Extract benchmark values
-        id: extract-values
-        run: |
-          # Extract values from benchmark output
-          PR_MEDIAN=$(grep "Median startup time" benchmark_output.txt | awk '{print $4}' | tr -d 's')
-          PR_AVERAGE=$(grep "Average startup time" benchmark_output.txt | awk '{print $4}' | tr -d 's')
-          
-          echo "PR_MEDIAN=$PR_MEDIAN"
-          echo "PR_AVERAGE=$PR_AVERAGE"
-          
-          # Make sure we have values
-          PR_MEDIAN="${PR_MEDIAN:-0.000}"
-          PR_AVERAGE="${PR_AVERAGE:-0.000}"
-          
-          # Store as outputs
-          echo "pr-median=$PR_MEDIAN" >> $GITHUB_OUTPUT
-          echo "pr-average=$PR_AVERAGE" >> $GITHUB_OUTPUT
+          - name: Extract benchmark values
+            id: extract-values
+            run: |
+              # Extract values from benchmark output
+              PR_MEDIAN=$(grep "Median startup time" benchmark_output.txt | awk '{print $4}' | tr -d 's')
+              PR_AVERAGE=$(grep "Average startup time" benchmark_output.txt | awk '{print $4}' | tr -d 's')
+              
+              echo "PR_MEDIAN=$PR_MEDIAN"
+              echo "PR_AVERAGE=$PR_AVERAGE"
+              
+              # Make sure we have values
+              PR_MEDIAN="${PR_MEDIAN:-0.000}"
+              PR_AVERAGE="${PR_AVERAGE:-0.000}"
+              
+              # Store as outputs
+              echo "pr-median=$PR_MEDIAN" >> $GITHUB_OUTPUT
+              echo "pr-average=$PR_AVERAGE" >> $GITHUB_OUTPUT
       
-      - name: Commit benchmark results
-        run: |
-          # Ensure we have the latest changes from the PR branch
-          git fetch origin ${{ github.event.pull_request.head.ref }}
-          
-          # Check if there are changes to commit
-          if git diff --quiet docs/benchmarks.md; then
-            echo "No changes to benchmarks.md, skipping commit"
-          else
-            echo "Changes detected in benchmarks.md, committing updates"
-            
-            # Configure Git
-            git config --local user.email "github-actions[bot]@users.noreply.github.com"
-            git config --local user.name "github-actions[bot]"
-            
-            # Stage and commit only the benchmarks file
-            git add docs/benchmarks.md
-            git commit -m "Update benchmarks.md with PR #${{ github.event.pull_request.number }} results [skip ci]"
-            
-            # Pull latest changes (if any) using rebase to avoid merge commits
-            git pull --rebase origin ${{ github.event.pull_request.head.ref }}
-            
-            # If there were conflicts, report and exit
-            if [ $? -ne 0 ]; then
-              echo "⚠️ There were conflicts while rebasing. Manual intervention required."
-              exit 1
-            fi
-            
-            # Push changes back to the PR branch using force-with-lease for safety
-            # This only forces the push if the remote hasn't changed in an unexpected way
-            git push --force-with-lease origin HEAD:${{ github.event.pull_request.head.ref }}
-            echo "✅ Successfully pushed benchmark update to PR branch"
-          fi
+          - name: Commit benchmark results
+            run: |
+              # Ensure we have the latest changes from the PR branch
+              git fetch origin ${{ github.event.pull_request.head.ref }}
+              
+              # Check if there are changes to commit
+              if git diff --quiet docs/benchmarks.md; then
+                echo "No changes to benchmarks.md, skipping commit"
+              else
+                echo "Changes detected in benchmarks.md, committing updates"
+                
+                # Configure Git
+                git config --local user.email "github-actions[bot]@users.noreply.github.com"
+                git config --local user.name "github-actions[bot]"
+                
+                # Stage and commit only the benchmarks file
+                git add docs/benchmarks.md
+                git commit -m "Update benchmarks.md with PR #${{ github.event.pull_request.number }} results [skip ci]"
+                
+                # Pull latest changes (if any) using rebase to avoid merge commits
+                git pull --rebase origin ${{ github.event.pull_request.head.ref }}
+                
+                # If there were conflicts, report and exit
+                if [ $? -ne 0 ]; then
+                  echo "⚠️ There were conflicts while rebasing. Manual intervention required."
+                  exit 1
+                fi
+                
+                # Push changes back to the PR branch using force-with-lease for safety
+                # This only forces the push if the remote hasn't changed in an unexpected way
+                git push --force-with-lease origin HEAD:${{ github.event.pull_request.head.ref }}
+                echo "✅ Successfully pushed benchmark update to PR branch"
+              fi
       
-      - name: Upload PR benchmark results
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr-benchmark
-          path: |
-            /tmp/pr-results
-            benchmark_output.txt
-            docs/benchmarks.md
+          - name: Upload PR benchmark results
+            uses: actions/upload-artifact@v4
+            with:
+              name: pr-benchmark
+              path: |
+                /tmp/pr-results
+                benchmark_output.txt
+                docs/benchmarks.md
+      - name: Skip benchmark (not relevant)
+        if: steps.changes.outputs.zsh != 'true'
+        run: echo "No relevant changes, skipping benchmark."
   
   benchmark-main:
     name: Benchmark Main Branch
@@ -185,92 +195,107 @@ jobs:
       main-average: ${{ steps.extract-values.outputs.main-average }}
     
     steps:
-      - name: Checkout Main Branch
-        uses: actions/checkout@v4
+      - name: Check if relevant files changed
+        id: changes
+        uses: dorny/paths-filter@v3
         with:
-          ref: main
-          fetch-depth: 0
-          
-      - name: Install required packages
+          filters: |
+            zsh:
+              - 'config/zsh/**'
+              - 'scripts/benchmark.sh'
+              - '.github/workflows/benchmark.yml'
+      - name: Run benchmark steps
+        if: steps.changes.outputs.zsh == 'true'
         run: |
-          # Use multiple mirrors to be more resilient
-          echo "Updating apt sources to use multiple mirrors"
-          sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list
+          - name: Checkout Main Branch
+            uses: actions/checkout@v4
+            with:
+              ref: main
+              fetch-depth: 0
           
-          # Add retry logic for apt operations
-          for i in {1..3}; do
-            echo "Attempt $i: Running apt-get update"
-            if sudo apt-get update; then break; fi
-            sleep 5
-          done
+          - name: Install required packages
+            run: |
+              # Use multiple mirrors to be more resilient
+              echo "Updating apt sources to use multiple mirrors"
+              sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list
+              
+              # Add retry logic for apt operations
+              for i in {1..3}; do
+                echo "Attempt $i: Running apt-get update"
+                if sudo apt-get update; then break; fi
+                sleep 5
+              done
+              
+              # Install packages with retry
+              for i in {1..3}; do
+                echo "Attempt $i: Installing packages"
+                if sudo apt-get install -y zsh bc stow time; then
+                  echo "✅ Package installation successful"
+                  break
+                fi
+                sleep 5
+              done
+              
+              # Verify installations
+              which zsh
+              which bc
+              which stow
+              which time
           
-          # Install packages with retry
-          for i in {1..3}; do
-            echo "Attempt $i: Installing packages"
-            if sudo apt-get install -y zsh bc stow time; then
-              echo "✅ Package installation successful"
-              break
-            fi
-            sleep 5
-          done
+          - name: Setup home environment
+            run: |
+              # Create clean home directory structure for test
+              mkdir -p $HOME/.config $HOME/.local/share $HOME/.cache
+              
+              # Install the dotfiles using stow
+              if [ -d "config/zsh" ]; then
+                stow -d ./config -t $HOME zsh
+                echo "✅ Applied zsh configuration from main branch"
+              else
+                echo "⚠️ No zsh configuration found in main branch"
+                exit 1
+              fi
+              
+          - name: Run benchmark on main branch
+            id: benchmark-main
+            run: |
+              # Run benchmark and save output to file
+              ./scripts/benchmark.sh > main_benchmark_output.txt
+              cat main_benchmark_output.txt
+              
+              # Save results to file for artifact
+              mkdir -p /tmp/main-results
+              cp main_benchmark_output.txt /tmp/main-results/
           
-          # Verify installations
-          which zsh
-          which bc
-          which stow
-          which time
-      
-      - name: Setup home environment
-        run: |
-          # Create clean home directory structure for test
-          mkdir -p $HOME/.config $HOME/.local/share $HOME/.cache
+          - name: Extract benchmark values
+            id: extract-values
+            run: |
+              MAIN_MEDIAN=$(grep "Median startup time" main_benchmark_output.txt | awk '{print $4}' | tr -d 's')
+              MAIN_AVERAGE=$(grep "Average startup time" main_benchmark_output.txt | awk '{print $4}' | tr -d 's')
+              
+              # Make sure we have values
+              MAIN_MEDIAN="${MAIN_MEDIAN:-0.000}"
+              MAIN_AVERAGE="${MAIN_AVERAGE:-0.000}"
+              
+              echo "MAIN_MEDIAN=$MAIN_MEDIAN"
+              echo "MAIN_AVERAGE=$MAIN_AVERAGE"
+              
+              # Save to file for artifact
+              echo "MAIN_MEDIAN=$MAIN_MEDIAN" > /tmp/main-results/times.txt
+              echo "MAIN_AVERAGE=$MAIN_AVERAGE" >> /tmp/main-results/times.txt
+              
+              # Store as outputs
+              echo "main-median=$MAIN_MEDIAN" >> $GITHUB_OUTPUT
+              echo "main-average=$MAIN_AVERAGE" >> $GITHUB_OUTPUT
           
-          # Install the dotfiles using stow
-          if [ -d "config/zsh" ]; then
-            stow -d ./config -t $HOME zsh
-            echo "✅ Applied zsh configuration from main branch"
-          else
-            echo "⚠️ No zsh configuration found in main branch"
-            exit 1
-          fi
-          
-      - name: Run benchmark on main branch
-        id: benchmark-main
-        run: |
-          # Run benchmark and save output to file
-          ./scripts/benchmark.sh > main_benchmark_output.txt
-          cat main_benchmark_output.txt
-          
-          # Save results to file for artifact
-          mkdir -p /tmp/main-results
-          cp main_benchmark_output.txt /tmp/main-results/
-      
-      - name: Extract benchmark values
-        id: extract-values
-        run: |
-          MAIN_MEDIAN=$(grep "Median startup time" main_benchmark_output.txt | awk '{print $4}' | tr -d 's')
-          MAIN_AVERAGE=$(grep "Average startup time" main_benchmark_output.txt | awk '{print $4}' | tr -d 's')
-          
-          # Make sure we have values
-          MAIN_MEDIAN="${MAIN_MEDIAN:-0.000}"
-          MAIN_AVERAGE="${MAIN_AVERAGE:-0.000}"
-          
-          echo "MAIN_MEDIAN=$MAIN_MEDIAN"
-          echo "MAIN_AVERAGE=$MAIN_AVERAGE"
-          
-          # Save to file for artifact
-          echo "MAIN_MEDIAN=$MAIN_MEDIAN" > /tmp/main-results/times.txt
-          echo "MAIN_AVERAGE=$MAIN_AVERAGE" >> /tmp/main-results/times.txt
-          
-          # Store as outputs
-          echo "main-median=$MAIN_MEDIAN" >> $GITHUB_OUTPUT
-          echo "main-average=$MAIN_AVERAGE" >> $GITHUB_OUTPUT
-      
-      - name: Upload Main benchmark results
-        uses: actions/upload-artifact@v4
-        with:
-          name: main-benchmark
-          path: /tmp/main-results
+          - name: Upload Main benchmark results
+            uses: actions/upload-artifact@v4
+            with:
+              name: main-benchmark
+              path: /tmp/main-results
+      - name: Skip benchmark (not relevant)
+        if: steps.changes.outputs.zsh != 'true'
+        run: echo "No relevant changes, skipping benchmark."
   
   compare-results:
     name: Compare Benchmark Results
@@ -494,4 +519,17 @@ jobs:
           else
             echo "::notice::Performance check passed! Change: $PERCENT_CHANGE%"
           fi
+
+  alls-green-benchmark:
+    if: always()
+    needs:
+      - benchmark-pr
+      - benchmark-main
+      - compare-results
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
   
