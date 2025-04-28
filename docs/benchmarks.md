@@ -16,6 +16,7 @@ This file tracks zsh startup time as configuration changes are made.
 | Date | PR | Description | Median | Average |
 |------|-------|-------------|--------|---------|
 | 2025-04-28 | #11 | feat: add fzf and update zsh guidelines and structure | .030s | .030s |
+| 2025-04-28 | #10 | feat: add mise-en-place | .030s | .030s |
 | 2025-04-28 | #8 | feat: add starship and make zsh-defer a submodule | .030s | .031s |
 | 2025-04-28 | #7 | feat: add minimal git module | .030s | .030s |
 | 2025-04-28 | #6 | feat: add all-checks-green base workflow and dependabot | .040s | .039s |
