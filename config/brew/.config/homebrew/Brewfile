@@ -3,9 +3,7 @@
 
 # Taps
 tap "homebrew/bundle"
-tap "homebrew/cask"
 tap "homebrew/cask-fonts"
-tap "homebrew/core"
 
 # Development Tools
 brew "fd"                # Fast find alternative
@@ -51,6 +49,7 @@ cask "intellij-idea"     # IDE for JVM languages
 # Fonts
 cask "font-hack-nerd-font"             # Clean monospaced font with icons
 cask "font-jetbrains-mono-nerd-font"   # Developer font with programming ligatures and icons
+cask "font-iosevka-nerd-font"          # Highly customizable coding font
 
 # Mac App Store applications
 # Uncomment and run 'brew install mas' first if you want to use these

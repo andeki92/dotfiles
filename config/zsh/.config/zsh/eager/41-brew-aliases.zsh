@@ -7,23 +7,23 @@ alias brewup="brew update && brew upgrade && brew cleanup"
 # Show what would be installed/upgraded without actually doing it
 alias brewdry="brew upgrade --dry-run"
 
-# Dump current packages to Brewfile
-alias brewdump="brew bundle dump --force"
+# Dump current packages to Brewfile (global location)
+alias brewdump="brew bundle dump --global --force"
 
-# Install everything from Brewfile
-alias brewinstall="brew bundle"
+# Install everything from Brewfile (global location)
+alias brewinstall="brew bundle --global"
 
 # Check which packages in Brewfile are installed or missing
-alias brewcheck="brew bundle check"
+alias brewcheck="brew bundle check --global"
 
 # Clean up (remove) outdated downloads and versions
 alias brewclean="brew cleanup"
 
 # Show packages that aren't in Brewfile (dry run)
-alias brewcleanup="brew bundle cleanup"
+alias brewcleanup="brew bundle cleanup --global"
 
 # Remove packages that aren't in Brewfile
-alias brewcleanupforce="brew bundle cleanup --force"
+alias brewcleanupforce="brew bundle cleanup --global --force"
 
 # List installed packages
 alias brewls="brew list"
@@ -43,12 +43,27 @@ brewfind() {
   brew search "$@"
 }
 
-# Sync Brewfile from home directory to dotfiles repository
+# List all brew commands
+alias brewhelp="brew commands"
+
+# Edit the Brewfile directly
+brewedit() {
+  ${EDITOR:-vim} "${XDG_CONFIG_HOME:-$HOME/.config}/homebrew/Brewfile"
+}
+
+# Display path to global Brewfile
+alias brewfile="echo ${XDG_CONFIG_HOME:-$HOME/.config}/homebrew/Brewfile"
+
+# Sync Brewfile from system to dotfiles repository
 brewsync() {
-  if [[ -f "$HOME/.config/brewfile/Brewfile" ]]; then
-    cp "$HOME/.config/brewfile/Brewfile" "$HOME/.dotfiles/config/brew/.config/brewfile/"
-    echo "Brewfile synced to dotfiles repository"
+  local src="${XDG_CONFIG_HOME:-$HOME/.config}/homebrew/Brewfile"
+  local dest="$HOME/.dotfiles/config/brew/.config/homebrew/Brewfile"
+  
+  if [[ -f "$src" ]]; then
+    cp "$src" "$dest"
+    echo "Brewfile synced from $src to $dest"
   else
-    echo "Brewfile not found at ~/.config/brewfile/Brewfile"
+    echo "Error: Brewfile not found at $src"
+    return 1
   fi
 } 

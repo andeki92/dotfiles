@@ -1,63 +1,74 @@
 # Homebrew Configuration
 
-This directory contains the Homebrew configuration files used to maintain a consistent set of packages and applications across different macOS machines.
+## Overview
+
+This directory contains configuration for [Homebrew](https://brew.sh), the missing package manager for macOS (and Linux). The configuration follows XDG Base Directory specifications and uses Brewfile for declarative package management.
 
 ## Structure
 
-```
-config/brew/
-├── .config/
-│   └── brewfile/
-│       └── Brewfile    # List of packages, casks, and Mac App Store apps to install
-└── README.md           # This file
-```
+- `.config/homebrew/Brewfile` - Main Brewfile defining all packages, casks, and applications
 
-The structure follows the XDG Base Directory Specification, which will symlink to `~/.config/brewfile/Brewfile` when stowed.
+## Homebrew Defaults
+
+Homebrew follows the XDG Base Directory Specification for configuration:
+
+- Global Brewfile: `${XDG_CONFIG_HOME}/homebrew/Brewfile` (defaults to `~/.config/homebrew/Brewfile`)
+- When `--global` flag is used, Homebrew will use this location
 
 ## Usage
 
-### Installation
-
-First, ensure that this module is stowed to your home directory:
-
-```bash
-cd ~/.dotfiles
-stow brew
-```
-
-This will create the XDG-compliant brewfile directory structure in your home directory.
-
 ### Installing Packages
 
-To install all packages defined in the Brewfile:
-
 ```bash
-brew bundle
+# Install all packages from global Brewfile
+brew bundle --global
+
+# Install without upgrading existing packages
+brew bundle --global --no-upgrade
 ```
 
-Homebrew automatically detects the Brewfile in `~/.config/brewfile/Brewfile`, so no additional parameters are needed.
-
-### Updating the Brewfile
-
-To update the Brewfile with your currently installed packages:
+### Updating Brewfile
 
 ```bash
-brew bundle dump --force
+# Create/update global Brewfile from currently installed packages
+brew bundle dump --global --force
 ```
 
-The updated file will be saved to `~/.config/brewfile/Brewfile`. To update your dotfiles repository, copy the changes:
+### Checking Installation Status
 
 ```bash
-cp ~/.config/brewfile/Brewfile ~/.dotfiles/config/brew/.config/brewfile/
+# Check if all dependencies are installed
+brew bundle check --global
+
+# List all dependencies in the Brewfile
+brew bundle list --global
 ```
 
-### Checking Status
-
-To check which packages in the Brewfile are installed/missing:
+### Cleanup
 
 ```bash
-brew bundle check
+# Show what would be removed (packages not in Brewfile)
+brew bundle cleanup --global
+
+# Actually remove packages not in Brewfile
+brew bundle cleanup --global --force
 ```
+
+## Environment Variables
+
+The following environment variables can be used to customize Homebrew's behavior:
+
+- `HOMEBREW_BUNDLE_FILE`: Specify custom Brewfile location
+- `HOMEBREW_BUNDLE_NO_LOCK`: Disable lockfile generation
+- `HOMEBREW_BUNDLE_NO_UPGRADE`: Skip upgrading outdated packages
+- `HOMEBREW_BUNDLE_BREW_SKIP`: Skip installing Homebrew formulas
+- `HOMEBREW_BUNDLE_CASK_SKIP`: Skip installing Casks
+- `HOMEBREW_BUNDLE_MAS_SKIP`: Skip installing Mac App Store apps
+- `HOMEBREW_BUNDLE_TAP_SKIP`: Skip tapping repositories
+
+## Useful Aliases
+
+See `config/zsh/.config/zsh/eager/41-brew-aliases.zsh` for useful Homebrew aliases and functions.
 
 ## Customization
 
