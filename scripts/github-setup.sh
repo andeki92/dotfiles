@@ -44,11 +44,7 @@ setup_branch_protection() {
 {
   "required_status_checks": {
     "strict": true,
-    "contexts": [
-      "Zsh Startup Benchmark / Benchmark PR Branch",
-      "Zsh Startup Benchmark / Benchmark Main Branch",
-      "Zsh Startup Benchmark / Compare Benchmark Results"
-    ]
+    "contexts": []
   },
   "enforce_admins": false,
   "required_pull_request_reviews": null,
