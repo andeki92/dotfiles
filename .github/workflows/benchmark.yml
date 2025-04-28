@@ -456,7 +456,7 @@ jobs:
           fi
 
   alls-green-benchmark:
-    name: All Benchmark Jobs Green
+    name: All Green
     if: always()
     needs:
       - benchmark-pr
