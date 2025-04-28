@@ -296,23 +296,35 @@ jobs:
             else
               AVERAGE_STATUS="unchanged ⚠️"
             fi
+            
+            # Calculate percentage difference for thresholds
+            if [[ "$MAIN_MEDIAN" != "0.000" && "$PR_MEDIAN" != "0.000" ]]; then
+              PERCENT_CHANGE=$(echo "scale=1; ($PR_MEDIAN - $MAIN_MEDIAN) / $MAIN_MEDIAN * 100" | bc)
+              echo "PERCENT_CHANGE=$PERCENT_CHANGE%"
+            else
+              PERCENT_CHANGE="0.0"
+              echo "Cannot calculate percentage change, using default of $PERCENT_CHANGE%"
+            fi
           else
             MEDIAN_DIFF="0.000"
             AVERAGE_DIFF="0.000"
             MEDIAN_STATUS="unknown ⚠️"
             AVERAGE_STATUS="unknown ⚠️"
+            PERCENT_CHANGE="0.0"
           fi
           
           echo "MEDIAN_DIFF=$MEDIAN_DIFF"
           echo "AVERAGE_DIFF=$AVERAGE_DIFF"
           echo "MEDIAN_STATUS=$MEDIAN_STATUS"
           echo "AVERAGE_STATUS=$AVERAGE_STATUS"
+          echo "PERCENT_CHANGE=$PERCENT_CHANGE"
           
           # Store as outputs
           echo "median-diff=$MEDIAN_DIFF" >> $GITHUB_OUTPUT
           echo "average-diff=$AVERAGE_DIFF" >> $GITHUB_OUTPUT
           echo "median-status=$MEDIAN_STATUS" >> $GITHUB_OUTPUT
           echo "average-status=$AVERAGE_STATUS" >> $GITHUB_OUTPUT
+          echo "percent-change=$PERCENT_CHANGE" >> $GITHUB_OUTPUT
       
       - name: Get PR Details
         id: pr-details
@@ -348,18 +360,47 @@ jobs:
             const averageDiff = '${{ steps.compare.outputs.average-diff }}';
             const medianStatus = '${{ steps.compare.outputs.median-status }}';
             const averageStatus = '${{ steps.compare.outputs.average-status }}';
+            const percentChange = '${{ steps.compare.outputs.percent-change }}';
             
             let historySection = '';
             try {
-              const benchmarkContent = fs.readFileSync('/tmp/pr-results/docs/benchmarks.md', 'utf8');
-              const ciSection = benchmarkContent.split('## CI Benchmarks')[1];
-              if (ciSection) {
-                historySection = ciSection.split('##')[0].trim();
+              // Try different paths to find the benchmark file
+              let benchmarkContent = '';
+              let benchmarkPath = '';
+              
+              // Check possible paths
+              const possiblePaths = [
+                '/tmp/pr-results/docs/benchmarks.md',
+                '/tmp/pr-results/benchmarks.md',
+                'docs/benchmarks.md'
+              ];
+              
+              for (const path of possiblePaths) {
+                try {
+                  if (fs.existsSync(path)) {
+                    benchmarkContent = fs.readFileSync(path, 'utf8');
+                    benchmarkPath = path;
+                    console.log(`Found benchmark file at: ${path}`);
+                    break;
+                  }
+                } catch (err) {
+                  console.log(`Error checking path ${path}: ${err.message}`);
+                }
+              }
+              
+              if (benchmarkContent) {
+                const ciSection = benchmarkContent.split('## CI Benchmarks')[1];
+                if (ciSection) {
+                  historySection = ciSection.split('##')[0].trim();
+                } else {
+                  historySection = 'No CI benchmark history found in the file.';
+                }
               } else {
-                historySection = 'No CI benchmark history found.';
+                historySection = 'Could not locate the benchmark history file.';
               }
             } catch (error) {
               historySection = `Error reading benchmark history: ${error.message}`;
+              console.log(`Error details: ${error.stack}`);
             }
             
             // Construct comment text
@@ -367,13 +408,19 @@ jobs:
             
             if (medianDiff === '0.000') {
               commentText += '⚠️ Could not determine performance difference due to missing or invalid measurements.\n\n';
+            } else if (percentChange && percentChange.startsWith('-') && parseFloat(percentChange) < -10) {
+              // PR is significantly slower (>10%)
+              commentText += `⚠️ **Warning**: This PR is ${percentChange}% slower than the main branch.\n\n`;
+            } else if (percentChange && !percentChange.startsWith('-') && parseFloat(percentChange) > 10) {
+              // PR is significantly faster (>10%)
+              commentText += `🚀 **Great improvement**: This PR is ${percentChange}% faster than the main branch.\n\n`;
             }
             
             commentText += '### Detailed Results\n\n';
-            commentText += '|        | PR | Main |\n';
-            commentText += '|--------|-----|------|\n';
-            commentText += `| Median | ${prMedian}s | ${mainMedian}s |\n`;
-            commentText += `| Average | ${prAverage}s | ${mainAverage}s |\n\n`;
+            commentText += '|        | PR | Main | Change |\n';
+            commentText += '|--------|-----|------|--------|\n';
+            commentText += `| Median | ${prMedian}s | ${mainMedian}s | ${medianDiff}s ${medianStatus} |\n`;
+            commentText += `| Average | ${prAverage}s | ${mainAverage}s | ${averageDiff}s ${averageStatus} |\n\n`;
             
             commentText += '#### Benchmark History\n';
             commentText += historySection + '\n\n';
@@ -386,4 +433,26 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: commentText
-            }); 
+            });
+      
+      - name: Check performance regression
+        if: success()
+        run: |
+          PERCENT_CHANGE="${{ steps.compare.outputs.percent-change }}"
+          
+          # Strip % sign if present
+          PERCENT_CHANGE="${PERCENT_CHANGE/\%/}"
+          
+          echo "Performance change: $PERCENT_CHANGE%"
+          
+          # Fail on significant regressions (>25% slower)
+          # Negative percentage means PR is slower than main
+          if [[ "$PERCENT_CHANGE" =~ ^- && $(echo "${PERCENT_CHANGE#-} > 25" | bc -l) -eq 1 ]]; then
+            echo "::error::Performance regression detected: $PERCENT_CHANGE% slower than main branch!"
+            echo "This exceeds the threshold of 25% regression."
+            
+            # Exit with error - this will make the GitHub check fail
+            # To override, use the GitHub UI to bypass this check if needed
+            exit 1
+          else
+            echo "::notice::Performance check passed! Change: $PERCENT_CHANGE%" 
