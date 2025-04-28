@@ -45,7 +45,7 @@ setup_branch_protection() {
   "required_status_checks": {
     "strict": true,
     "contexts": [
-      "Zsh Startup Benchmark / All Green"
+      "All Green Benchmark"
     ]
   },
   "enforce_admins": false,
