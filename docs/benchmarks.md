@@ -15,7 +15,7 @@ This file tracks zsh startup time as configuration changes are made.
 
 | Date | PR | Description | Median | Average |
 |------|-------|-------------|--------|---------|
-| 2025-04-28 | #6 | feat: add all-checks-green base workflow and dependabot | .040s | .038s |
+| 2025-04-28 | #6 | feat: add all-checks-green base workflow and dependabot | .030s | .030s |
 | 2025-04-28 | #5 | feat: add brew setup and deferred loading | .030s | .031s |
 | 2025-04-28 | #3 | feat: update workflow with docs | .020s | .024s |
 | 2025-04-28 | #0 | Test PR Updated | .040s | .041s |
