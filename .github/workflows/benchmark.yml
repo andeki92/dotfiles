@@ -10,7 +10,7 @@ on:
 
 # Add workflow permissions
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   issues: write
 
@@ -133,6 +133,40 @@ jobs:
           # Store as outputs
           echo "pr-median=$PR_MEDIAN" >> $GITHUB_OUTPUT
           echo "pr-average=$PR_AVERAGE" >> $GITHUB_OUTPUT
+      
+      - name: Commit benchmark results
+        run: |
+          # Ensure we have the latest changes from the PR branch
+          git fetch origin ${{ github.event.pull_request.head.ref }}
+          
+          # Check if there are changes to commit
+          if git diff --quiet docs/benchmarks.md; then
+            echo "No changes to benchmarks.md, skipping commit"
+          else
+            echo "Changes detected in benchmarks.md, committing updates"
+            
+            # Configure Git
+            git config --local user.email "github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            
+            # Stage and commit only the benchmarks file
+            git add docs/benchmarks.md
+            git commit -m "Update benchmarks.md with PR #${{ github.event.pull_request.number }} results [skip ci]"
+            
+            # Pull latest changes (if any) using rebase to avoid merge commits
+            git pull --rebase origin ${{ github.event.pull_request.head.ref }}
+            
+            # If there were conflicts, report and exit
+            if [ $? -ne 0 ]; then
+              echo "⚠️ There were conflicts while rebasing. Manual intervention required."
+              exit 1
+            fi
+            
+            # Push changes back to the PR branch using force-with-lease for safety
+            # This only forces the push if the remote hasn't changed in an unexpected way
+            git push --force-with-lease origin HEAD:${{ github.event.pull_request.head.ref }}
+            echo "✅ Successfully pushed benchmark update to PR branch"
+          fi
       
       - name: Upload PR benchmark results
         uses: actions/upload-artifact@v4
@@ -299,7 +333,10 @@ jobs:
             
             # Calculate percentage difference for thresholds
             if [[ "$MAIN_MEDIAN" != "0.000" && "$PR_MEDIAN" != "0.000" ]]; then
-              PERCENT_CHANGE=$(echo "scale=1; ($PR_MEDIAN - $MAIN_MEDIAN) / $MAIN_MEDIAN * 100" | bc)
+              # Invert the formula: positive means PR is faster, negative means PR is slower
+              # When PR time is lower (faster), the result will be positive
+              # When PR time is higher (slower), the result will be negative
+              PERCENT_CHANGE=$(echo "scale=1; ($MAIN_MEDIAN - $PR_MEDIAN) / $MAIN_MEDIAN * 100" | bc)
               echo "PERCENT_CHANGE=$PERCENT_CHANGE%"
             else
               PERCENT_CHANGE="0.0"
@@ -408,10 +445,10 @@ jobs:
             
             if (medianDiff === '0.000') {
               commentText += '⚠️ Could not determine performance difference due to missing or invalid measurements.\n\n';
-            } else if (percentChange && percentChange.startsWith('-') && parseFloat(percentChange) < -25) {
+            } else if (percentChange && parseFloat(percentChange) < -25) {
               // PR is significantly slower (>25%)
-              commentText += `⚠️ **Warning**: This PR is ${percentChange}% slower than the main branch.\n\n`;
-            } else if (percentChange && !percentChange.startsWith('-') && parseFloat(percentChange) > 25) {
+              commentText += `⚠️ **Warning**: This PR is ${Math.abs(parseFloat(percentChange))}% slower than the main branch.\n\n`;
+            } else if (percentChange && parseFloat(percentChange) > 25) {
               // PR is significantly faster (>25%)
               commentText += `🚀 **Great improvement**: This PR is ${percentChange}% faster than the main branch.\n\n`;
             }
@@ -448,7 +485,7 @@ jobs:
           # Fail on significant regressions (>25% slower)
           # Negative percentage means PR is slower than main
           if [[ "$PERCENT_CHANGE" =~ ^- && $(echo "${PERCENT_CHANGE#-} > 25" | bc -l) -eq 1 ]]; then
-            echo "::error::Performance regression detected: $PERCENT_CHANGE% slower than main branch!"
+            echo "::error::Performance regression detected: ${PERCENT_CHANGE#-}% slower than main branch!"
             echo "This exceeds the threshold of 25% regression."
             
             # Exit with error - this will make the GitHub check fail
@@ -457,4 +494,4 @@ jobs:
           else
             echo "::notice::Performance check passed! Change: $PERCENT_CHANGE%"
           fi
-     
+  
