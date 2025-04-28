@@ -113,10 +113,11 @@ if [[ "$SAVE_RESULTS" == "true" ]]; then
   # Get description
   if [[ "$CI" == "true" ]]; then
     # Get PR number from GitHub environment
-    PR_NUMBER=${GITHUB_REF#refs/pull/}
-    PR_NUMBER=${PR_NUMBER%/merge}
-    description="CI Run"
-    entry="| ${current_date} | #${PR_NUMBER:-N/A} | ${description} | ${median}s | ${average}s |"
+    PR_NUMBER=${PR_NUMBER:-"N/A"}
+    description=${PR_DESCRIPTION:-"CI Run"}
+    echo "Using PR #${PR_NUMBER} with description: ${description}"
+    
+    entry="| ${current_date} | #${PR_NUMBER} | ${description} | ${median}s | ${average}s |"
     
     # Find the CI section line number
     ci_line=$(grep -n "^## CI Benchmarks" "$BENCHMARK_FILE" | cut -d: -f1)
