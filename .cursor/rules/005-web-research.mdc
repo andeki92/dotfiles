@@ -1,0 +1,59 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Web Research Integration
+
+## Purpose
+
+This rule provides guidelines for leveraging web search and content fetching to ensure dotfiles configurations follow current best practices.
+
+## Usage Guidelines
+
+### When to Use Web Research
+
+- When evaluating configuration options for tools or applications
+- When troubleshooting compatibility issues between platforms
+- When needing to understand newer features of tools in our stack
+- Before implementing any major structural changes to the dotfiles
+
+### Research Process
+
+1. **Search for Current Best Practices**
+   ```
+   web_search "latest <tool> configuration best practices"
+   web_search "<tool> dotfiles XDG compliance"
+   web_search "<tool> macOS vs Linux configuration differences"
+   ```
+
+2. **Fetch Specific Resources**
+   ```
+   mcp_fetch_fetch {url: "https://relevant-documentation.com/page"}
+   ```
+
+3. **Analyze Findings**
+   - Compare multiple sources
+   - Consider the recency of information
+   - Evaluate compatibility with our multi-platform approach
+
+## Example Workflow
+
+For updating Zsh configuration:
+
+1. Search for current best practices:
+   ```
+   web_search "zsh configuration best practices 2023"
+   ```
+
+2. Check for XDG compliance guidelines:
+   ```
+   web_search "zsh XDG Base Directory support"
+   ```
+
+3. Fetch specific documentation if needed:
+   ```
+   mcp_fetch_fetch {url: "https://github.com/zdharma-continuum/zinit#xdg-base-directory-support"}
+   ```
+
+4. Apply findings to our modular structure

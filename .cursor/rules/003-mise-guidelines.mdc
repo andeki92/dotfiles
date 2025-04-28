@@ -1,0 +1,161 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# mise-en-place Guidelines
+
+## Overview
+
+mise-en-place (mise) is a powerful tool for managing developer environments, including:
+
+- Version-controlled tools (like Node.js, Python, Ruby, etc.)
+- Environment variables
+- Project-specific tasks
+
+It replaces tools like nvm, pyenv, rbenv, and others with a single unified interface.
+
+## Installation
+
+```bash
+# macOS
+brew install mise
+
+# Using the official installer
+curl https://mise.run | sh
+
+# Manual installation
+# See: https://mise.jdx.dev/getting-started.html
+```
+
+## Configuration
+
+mise uses a TOML-based configuration format. The global configuration file is located at `~/.config/mise/config.toml`.
+
+Example configuration:
+
+```toml
+[tools]
+node = "20"
+python = "3.12"
+ruby = "latest"
+
+[env]
+PATH = "$HOME/.local/bin:$PATH"
+
+[alias.node.versions]
+lts = "20"
+```
+
+### Project-specific Configuration
+
+Create a `mise.toml` file in your project directory:
+
+```toml
+[tools]
+node = "20"
+python = "3.12.0"
+
+[env]
+ENVIRONMENT = "development"
+DEBUG = "true"
+
+[tasks.test]
+description = "Run tests"
+run = "pytest tests/"
+```
+
+## Usage
+
+### Installing and Using Tools
+
+```bash
+# Install and use a specific version of a tool
+mise use node@20
+
+# Install a tool globally
+mise use -g python@3.12
+
+# List installed tools
+mise ls
+
+# Run a command with specific tool versions
+mise exec -- npm run build
+
+# Run a command in a new shell with all tools activated
+mise shell
+```
+
+### Working with Tasks
+
+```bash
+# Run a task defined in mise.toml
+mise run test
+
+# List available tasks
+mise tasks ls
+
+# Add a new task
+mise tasks add build -- "npm run build"
+```
+
+### Managing Environment Variables
+
+```bash
+# Set an environment variable
+mise set NODE_ENV=production
+
+# Unset an environment variable
+mise unset NODE_ENV
+```
+
+## Best Practices
+
+### Tool Version Management
+
+- Use fuzzy versions (like `node = "20"`) in global config to automatically get the latest patch updates
+- Use exact versions (like `node = "20.2.1"`) in project configs for reproducibility
+- Create version aliases for commonly used versions
+
+### Directory Structure
+
+Our dotfiles repository organizes mise configuration as follows:
+
+```
+.dotfiles/
+└── mise/
+    └── .config/
+        └── mise/
+            ├── config.toml      # Global configuration
+            ├── settings.toml    # User settings
+            └── tasks.toml       # Global tasks
+```
+
+### XDG Compliance
+
+mise automatically respects the XDG Base Directory specification:
+
+- Configuration files: `~/.config/mise/`
+- Cache files: `~/.cache/mise/`
+- Data files: `~/.local/share/mise/`
+
+### Integrating with Other Tools
+
+- Use `mise activate` in your shell initialization files to automatically activate mise in every shell
+- Consider using plugins for additional functionality:
+  - IDE integrations (VS Code, JetBrains, etc.)
+  - Shell integrations (completions, prompts, etc.)
+
+## Migrating from Other Tools
+
+If you're migrating from other version managers like asdf, nvm, or pyenv, mise provides tools to help with migration:
+
+```bash
+# Migrating from asdf
+mise use -g $(cat ~/.tool-versions)
+
+# Migrating from nvm
+for version in $(nvm ls --no-colors --no-alias | grep -v -e "^\->.*" | xargs); do
+  mise use -g node@$version
+done
+```

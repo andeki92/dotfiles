@@ -1,0 +1,208 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Homebrew and Brewfile Guidelines
+
+## Overview
+
+Homebrew is the missing package manager for macOS and Linux. Brewfile is a declarative way to manage Homebrew packages, casks, and Mac App Store applications.
+
+## Installation
+
+### macOS
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+### Linux
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+## Brewfile Location
+
+In our dotfiles repository, the Brewfile is stored at:
+
+```
+config/brew/Brewfile
+```
+
+When stowed, this becomes:
+
+```
+~/.brew/Brewfile
+```
+
+This allows us to manage the Brewfile with stow just like our other configuration files.
+
+## Brewfile Structure
+
+A Brewfile is a simple Ruby-based DSL that defines the packages, casks, and Mac App Store applications to be installed.
+
+Example Brewfile:
+
+```ruby
+# Taps
+tap "homebrew/bundle"
+tap "homebrew/cask"
+tap "homebrew/cask-fonts"
+tap "homebrew/core"
+tap "homebrew/services"
+
+# Core packages
+brew "git"
+brew "stow"
+brew "mise"
+brew "zsh"
+brew "nvim"
+
+# Optional flags
+brew "postgresql@15", restart_service: true
+brew "python@3.12", link: true
+
+# macOS applications
+cask "alacritty"
+cask "firefox"
+cask "visual-studio-code"
+
+# Fonts
+cask "font-fira-code-nerd-font"
+cask "font-jetbrains-mono-nerd-font"
+
+# Mac App Store applications (macOS only)
+mas "Amphetamine", id: 937984704
+mas "Keynote", id: 409183694
+```
+
+## Usage
+
+### Installing Packages
+
+```bash
+# Install all packages defined in Brewfile
+brew bundle --file=~/.brew/Brewfile
+
+# Install without upgrading existing packages
+brew bundle --file=~/.brew/Brewfile --no-upgrade
+```
+
+### Creating/Updating a Brewfile
+
+```bash
+# Create a Brewfile from currently installed packages
+brew bundle dump --file=~/.dotfiles/config/brew/Brewfile
+
+# Force overwrite an existing Brewfile
+brew bundle dump --file=~/.dotfiles/config/brew/Brewfile --force
+```
+
+### Checking Brewfile Status
+
+```bash
+# Check if all dependencies are installed
+brew bundle check --file=~/.brew/Brewfile
+
+# List all dependencies in the Brewfile
+brew bundle list --file=~/.brew/Brewfile
+```
+
+### Cleanup
+
+```bash
+# Remove any installed packages not listed in Brewfile (dry run)
+brew bundle cleanup --file=~/.brew/Brewfile
+
+# Actually remove packages not in Brewfile
+brew bundle cleanup --file=~/.brew/Brewfile --force
+```
+
+## Best Practices
+
+### Organization
+
+- Keep your Brewfile organized by logical categories with comments
+- Split your Brewfile into multiple files if needed for different environments
+
+Example directory structure for platform-specific Brewfiles:
+
+```
+config/
+├── brew/             # Core Homebrew packages (common)
+│   └── Brewfile
+├── brew-macos/       # macOS-specific packages
+│   └── Brewfile
+└── brew-wsl/         # WSL-specific packages
+    └── Brewfile
+```
+
+### Maintenance
+
+- Regularly update your Brewfile to reflect your current setup
+- Use comments to document why certain packages are included
+- Consider pinning versions for critical packages
+
+### Cross-Platform Considerations
+
+For cross-platform compatibility (macOS and Linux), you can use conditional includes in your Brewfile:
+
+```ruby
+# Core packages (shared)
+brew "git"
+brew "zsh"
+brew "vim"
+
+# macOS-specific
+if OS.mac?
+  brew "mas"
+  cask "alfred"
+  cask "iterm2"
+end
+
+# Linux-specific
+if OS.linux?
+  brew "xclip"
+  brew "linuxbrew/xorg/xorg"
+end
+```
+
+### Automation
+
+You can automate Brewfile management with a shell function in your `.zshrc`:
+
+```bash
+# Update Brewfile with current packages
+brewdump() {
+  brew bundle dump --file=~/.dotfiles/config/brew/Brewfile --force
+  echo "Brewfile updated at ~/.dotfiles/config/brew/Brewfile"
+}
+```
+
+## Cleanup and Maintenance
+
+Regularly perform maintenance on your Homebrew installation:
+
+```bash
+# Update Homebrew and upgrade all packages
+brew update && brew upgrade
+
+# Cleanup old versions
+brew cleanup
+
+# Check for issues
+brew doctor
+```
+
+## Integration with dotfiles
+
+In your shell setup, you might want to add aliases for common Homebrew operations:
+
+```bash
+# Add to .zshrc or similar
+alias brewup="brew update && brew upgrade && brew cleanup"
+alias brewdump="brew bundle dump --file=~/.dotfiles/config/brew/Brewfile --force"
+alias brewinstall="brew bundle --file=~/.brew/Brewfile"
+```

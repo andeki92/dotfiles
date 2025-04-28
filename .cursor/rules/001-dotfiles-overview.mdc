@@ -1,0 +1,154 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Dotfiles Management Overview
+
+## Structure and Philosophy
+
+Our dotfiles repository uses a modular, application-based structure that works with GNU Stow for symlink management. The main principles are:
+
+- **Application-first organization**: Each tool or application has its own directory
+- **XDG compliance**: Configuration files respect the XDG Base Directory Specification
+- **Platform-agnostic**: Works across macOS and WSL environments
+- **Modular stowing**: Each application can be stowed independently
+
+## Repository Structure
+
+```
+.dotfiles/               # Root directory
+├── .stowrc              # Stow configuration 
+├── scripts/             # Helper scripts
+└── config/              # All configuration files
+    ├── zsh/             # Zsh configuration
+    │   ├── .config/     # Goes to ~/.config
+    │   │   └── zsh/     # Goes to ~/.config/zsh
+    │   └── .zshrc       # Goes to ~/.zshrc
+    ├── git/             # Git configuration (common)
+    │   └── .config/     # Goes to ~/.config
+    │       └── git/     # Goes to ~/.config/git
+    ├── git-macos/       # macOS-specific git configuration
+    │   └── .config/     # Goes to ~/.config
+    │       └── git/     # Goes to ~/.config/git
+    ├── git-linux/       # Linux-specific git configuration
+    │   └── .config/     # Goes to ~/.config
+    │       └── git/     # Goes to ~/.config/git
+    ├── mise/            # mise-en-place configuration
+    │   └── .config/     # Goes to ~/.config
+    │       └── mise/    # Goes to ~/.config/mise
+    └── brew/            # Homebrew configuration
+        └── Brewfile     # Goes to ~/.brew/Brewfile
+```
+
+## Stow Configuration
+
+A `.stowrc` file in the repository root contains:
+
+```
+--dir=./config
+--target=~/
+--ignore=.stowrc
+--ignore=DS_Store
+```
+
+This makes stow commands simpler by automatically:
+- Looking for files in `./config`
+- Creating symlinks in the home directory
+- Ignoring specific files from being stowed
+
+## Core Components
+
+### GNU Stow
+
+For detailed information about Stow usage and guidelines, see [Stow Guidelines](mdc:.cursor/rules/002-stow-guidelines.mdc).
+
+### mise-en-place
+
+For detailed information about our mise configuration and usage, see [mise Guidelines](mdc:.cursor/rules/003-mise-guidelines.mdc).
+
+### Homebrew & Brewfile
+
+For detailed information about our Brewfile guidelines, see [Brewfile Guidelines](mdc:.cursor/rules/004-brewfile-guidelines.mdc).
+
+## Basic Usage
+
+```bash
+# Clone the repository
+git clone https://github.com/username/dotfiles.git ~/.dotfiles
+
+# Navigate to the repository
+cd ~/.dotfiles
+
+# Stow everything
+stow .
+
+# Stow specific applications
+stow zsh git brew
+
+# Update after changes
+stow -R .
+
+# Install Homebrew packages
+brew bundle --file=~/.brew/Brewfile
+```
+
+## Platform-Specific Considerations
+
+### Zsh Configuration Approach
+
+For zsh, we use conditional functions within a single module rather than separate modules:
+
+```zsh
+# In ~/.config/zsh/platform.zsh
+is_macos() {
+  [[ "$(uname)" == "Darwin" ]]
+}
+
+is_linux() {
+  [[ "$(uname)" == "Linux" ]]
+}
+
+is_wsl() {
+  [[ -f /proc/version ]] && grep -q Microsoft /proc/version
+}
+
+# Then apply conditional settings
+if is_macos; then
+  # macOS-specific settings
+  export PATH="$PATH:/usr/local/bin"
+  # ...
+elif is_linux; then
+  # Linux-specific settings
+  # ...
+  if is_wsl; then
+    # WSL-specific settings
+    # ...
+  fi
+fi
+```
+
+### Git Configuration Approach
+
+For git, we use separate modules for platform-specific configurations:
+
+```
+config/
+├── git/        # Common git configuration (stow git)
+├── git-macos/  # macOS-specific git config (stow git-macos)
+└── git-linux/  # Linux-specific git config (stow git-linux)
+```
+
+Apply git configurations with:
+
+```bash
+# Always apply common git configuration
+stow git
+
+# Then apply platform-specific configuration
+if [[ "$(uname)" == "Darwin" ]]; then
+    stow git-macos
+else
+    stow git-linux
+fi
+```

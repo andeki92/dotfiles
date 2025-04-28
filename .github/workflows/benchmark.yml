@@ -1,0 +1,171 @@
+name: Zsh Startup Benchmark
+
+on:
+  pull_request:
+    paths:
+      - 'config/zsh/**'
+      - 'scripts/benchmark.sh'
+      - '.github/workflows/benchmark.yml'
+      - 'docs/benchmarks.md'
+
+jobs:
+  benchmark-pr:
+    name: Benchmark PR Branch
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout PR Branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          
+      - name: Install required packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh bc stow
+      
+      - name: Setup home environment
+        run: |
+          # Create clean home directory structure for test
+          mkdir -p $HOME/.config $HOME/.local/share $HOME/.cache
+          
+          # Install the dotfiles using stow
+          if [ -d "config/zsh" ]; then
+            stow -d ./config -t $HOME zsh
+            echo "✅ Applied zsh configuration from PR branch"
+          else
+            echo "⚠️ No zsh configuration found in PR branch"
+            exit 1
+          fi
+          
+      - name: Run benchmark on PR branch
+        id: benchmark-pr
+        run: |
+          # Run benchmark with save option
+          ./scripts/benchmark.sh --save
+          
+          # Extract the average time from output for later comparison
+          PR_TIME=$(grep -A 10 "^## CI Benchmarks" docs/benchmarks.md | grep -oE '[0-9]+\.[0-9]+s' | tail -1 | tr -d 's')
+          echo "PR_TIME=$PR_TIME" > /tmp/pr_time.txt
+      
+      - name: Upload PR benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-benchmark
+          path: |
+            /tmp/pr_time.txt
+            docs/benchmarks.md
+  
+  benchmark-main:
+    name: Benchmark Main Branch
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Main Branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          
+      - name: Install required packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh bc stow
+      
+      - name: Setup home environment
+        run: |
+          # Create clean home directory structure for test
+          mkdir -p $HOME/.config $HOME/.local/share $HOME/.cache
+          
+          # Install the dotfiles using stow
+          if [ -d "config/zsh" ]; then
+            stow -d ./config -t $HOME zsh
+            echo "✅ Applied zsh configuration from main branch"
+          else
+            echo "⚠️ No zsh configuration found in main branch"
+            exit 1
+          fi
+          
+      - name: Run benchmark on main branch
+        id: benchmark-main
+        run: |
+          # Run benchmark
+          OUTPUT=$(./scripts/benchmark.sh)
+          
+          # Extract the average time from output
+          MAIN_TIME=$(echo "$OUTPUT" | grep "Average startup time" | awk '{print $4}' | tr -d 's')
+          echo "MAIN_TIME=$MAIN_TIME" > /tmp/main_time.txt
+          
+      - name: Upload main benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: main-benchmark
+          path: /tmp/main_time.txt
+
+  compare-and-comment:
+    name: Compare Results and Comment
+    needs: [benchmark-pr, benchmark-main]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        
+      - name: Compare benchmark results
+        run: |
+          PR_TIME=$(cat pr-benchmark/pr_time.txt | grep "PR_TIME" | cut -d= -f2)
+          MAIN_TIME=$(cat main-benchmark/main_time.txt | grep "MAIN_TIME" | cut -d= -f2)
+          
+          # Calculate the difference
+          DIFF=$(echo "scale=3; $PR_TIME - $MAIN_TIME" | bc)
+          echo "DIFF=$DIFF" >> $GITHUB_ENV
+          
+          # Determine if it's faster or slower
+          if (( $(echo "$DIFF < 0" | bc -l) )); then
+            echo "FASTER=true" >> $GITHUB_ENV
+            echo "DIFF_ABS=${DIFF#-}" >> $GITHUB_ENV
+          else
+            echo "FASTER=false" >> $GITHUB_ENV
+            echo "DIFF_ABS=$DIFF" >> $GITHUB_ENV
+          fi
+          
+          # Store times for comment
+          echo "PR_TIME=$PR_TIME" >> $GITHUB_ENV
+          echo "MAIN_TIME=$MAIN_TIME" >> $GITHUB_ENV
+      
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            
+            const mainTime = process.env.MAIN_TIME;
+            const prTime = process.env.PR_TIME;
+            const diffAbs = process.env.DIFF_ABS;
+            const faster = process.env.FASTER === 'true';
+            
+            let performanceEmoji = faster ? '🚀' : '⚠️';
+            let performanceText = faster ? 
+              `This PR is **${diffAbs}s faster** than main (${prTime}s vs ${mainTime}s)` :
+              `This PR is **${diffAbs}s slower** than main (${prTime}s vs ${mainTime}s)`;
+            
+            // Read the benchmarks.md file to show the history
+            let benchmarkHistory = '';
+            try {
+              const benchmarkFile = fs.readFileSync('pr-benchmark/benchmarks.md', 'utf8');
+              const ciSection = benchmarkFile.split('## CI Benchmarks')[1].split('##')[0];
+              benchmarkHistory = ciSection;
+            } catch (error) {
+              benchmarkHistory = '> Error reading benchmark history';
+            }
+            
+            const comment = `## Zsh Startup Benchmark Results\n\n${performanceEmoji} ${performanceText}\n\n<details>\n<summary>Benchmark History</summary>\n\n${benchmarkHistory}\n</details>\n\n> **Note:** Both configurations were properly installed with stow in clean environments.\n> For the most accurate results, run \`./scripts/benchmark.sh\` locally both before and after your changes.`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            }); 
