@@ -299,7 +299,10 @@ jobs:
             
             # Calculate percentage difference for thresholds
             if [[ "$MAIN_MEDIAN" != "0.000" && "$PR_MEDIAN" != "0.000" ]]; then
-              PERCENT_CHANGE=$(echo "scale=1; ($PR_MEDIAN - $MAIN_MEDIAN) / $MAIN_MEDIAN * 100" | bc)
+              # Invert the formula: positive means PR is faster, negative means PR is slower
+              # When PR time is lower (faster), the result will be positive
+              # When PR time is higher (slower), the result will be negative
+              PERCENT_CHANGE=$(echo "scale=1; ($MAIN_MEDIAN - $PR_MEDIAN) / $MAIN_MEDIAN * 100" | bc)
               echo "PERCENT_CHANGE=$PERCENT_CHANGE%"
             else
               PERCENT_CHANGE="0.0"
@@ -408,10 +411,10 @@ jobs:
             
             if (medianDiff === '0.000') {
               commentText += '⚠️ Could not determine performance difference due to missing or invalid measurements.\n\n';
-            } else if (percentChange && percentChange.startsWith('-') && parseFloat(percentChange) < -25) {
+            } else if (percentChange && parseFloat(percentChange) < -25) {
               // PR is significantly slower (>25%)
-              commentText += `⚠️ **Warning**: This PR is ${percentChange}% slower than the main branch.\n\n`;
-            } else if (percentChange && !percentChange.startsWith('-') && parseFloat(percentChange) > 25) {
+              commentText += `⚠️ **Warning**: This PR is ${Math.abs(parseFloat(percentChange))}% slower than the main branch.\n\n`;
+            } else if (percentChange && parseFloat(percentChange) > 25) {
               // PR is significantly faster (>25%)
               commentText += `🚀 **Great improvement**: This PR is ${percentChange}% faster than the main branch.\n\n`;
             }
@@ -448,7 +451,7 @@ jobs:
           # Fail on significant regressions (>25% slower)
           # Negative percentage means PR is slower than main
           if [[ "$PERCENT_CHANGE" =~ ^- && $(echo "${PERCENT_CHANGE#-} > 25" | bc -l) -eq 1 ]]; then
-            echo "::error::Performance regression detected: $PERCENT_CHANGE% slower than main branch!"
+            echo "::error::Performance regression detected: ${PERCENT_CHANGE#-}% slower than main branch!"
             echo "This exceeds the threshold of 25% regression."
             
             # Exit with error - this will make the GitHub check fail
