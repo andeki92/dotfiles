@@ -238,6 +238,15 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Check if relevant files changed
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            zsh:
+              - 'config/zsh/**'
+              - 'scripts/benchmark.sh'
+              - '.github/workflows/benchmark.yml'
       - name: Checkout PR Branch
         uses: actions/checkout@v4
         with:

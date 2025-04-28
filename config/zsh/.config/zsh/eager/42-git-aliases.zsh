@@ -13,7 +13,7 @@ alias gcm='git commit -m'
 alias gca='git commit --amend'
 
 # Push
-alias gp='git push'
+alias gp=git_push_with_pr
 
 # Pull/Fetch
 alias gf='git fetch'
