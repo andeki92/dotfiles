@@ -15,7 +15,7 @@ This file tracks zsh startup time as configuration changes are made.
 
 | Date | PR | Description | Median | Average |
 |------|-------|-------------|--------|---------|
-| 2025-04-30 | #16 | feat: add kubectl aliases and docs | .070s | .070s |
+| 2025-04-30 | #16 | feat: add kubectl aliases and docs | .030s | .030s |
 | 2025-04-28 | #12 | fix: update fzf-opt parameters | .030s | .030s |
 | 2025-04-28 | #10 | feat: add mise-en-place | .030s | .030s |
 | 2025-04-28 | #8 | feat: add starship and make zsh-defer a submodule | .030s | .031s |
