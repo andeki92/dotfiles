@@ -10,7 +10,7 @@ is_linux() {
 }
 
 is_wsl() {
-  [[ -f /proc/version ]] && grep -q Microsoft /proc/version
+  [[ -f /proc/version ]] && { grep -q *"Microsoft"* /proc/version || grep -q *"microsoft"* /proc/version; }
 }
 
 # Ensure PATH elements are unique to prevent duplication during reload
