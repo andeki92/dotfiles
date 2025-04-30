@@ -52,3 +52,13 @@
 
 [help]
 	autocorrect = prompt 
+
+# Platform-specific configurations using includeIf with os.name
+[includeIf "hasconfig:os.name=macos"]
+	path = ~/.config/git/config-macos
+
+[includeIf "hasconfig:os.name=linux"]
+	path = ~/.config/git/config-linux
+
+[includeIf "hasconfig:os.name=wsl"]
+	path = ~/.config/git/config-wsl 

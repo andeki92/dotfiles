@@ -15,6 +15,7 @@ This file tracks zsh startup time as configuration changes are made.
 
 | Date | PR | Description | Median | Average |
 |------|-------|-------------|--------|---------|
+| 2025-04-30 | #18 | feat: add platform-specific git configs | .040s | .039s |
 | 2025-04-30 | #17 | fix: update PATH setting | .030s | .032s |
 | 2025-04-30 | #16 | feat: add kubectl aliases and docs | .030s | .030s |
 | 2025-04-28 | #12 | fix: update fzf-opt parameters | .030s | .030s |
