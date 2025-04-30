@@ -10,7 +10,13 @@ is_linux() {
 }
 
 is_wsl() {
-  [[ -f /proc/version ]] && { grep -q *"Microsoft"* /proc/version || grep -q *"microsoft"* /proc/version; }
+  # Most reliable WSL detection method:
+  # Check for /proc/sys/fs/binfmt_misc/WSLInterop
+  [[ -e /proc/sys/fs/binfmt_misc/WSLInterop ]] || 
+  # Fallback: check kernel version string for "microsoft" or "Microsoft"
+  [[ "$(uname -r)" =~ [Mm]icrosoft ]] ||
+  # Fallback: check if WSL_DISTRO_NAME environment variable exists
+  [[ -n "${WSL_DISTRO_NAME}" ]]
 }
 
 # Ensure PATH elements are unique to prevent duplication during reload
