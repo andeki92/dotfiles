@@ -20,6 +20,49 @@ The repository follows a modular structure to allow for easy management of diffe
             └── git/     # Goes to ~/.config/git
 ```
 
+## Aliases
+
+This repository includes various aliases to improve productivity across different tools.
+
+### Kubernetes Aliases
+
+| Alias | Command | Description |
+|-------|---------|-------------|
+| `k` | `kubectl` | Main kubectl shorthand |
+| `kg` | `kubectl get` | Get resources |
+| `kgp` | `kubectl get pods` | Get pods |
+| `kd` | `kubectl describe` | Describe resources |
+| `kl` | `kubectl logs` | View logs |
+| `kaf` | `kubectl apply -f` | Apply a YAML file |
+| `kx` | `kubectx` | Switch between clusters |
+| `kn` | `kubens` | Switch between namespaces |
+
+#### Helper Functions
+
+- `kns <namespace>`: Switch to namespace with feedback
+- `klp <pattern>`: Follow logs of pod matching pattern
+- `kep <pattern> [command]`: Execute command in pod matching pattern
+
+### Git Aliases
+
+| Alias | Command | Description |
+|-------|---------|-------------|
+| `g` | `git` | Main git shorthand |
+| `ga` | `git add` | Stage changes |
+| `gc` | `git commit` | Commit changes |
+| `gp` | `git push` | Push changes |
+| `gl` | `git pull` | Pull changes |
+| `gs` | `git status` | Check status |
+
+### Directory Navigation
+
+| Alias | Command | Description |
+|-------|---------|-------------|
+| `..` | `cd ..` | Move up one directory |
+| `...` | `cd ../..` | Move up two directories |
+| `l` | `ls -lah` | List all files with details |
+| `ll` | `ls -lh` | List files with details |
+
 ## Performance Monitoring
 
 This repository includes tooling to monitor zsh startup performance over time.
