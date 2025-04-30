@@ -1,12 +1,12 @@
 # mise-en-place integration for zsh
-# This file is loaded lazily using zsh-defer
+# Load critical PATH integration immediately, defer completions
 
-# Check if mise is installed and defer the activation
+# Check if mise is installed
 if command -v mise &>/dev/null; then
-  # Use zsh-defer to load mise after shell startup
-  zsh-defer eval "$(mise activate zsh)"
+  # Critical: Use eval directly for mise activation to ensure proper PATH setup
+  eval "$(mise activate zsh)"
   
-  # Also defer completion loading
+  # Defer only the completion loading as it's not critical for functionality
   zsh-defer eval "$(mise completion zsh)"
 else
   # Even the error message is deferred to not slow down startup

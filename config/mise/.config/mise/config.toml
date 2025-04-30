@@ -3,7 +3,7 @@
 
 [tools]
 python = "3.12"
-node = "lts"
+node = "22"
 go = "latest"
 rust = "latest"
 kubectl = "latest"
