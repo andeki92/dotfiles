@@ -11,7 +11,3 @@ helm = "latest"
 
 [settings]
 experimental = true
-
-[env]
-# Virtual environment config
-_.python.venv = { path = ".venv", create = true }

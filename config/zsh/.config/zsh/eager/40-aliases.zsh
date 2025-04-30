@@ -4,11 +4,16 @@
 # Navigation
 alias ..='cd ..'
 alias ...='cd ../..'
-alias ll='ls -la'
-alias la='ls -A'
-alias l='ls -CF'
+alias ....='cd ../../..'
+alias .....='cd ../../../..'
+alias -- -='cd -'
 
 # General
 alias c='clear'
 alias h='history'
-alias rl='source ~/.zshrc' 
+alias rl='typeset -U path && source ~/.zshrc'
+
+# Listing
+alias l='ls -lah'
+alias la='ls -lAh'
+alias ll='ls -lh' 

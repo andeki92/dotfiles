@@ -50,4 +50,21 @@ You can customize the reminder frequency by setting `UPDATE_REMINDER_DAYS` in yo
 2. Prompt & basic interactivity (eager)
 3. Package managers & version managers (lazy)
 4. Completions & enhanced features (lazy)
-5. Aliases & user customizations (lazy) 
+5. Aliases & user customizations (lazy)
+
+## PATH Management
+
+To prevent PATH duplication when reloading the shell configuration (`source ~/.zshrc`), we use zsh's `-U` flag with the `path` array, which automatically enforces uniqueness:
+
+```zsh
+# In 10-platform.zsh
+typeset -U path
+```
+
+This approach:
+1. Uses zsh's `path` array which automatically maps to the `PATH` environment variable
+2. The `-U` flag ensures only unique elements are kept in the array
+3. When adding to PATH, we use the array syntax: `path=(/new/path $path)`
+4. The reload alias also reinforces uniqueness: `alias rl='typeset -U path && source ~/.zshrc'`
+
+This pattern prevents PATH from growing with duplicates when reloading the shell configuration multiple times. 
