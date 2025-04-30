@@ -1,0 +1,3 @@
+# Linux-specific Git configuration
+[credential]
+	helper = cache --timeout=3600 
