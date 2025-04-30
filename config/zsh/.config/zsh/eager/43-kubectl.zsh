@@ -80,24 +80,4 @@ kep() {
   CMD=${2:-"sh"}
   echo "Executing $CMD in pod: $POD"
   kubectl exec -it "$POD" -- $CMD
-}
-
-# Completion for kubectl
-if (( $+commands[kubectl] )); then
-  source <(kubectl completion zsh)
-fi
-
-# Completion for kubectx and kubens if installed
-if (( $+commands[kubectx] )); then
-  # Load completion if available
-  command -v compdef >/dev/null && {
-    [[ -f ~/.config/kubectx/completion/kubectx.zsh ]] && source ~/.config/kubectx/completion/kubectx.zsh
-  }
-fi
-
-if (( $+commands[kubens] )); then
-  # Load completion if available
-  command -v compdef >/dev/null && {
-    [[ -f ~/.config/kubectx/completion/kubens.zsh ]] && source ~/.config/kubectx/completion/kubens.zsh
-  }
-fi 
+} 
