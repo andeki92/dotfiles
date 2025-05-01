@@ -7,6 +7,7 @@ tap "homebrew/cask-fonts"
 tap "siderolabs/tap"
 
 # Development Tools
+brew "age"               # Encryption tool
 brew "fd"                # Fast find alternative
 brew "fzf"               # Fuzzy finder
 brew "gh"                # GitHub CLI
@@ -17,6 +18,7 @@ brew "jq"                # JSON processor
 brew "mise"              # Tool version manager (replacing asdf, nvm, etc)
 brew "neovim"            # Improved vim
 brew "ripgrep"           # Fast grep alternative
+brew "sops"              # Secrets management tool
 brew "stow"              # Symlink farm manager for dotfiles
 brew "talosctl"          # Talos CLI
 brew "tree"              # Display directory structure
