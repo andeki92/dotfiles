@@ -12,6 +12,7 @@ brew "fzf"               # Fuzzy finder
 brew "gh"                # GitHub CLI
 brew "git"               # Version control
 brew "git-lfs"           # Git extension for versioning large files
+brew "go-task"           # Task runner / Make alternative
 brew "jq"                # JSON processor
 brew "mise"              # Tool version manager (replacing asdf, nvm, etc)
 brew "neovim"            # Improved vim
@@ -40,6 +41,7 @@ cask "discord"            # Communication platform
 cask "ghostty"            # Terminal emulator
 cask "hammerspoon"        # Automation tool
 cask "karabiner-elements" # Keyboard customizer
+cask "orbstack"           # Alternative to Docker desktop
 cask "raycast"            # Productivity launcher
 cask "slack"              # Team communication
 cask "spotify"            # Music streaming
