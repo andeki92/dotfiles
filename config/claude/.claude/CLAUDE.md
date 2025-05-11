@@ -1,6 +1,6 @@
 # Project Vision & Roadmap Tracking
 
-Whenever you update documents or set up PRs you MUSt do the following:
+Before you start working on a coding task, when you update documents, or when you set up PRs you MUST do the following:
 
 1. Project Context:
     - Determine current project based on working directory path
