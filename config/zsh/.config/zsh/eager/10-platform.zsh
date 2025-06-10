@@ -27,8 +27,7 @@ if is_macos; then
   # macOS-specific minimal settings
   path=(/usr/local/bin /usr/bin /bin /usr/sbin /sbin $path)
   
-  # Set Git os configuration for macOS
-  git config --global os.name macos
+   ln -sf ~/.config/git/config-macos ~/.config/git/config-platform
 elif is_linux; then
   # Linux-specific minimal settings
   path=(/usr/local/bin /usr/bin /bin /usr/local/sbin /usr/sbin /sbin $path)
@@ -37,10 +36,8 @@ elif is_linux; then
     # WSL-specific minimal settings
     # Add Windows interop settings here if needed
     
-    # Set Git os configuration for WSL
-    git config --global os.name wsl
+     ln -sf ~/.config/git/config-wsl ~/.config/git/config-platform
   else
-    # Set Git os configuration for standard Linux
-    git config --global os.name linux
+     ln -sf ~/.config/git/config-linux ~/.config/git/config-platform
   fi
 fi 

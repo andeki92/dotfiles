@@ -78,3 +78,6 @@ __pycache__/
 *.local
 *.bak
 *.tmp 
+
+# Dynamically created with platform setupø
+config-platform
