@@ -8,6 +8,7 @@ tap "siderolabs/tap"
 
 # Development Tools
 brew "age"               # Encryption tool
+brew "coreutils"         # GNU core utilities
 brew "fd"                # Fast find alternative
 brew "fzf"               # Fuzzy finder
 brew "gh"                # GitHub CLI
