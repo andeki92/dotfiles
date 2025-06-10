@@ -6,9 +6,11 @@ python = "3.12"
 node = "22"
 go = "latest"
 rust = "latest"
-kubectl = "latest"
-helm = "latest"
 gradle = "8.14.0"
+kubectl = "latest"
+kubectx = "latest"
+kubens = "latest"
+helm = "latest"
 
 [settings]
 experimental = true
