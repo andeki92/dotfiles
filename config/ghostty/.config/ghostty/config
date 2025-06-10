@@ -50,3 +50,4 @@ keybind = cmd+i=inspector:toggle
 # Tab navigation
 keybind = ctrl+tab=next_tab
 keybind = ctrl+shift+tab=previous_tab
+keybind = shift+enter=text:\n

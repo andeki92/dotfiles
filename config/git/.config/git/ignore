@@ -77,7 +77,10 @@ __pycache__/
 .env.*
 *.local
 *.bak
-*.tmp 
+*.tmp
 
 # Dynamically created with platform setupø
 config-platform
+
+# Never comitt local claude settings
+**/.claude/settings.local.json
