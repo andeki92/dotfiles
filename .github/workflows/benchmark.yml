@@ -22,7 +22,7 @@ jobs:
       pr-average: ${{ steps.extract-values.outputs.pr-average }}
     steps:
       - name: Checkout PR Branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
@@ -60,7 +60,7 @@ jobs:
           fi
       - name: Get PR Title
         id: pr-info
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -136,7 +136,7 @@ jobs:
       main-average: ${{ steps.extract-values.outputs.main-average }}
     steps:
       - name: Checkout Main Branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: main
           fetch-depth: 0
@@ -203,17 +203,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR Branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.ref }}
       - name: Download PR benchmark results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: pr-benchmark
           path: /tmp/pr-results
       
       - name: Download Main benchmark results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: main-benchmark
           path: /tmp/main-results
@@ -288,7 +288,7 @@ jobs:
       
       - name: Get PR Details
         id: pr-details
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -305,7 +305,7 @@ jobs:
           result-encoding: json
       
       - name: Comment on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
