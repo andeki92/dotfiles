@@ -11,7 +11,7 @@ alias brewdry="brew upgrade --dry-run"
 alias brewdump="brew bundle dump --global --force"
 
 # Install everything from Brewfile (global location)
-alias brewinstall="brew bundle --global"
+alias brewinstall="brewup && brew bundle --global"
 
 # Check which packages in Brewfile are installed or missing
 alias brewcheck="brew bundle check --global"
@@ -58,7 +58,7 @@ alias brewfile="echo ${XDG_CONFIG_HOME:-$HOME/.config}/homebrew/Brewfile"
 brewsync() {
   local src="${XDG_CONFIG_HOME:-$HOME/.config}/homebrew/Brewfile"
   local dest="$HOME/.dotfiles/config/brew/.config/homebrew/Brewfile"
-  
+
   if [[ -f "$src" ]]; then
     cp "$src" "$dest"
     echo "Brewfile synced from $src to $dest"
@@ -66,4 +66,4 @@ brewsync() {
     echo "Error: Brewfile not found at $src"
     return 1
   fi
-} 
+}

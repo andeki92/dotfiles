@@ -3,7 +3,6 @@
 
 # Taps
 tap "homebrew/bundle"
-tap "homebrew/cask-fonts"
 tap "siderolabs/tap"
 
 # Development Tools
