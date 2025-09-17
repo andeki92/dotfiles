@@ -15,6 +15,7 @@ This file tracks zsh startup time as configuration changes are made.
 
 | Date | PR | Description | Median | Average |
 |------|-------|-------------|--------|---------|
+| 2025-09-08 | #31 | build(deps): bump the actions group across 1 directory with 3 updates | .040s | .040s |
 | 2025-04-30 | #18 | feat: add platform-specific git configs | .040s | .039s |
 | 2025-04-30 | #17 | fix: update PATH setting | .030s | .032s |
 | 2025-04-30 | #16 | feat: add kubectl aliases and docs | .030s | .030s |
