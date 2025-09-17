@@ -18,6 +18,7 @@ brew "go-task"           # Task runner / Make alternative
 brew "jq"                # JSON processor
 brew "mise"              # Tool version manager (replacing asdf, nvm, etc)
 brew "neovim"            # Improved vim
+brew "opentofu"          # Terraform replacement
 brew "ripgrep"           # Fast grep alternative
 brew "sops"              # Secrets management tool
 brew "stow"              # Symlink farm manager for dotfiles
