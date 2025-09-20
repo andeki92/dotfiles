@@ -11,6 +11,7 @@ kubectl = "latest"
 kubectx = "latest"
 kubens = "latest"
 helm = "latest"
+lefthook = "latest"
 
 [settings]
 experimental = true
