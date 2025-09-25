@@ -2,7 +2,6 @@
 # Based on the Brewfile Guidelines from our dotfiles philosophy
 
 # Taps
-tap "homebrew/bundle"
 tap "siderolabs/tap"
 
 # Development Tools

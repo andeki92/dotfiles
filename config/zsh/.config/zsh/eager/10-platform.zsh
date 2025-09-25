@@ -35,9 +35,10 @@ elif is_linux; then
   if is_wsl; then
     # WSL-specific minimal settings
     # Add Windows interop settings here if needed
+    path=(/home/linuxbrew/.linuxbrew $path)
     
      ln -sf ~/.config/git/config-wsl ~/.config/git/config-platform
   else
      ln -sf ~/.config/git/config-linux ~/.config/git/config-platform
   fi
-fi 
+fi
