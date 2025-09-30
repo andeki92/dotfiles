@@ -2,7 +2,7 @@
 # See: https://mise.jdx.dev/configuration.html
 
 [tools]
-python = "3.12"
+python = "latest"
 node = "22"
 go = "latest"
 rust = "latest"
@@ -12,6 +12,7 @@ kubectx = "latest"
 kubens = "latest"
 helm = "latest"
 lefthook = "latest"
+gitleaks = "latest"
 
 [settings]
 experimental = true

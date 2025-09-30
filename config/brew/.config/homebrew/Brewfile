@@ -31,6 +31,7 @@ brew "curl"              # URL transfer tool
 brew "exa" if OS.mac?    # Modern ls replacement
 brew "grep"              # GNU grep
 brew "htop"              # Interactive process viewer
+brew "markdownlint-cli2" # Markdown formatter
 brew "mas" if OS.mac?    # Mac App Store CLI
 brew "starship"          # Cross-shell prompt
 brew "wget"              # Internet file retriever
@@ -48,6 +49,7 @@ cask "raycast"            # Productivity launcher
 cask "slack"              # Team communication
 cask "spotify"            # Music streaming
 cask "obsidian"           # Markdown note-taking app
+cask "macfuse"            # EXT support
 
 # Development Applications
 cask "cursor"            # AI editor

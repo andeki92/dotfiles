@@ -12,7 +12,7 @@ is_linux() {
 is_wsl() {
   # Most reliable WSL detection method:
   # Check for /proc/sys/fs/binfmt_misc/WSLInterop
-  [[ -e /proc/sys/fs/binfmt_misc/WSLInterop ]] || 
+  [[ -e /proc/sys/fs/binfmt_misc/WSLInterop ]] ||
   # Fallback: check kernel version string for "microsoft" or "Microsoft"
   [[ "$(uname -r)" =~ [Mm]icrosoft ]] ||
   # Fallback: check if WSL_DISTRO_NAME environment variable exists
@@ -25,13 +25,13 @@ typeset -U path
 # Platform-specific settings (minimal)
 if is_macos; then
   # macOS-specific minimal settings
-  path=(/usr/local/bin /usr/bin /bin /usr/sbin /sbin $path)
-  
+  path=(/usr/local/bin /usr/bin /bin /usr/sbin /sbin $HOME/.local/bin $path)
+
    ln -sf ~/.config/git/config-macos ~/.config/git/config-platform
 elif is_linux; then
   # Linux-specific minimal settings
   path=(/usr/local/bin /usr/bin /bin /usr/local/sbin /usr/sbin /sbin $path)
-  
+
   if is_wsl; then
     # WSL-specific minimal settings
     # Add Windows interop settings here if needed
@@ -47,4 +47,3 @@ elif is_linux; then
 fi
 
 export PATH
-
