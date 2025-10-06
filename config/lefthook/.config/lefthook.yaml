@@ -23,7 +23,7 @@ pre-commit:
       files: git diff --name-only --diff-filter=d --staged
       run: yarn eslint {staged_files}
       glob: "*.{js,ts,jsx,tsx}"
-    - name: Go Vet\
+    - name: Go Vet
       tags: backend
       files: git diff --name-only --diff-filter=d --staged
       glob: "*.go"
