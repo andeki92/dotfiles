@@ -5,4 +5,7 @@
 .cache/mise/
 
 # Ignore log files
-*.log 
+*.log
+
+# Ignore age keys
+age.txt

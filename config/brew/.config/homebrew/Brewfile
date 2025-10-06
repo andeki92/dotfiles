@@ -5,7 +5,6 @@
 tap "siderolabs/tap"
 
 # Development Tools
-brew "age"                      # Encryption tool
 brew "coreutils"                # GNU core utilities
 brew "fd"                       # Fast find alternative
 brew "fzf"                      # Fuzzy finder
@@ -18,7 +17,6 @@ brew "mise"                     # Tool version manager (replacing asdf, nvm, etc
 brew "neovim"                   # Improved vim
 brew "opentofu"                 # Terraform replacement
 brew "ripgrep"                  # Fast grep alternative
-brew "sops"                     # Secrets management tool
 brew "stow"                     # Symlink farm manager for dotfiles
 brew "talosctl"                 # Talos CLI
 brew "tree"                     # Display directory structure
@@ -39,17 +37,17 @@ brew "zsh"               # Improved shell
 brew "zsh-completions"   # Additional completions for zsh
 
 # Applications
-cask "firefox"            # Browser
 cask "discord"            # Communication platform
+cask "firefox"            # Browser
 cask "ghostty"            # Terminal emulator
 cask "hammerspoon"        # Automation tool
 cask "karabiner-elements" # Keyboard customizer
+cask "macfuse"            # EXT support
+cask "obsidian"           # Markdown note-taking app
 cask "orbstack"           # Alternative to Docker desktop
 cask "raycast"            # Productivity launcher
 cask "slack"              # Team communication
 cask "spotify"            # Music streaming
-cask "obsidian"           # Markdown note-taking app
-cask "macfuse"            # EXT support
 
 # Development Applications
 cask "cursor"            # AI editor

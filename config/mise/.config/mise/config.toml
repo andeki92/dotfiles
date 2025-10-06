@@ -2,6 +2,7 @@
 # See: https://mise.jdx.dev/configuration.html
 
 [tools]
+age = "latest"
 gitleaks = "latest"
 go = "latest"
 gradle = "8.14.0"
@@ -14,6 +15,7 @@ neovim = "latest"
 node = "22"
 python = "latest"
 rust = "latest"
+sops = "latest"
 
 [settings]
 experimental = true
