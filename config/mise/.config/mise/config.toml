@@ -2,17 +2,18 @@
 # See: https://mise.jdx.dev/configuration.html
 
 [tools]
-python = "latest"
-node = "22"
+gitleaks = "latest"
 go = "latest"
-rust = "latest"
 gradle = "8.14.0"
+helm = "latest"
 kubectl = "latest"
 kubectx = "latest"
 kubens = "latest"
-helm = "latest"
 lefthook = "latest"
-gitleaks = "latest"
+neovim = "latest"
+node = "22"
+python = "latest"
+rust = "latest"
 
 [settings]
 experimental = true
