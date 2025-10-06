@@ -6,7 +6,7 @@ My personal dotfiles, managed with GNU Stow.
 
 The repository follows a modular structure to allow for easy management of different tools and environments:
 
-```
+```text
 .dotfiles/               # Root directory
 ├── .stowrc              # Stow configuration 
 ├── scripts/             # Helper scripts
@@ -26,16 +26,16 @@ This repository includes various aliases to improve productivity across differen
 
 ### Kubernetes Aliases
 
-| Alias | Command | Description |
-|-------|---------|-------------|
-| `k` | `kubectl` | Main kubectl shorthand |
-| `kg` | `kubectl get` | Get resources |
-| `kgp` | `kubectl get pods` | Get pods |
-| `kd` | `kubectl describe` | Describe resources |
-| `kl` | `kubectl logs` | View logs |
-| `kaf` | `kubectl apply -f` | Apply a YAML file |
-| `kx` | `kubectx` | Switch between clusters |
-| `kn` | `kubens` | Switch between namespaces |
+| Alias | Command            | Description               |
+|-------|--------------------|---------------------------|
+| `k`   | `kubectl`          | Main kubectl shorthand    |
+| `kg`  | `kubectl get`      | Get resources             |
+| `kgp` | `kubectl get pods` | Get pods                  |
+| `kd`  | `kubectl describe` | Describe resources        |
+| `kl`  | `kubectl logs`     | View logs                 |
+| `kaf` | `kubectl apply -f` | Apply a YAML file         |
+| `kx`  | `kubectx`          | Switch between clusters   |
+| `kn`  | `kubens`           | Switch between namespaces |
 
 #### Helper Functions
 
@@ -45,23 +45,23 @@ This repository includes various aliases to improve productivity across differen
 
 ### Git Aliases
 
-| Alias | Command | Description |
-|-------|---------|-------------|
-| `g` | `git` | Main git shorthand |
-| `ga` | `git add` | Stage changes |
-| `gc` | `git commit` | Commit changes |
-| `gp` | `git push` | Push changes |
-| `gl` | `git pull` | Pull changes |
-| `gs` | `git status` | Check status |
+| Alias | Command      | Description        |
+|-------|--------------|--------------------|
+| `g`   | `git`        | Main git shorthand |
+| `ga`  | `git add`    | Stage changes      |
+| `gc`  | `git commit` | Commit changes     |
+| `gp`  | `git push`   | Push changes       |
+| `gl`  | `git pull`   | Pull changes       |
+| `gs`  | `git status` | Check status       |
 
 ### Directory Navigation
 
-| Alias | Command | Description |
-|-------|---------|-------------|
-| `..` | `cd ..` | Move up one directory |
-| `...` | `cd ../..` | Move up two directories |
-| `l` | `ls -lah` | List all files with details |
-| `ll` | `ls -lh` | List files with details |
+| Alias | Command    | Description                 |
+|-------|------------|-----------------------------|
+| `..`  | `cd ..`    | Move up one directory       |
+| `...` | `cd ../..` | Move up two directories     |
+| `l`   | `ls -lah`  | List all files with details |
+| `ll`  | `ls -lh`   | List files with details     |
 
 ## Performance Monitoring
 
@@ -81,7 +81,8 @@ To measure zsh startup time:
 
 ### Automated Benchmarks
 
-Pull requests that modify zsh configurations will automatically trigger benchmark tests through GitHub Actions. The action will:
+Pull requests that modify zsh configurations will automatically trigger benchmark tests through GitHub Actions. The
+action will:
 
 1. Run benchmarks on both the PR branch and main branch
 2. Compare the results
@@ -106,4 +107,4 @@ stow zsh git
 
 # Update after changes
 stow -R .
-``` 
+```
