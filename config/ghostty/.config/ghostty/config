@@ -2,7 +2,7 @@
 # See: https://ghostty.org/docs/config
 
 # Theme configuration - using catppuccin theme with auto light/dark switching
-theme = catppuccin-macchiato
+theme = Catppuccin Macchiato
 
 # Font configuration
 font-family = JetBrains Mono Nerd Font
