@@ -51,8 +51,8 @@ _helmtpl_pick_cluster() {
 }
 
 _helmtpl_ensure_outdir() {
-  mkdir -p "outputs"
-  echo "outputs"
+  mkdir -p "output"
+  echo "output"
 }
 
 _helmtpl_build_deps() {
