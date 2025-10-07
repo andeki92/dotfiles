@@ -26,9 +26,7 @@ _helmtpl_detect_base() {
 
 _helmtpl_overlays_from_base() { echo "${1/base/overlays}"; }
 
-_helmtpl_list_apps() {
-  find "$1" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
-}
+_helmtpl_list_apps() { find "$1" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort; }
 
 _helmtpl_select() { fzf --prompt="$1"; }
 
@@ -50,72 +48,70 @@ _helmtpl_pick_cluster() {
   echo "$ctx"
 }
 
-_helmtpl_ensure_outdir() {
-  mkdir -p "output"
-  echo "output"
-}
+_helmtpl_outdir() { mkdir -p "output"; echo "output"; }
 
 _helmtpl_build_deps() {
   local chart_dir="$1"
   [ -f "$chart_dir/Chart.yaml" ] || return 0
-  [ "${HELM_SKIP_DEPS:-0}" = "1" ] && return 0
-  local cmd="${HELM_DEP_CMD:-build}"   # build | update
-  case "$cmd" in
-    build|update) : ;;
-    *) cmd="build" ;;
-  esac
+  local cmd="${HELM_DEP_CMD:-build}" # build|update
+  case "$cmd" in build|update) : ;; *) cmd="build" ;; esac
   echo "Resolving chart dependencies in: $chart_dir (helm dependency $cmd)"
   helm dependency "$cmd" "$chart_dir"
 }
 
-_helmtpl_render() {
+# Try a template render. Args: app cluster chart_path [fargs...]
+_helmtpl_try_template() {
   local app="$1" cluster="$2" chart_path="$3"; shift 3
-  local outdir; outdir="$(_helmtpl_ensure_outdir)"
+  local outdir; outdir="$(_helmtpl_outdir)"
   local outfile="$outdir/${app}-${cluster}.yaml"
 
-  helm template "$app" "$chart_path" \
-    "$@" \
-    --set-string "global.cluster=$cluster" \
-    > "$outfile" || return $?
-
-  echo "Rendered: $outfile"
+  # capture stderr to show on failure
+  if helm template "$app" "$chart_path" "$@" --set-string "global.cluster=$cluster" >"$outfile" 2>"/tmp/helmtpl.err"; then
+    echo "Rendered: $outfile"
+    return 0
+  else
+    # bubble up error, keep stderr available
+    cat /tmp/helmtpl.err 1>&2
+    rm -f /tmp/helmtpl.err
+    return 1
+  fi
 }
 
 # =========================
 # Public entrypoint
 # =========================
 helm_template() {
-  set -u
+  setopt LOCAL_OPTIONS NO_UNSET
   _helmtpl_require || return 1
 
-  # Early exit if repo structure missing
+  # validate repo layout early
   local base; base="$(_helmtpl_detect_base)" || {
-    echo "Error: not in a valid Helm repo (missing argocd/apps/base or apps/base or HELM_APPS_BASE)"
-    return 1
-  }
+    echo "Error: not in a valid Helm repo (need argocd/apps/base or apps/base or HELM_APPS_BASE)"; return 1; }
   local overlays; overlays="$(_helmtpl_overlays_from_base "$base")"
   [ -d "$overlays" ] || echo "Warning: overlays path not found: $overlays"
 
-  local app="${1:-}"
-  local cluster="${2:-}"
-
+  local app="${1:-}"; local cluster="${2:-}"
   [ -n "$app" ] || app="$(_helmtpl_pick_app "$base")"
   [ -n "$cluster" ] || cluster="$(_helmtpl_pick_cluster)"
 
   local app_base_dir="$base/$app"
   [ -d "$app_base_dir" ] || { echo "App not found: $app_base_dir"; return 1; }
-
   local app_overlay_dir="$overlays/$cluster/$app"
   [ -d "$app_overlay_dir" ] || echo "Warning: overlay not found: $app_overlay_dir"
 
+  # -f args as array (zsh-safe)
   local -a fargs=()
   [ -f "$app_base_dir/values.yaml" ]    && fargs+=(-f "$app_base_dir/values.yaml")
   [ -f "$app_overlay_dir/values.yaml" ] && fargs+=(-f "$app_overlay_dir/values.yaml")
 
-  _helmtpl_build_deps "$app_base_dir" || {
-    echo "Error: failed to resolve chart dependencies in $app_base_dir"
-    return 1
-  }
+  # 1) try render
+  if _helmtpl_try_template "$app" "$cluster" "$app_base_dir" "${fargs[@]}"; then
+    return 0
+  fi
 
-  _helmtpl_render "$app" "$cluster" "$app_base_dir" "${fargs[@]}"
+  # 2) on failure, resolve deps then retry once
+  echo "Initial render failed. Attempting dependency resolution..."
+  _helmtpl_build_deps "$app_base_dir" || { echo "Dependency resolution failed"; return 1; }
+
+  _helmtpl_try_template "$app" "$cluster" "$app_base_dir" "${fargs[@]}"
 }
