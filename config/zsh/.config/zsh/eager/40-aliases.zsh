@@ -6,7 +6,6 @@ alias ..='cd ..'
 alias ...='cd ../..'
 alias ....='cd ../../..'
 alias .....='cd ../../../..'
-alias -- -='cd -'
 
 # General
 alias c='clear'
@@ -16,4 +15,4 @@ alias rl='typeset -U path && source ~/.zshrc'
 # Listing
 alias l='ls -lah'
 alias la='ls -lAh'
-alias ll='ls -lh' 
+alias ll='ls -lh'
