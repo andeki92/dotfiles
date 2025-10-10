@@ -2,6 +2,7 @@
 # See: https://mise.jdx.dev/configuration.html
 
 [tools]
+adr-tools = "latest"
 age = "latest"
 gitleaks = "latest"
 go = "latest"
