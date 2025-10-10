@@ -13,10 +13,13 @@ kubectx = "latest"
 kubens = "latest"
 lefthook = "latest"
 neovim = "latest"
-node = "22"
+node = "latest"
 python = "latest"
 rust = "latest"
 sops = "latest"
 
 [settings]
 experimental = true
+
+[env]
+MISE_NODE_DEFAULT_PACKAGES_FILE = '$XDG_CONFIG_HOME/mise/.default-npm-packages'
