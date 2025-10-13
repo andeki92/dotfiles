@@ -1,37 +1,18 @@
 # Brewfile for dotfiles setup
 # Based on the Brewfile Guidelines from our dotfiles philosophy
 
-# Taps
-tap "siderolabs/tap"
-
 # Development Tools
 brew "coreutils"                # GNU core utilities
-brew "fd"                       # Fast find alternative
-brew "fzf"                      # Fuzzy finder
-brew "gh"                       # GitHub CLI
 brew "git" if OS.mac?           # Version control
 brew "git-lfs"                  # Git extension for versioning large files
-brew "go-task"                  # Task runner / Make alternative
-brew "jq"                       # JSON processor
 brew "mise"                     # Tool version manager (replacing asdf, nvm, etc)
-brew "neovim"                   # Improved vim
-brew "opentofu"                 # Terraform replacement
-brew "ripgrep"                  # Fast grep alternative
 brew "stow"                     # Symlink farm manager for dotfiles
-brew "talosctl"                 # Talos CLI
 brew "tree"                     # Display directory structure
-brew "yq"                       # YAML processor
 
 # Shells and CLI Utilities
-brew "bat"               # Cat with syntax highlighting
-brew "bottom"            # System monitor
 brew "curl"              # URL transfer tool
 brew "exa" if OS.mac?    # Modern ls replacement
-brew "grep"              # GNU grep
-brew "htop"              # Interactive process viewer
-brew "markdownlint-cli2" # Markdown formatter
 brew "mas" if OS.mac?    # Mac App Store CLI
-brew "starship"          # Cross-shell prompt
 brew "wget"              # Internet file retriever
 brew "zsh"               # Improved shell
 brew "zsh-completions"   # Additional completions for zsh
