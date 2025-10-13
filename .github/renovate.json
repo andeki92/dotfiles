@@ -1,0 +1,25 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["before 5am on monday"],
+  "groupName": "all dependencies",
+  "separateMajorMinor": true,
+  "minimumReleaseAge": "3 days",
+  "packageRules": [
+    {
+      "description": "Group all GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "automerge": false
+    },
+    {
+      "description": "Group all mise tool updates",
+      "matchManagers": ["mise"],
+      "groupName": "mise tools",
+      "automerge": false
+    }
+  ],
+  "mise": {
+    "enabled": true
+  }
+}
