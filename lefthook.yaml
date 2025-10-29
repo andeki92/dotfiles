@@ -1,0 +1,18 @@
+---
+pre-push:
+  parallel: true
+  commands:
+    secrets-detection:
+      tags: secrets
+      run: .lefthook/gitleaks.sh pre-push
+
+pre-commit:
+  parallel: true
+  commands:
+    secrets-detection:
+      tags: secrets
+      run: .lefthook/gitleaks.sh pre-commit
+    yamllint:
+      tags: yaml style
+      glob: "*.{yml,yaml}"
+      run: yamllint {staged_files}
