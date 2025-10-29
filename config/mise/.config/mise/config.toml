@@ -41,6 +41,3 @@ lazygit = "0.55.1"
 
 [settings]
 experimental = true
-
-[env]
-MISE_NODE_DEFAULT_PACKAGES_FILE = '$XDG_CONFIG_HOME/mise/.default-npm-packages'
