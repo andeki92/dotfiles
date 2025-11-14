@@ -107,23 +107,7 @@ ffx() {
   echo "$result"
 }
 
-# Advanced git branch management
-fbr() {
-  local branches branch
-  branches=$(git branch --all | grep -v HEAD) &&
-  branch=$(echo "$branches" |
-           fzf --ansi \
-               --preview="git log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --color=always \$(echo {} | sed 's/^[* ]*//' | sed 's#remotes/[^/]*/##')" \
-               --height=70% \
-               --layout=reverse \
-               --border=rounded \
-               --prompt="Branch > " \
-               --pointer="→" \
-               --header="Select git branch to checkout" |
-           sed 's/^[* ]*//' | 
-           sed 's#remotes/[^/]*/##') &&
-  git checkout "$branch"
-}
+# Note: fbr() function moved to 52-fzf-github.zsh for better GitHub integration
 
 # =======================================================
 # Load FZF shell integration (completions and key bindings)
