@@ -6,23 +6,50 @@
 # =======================================================
 
 fgh() {
-  local repo action
+  local repo action key
 
   while true; do
-    # Find all git repos in privatespace
-    repo=$(fd -H -t d '^\.git$' ~/privatespace --max-depth 3 --exec dirname 2>/dev/null |
-           fzf --ansi \
-               --preview='_fgh_repo_preview {}' \
-               --preview-window='right:60%' \
-               --header='Select repo | [Enter]=Menu [Ctrl-P]=PRs [Ctrl-I]=Issues [Ctrl-B]=Branches [Ctrl-C]=CD [ESC]=Quit' \
-               --prompt="Repository > " \
-               --pointer="→" \
-               --bind='ctrl-p:execute(echo pr)+abort' \
-               --bind='ctrl-i:execute(echo issue)+abort' \
-               --bind='ctrl-b:execute(echo branch)+abort' \
-               --bind='ctrl-c:execute(echo cd)+abort' \
-               --bind='ctrl-s:execute(echo status)+abort' \
-               --bind='ctrl-l:execute(echo log)+abort')
+    # Find all git repos in privatespace and workspace, with markers
+    local result=$(
+      {
+        fd -H -t d '^\.git$' ~/privatespace --max-depth 3 --exec dirname 2>/dev/null | sed 's|^|[PRIVATE] |'
+        fd -H -t d '^\.git$' ~/workspace --max-depth 3 --exec dirname 2>/dev/null | sed 's|^|[WORK] |'
+      } | fzf --ansi \
+          --expect=ctrl-p,ctrl-i,ctrl-b,ctrl-c,ctrl-s,ctrl-l \
+          --preview='
+            repo_path=$(echo {} | sed "s/^\[.*\] //")
+            cd "$repo_path" 2>/dev/null || exit 1
+            echo "📁 Repository: $(basename "$repo_path")"
+            echo "📍 Path: $repo_path"
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "📊 Status:"
+            git status -sb 2>/dev/null || echo "Not a git repository"
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "📝 Recent commits:"
+            git log --oneline --decorate --graph -5 2>/dev/null || echo "No commits"
+            echo ""
+            if command -v gh >/dev/null 2>&1; then
+              pr_count=$(gh pr list --json number 2>/dev/null | jq ". | length" 2>/dev/null)
+              issue_count=$(gh issue list --json number 2>/dev/null | jq ". | length" 2>/dev/null)
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "🔀 Pull Requests: ${pr_count:-0}"
+              echo "🎯 Issues: ${issue_count:-0}"
+            fi
+          ' \
+          --preview-window='right:60%' \
+          --header='Select repo | [Enter]=Menu [Ctrl-P]=PRs [Ctrl-I]=Issues [Ctrl-B]=Branches [Ctrl-C]=CD [ESC]=Quit' \
+          --prompt="Repository > " \
+          --pointer="→"
+    )
+
+    # Exit if no repo selected
+    [[ -z "$result" ]] && return
+
+    # Parse the result - first line is the key, second line is the selection
+    key=$(echo "$result" | head -1)
+    repo=$(echo "$result" | tail -1 | sed 's/^\[.*\] //')
 
     # Exit if no repo selected
     [[ -z "$repo" ]] && return
@@ -31,16 +58,16 @@ fgh() {
     local original_dir="$PWD"
     cd "$repo" || return
 
-    # Check what action was triggered
-    if [[ -f /tmp/fzf-action ]]; then
-      action=$(cat /tmp/fzf-action)
-      rm /tmp/fzf-action
-    fi
-
-    # Show action menu if Enter was pressed (no action file created)
-    if [[ -z "$action" ]]; then
-      action=$(_fgh_action_menu "$(basename "$repo")")
-    fi
+    # Map key to action
+    case "$key" in
+      ctrl-p) action="pr" ;;
+      ctrl-i) action="issue" ;;
+      ctrl-b) action="branch" ;;
+      ctrl-c) action="cd" ;;
+      ctrl-s) action="status" ;;
+      ctrl-l) action="log" ;;
+      *) action=$(_fgh_action_menu "$(basename "$repo")") ;;
+    esac
 
     # Execute the selected action
     case "$action" in
@@ -62,40 +89,6 @@ fgh() {
     echo
     [[ "$response" =~ ^[Nn]$ ]] && break
   done
-}
-
-# =======================================================
-# Helper: Repository Preview
-# =======================================================
-
-_fgh_repo_preview() {
-  local repo="$1"
-  cd "$repo" 2>/dev/null || return
-
-  echo "📁 Repository: $(basename "$repo")"
-  echo "📍 Path: $repo"
-  echo ""
-
-  # Show git status
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "📊 Status:"
-  git status -sb 2>/dev/null || echo "Not a git repository"
-  echo ""
-
-  # Show recent commits
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "📝 Recent commits:"
-  git log --oneline --decorate --graph -5 2>/dev/null || echo "No commits"
-  echo ""
-
-  # Show PR count if gh is available
-  if command -v gh >/dev/null 2>&1; then
-    local pr_count=$(gh pr list --json number 2>/dev/null | jq '. | length' 2>/dev/null)
-    local issue_count=$(gh issue list --json number 2>/dev/null | jq '. | length' 2>/dev/null)
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "🔀 Pull Requests: ${pr_count:-0}"
-    echo "🎯 Issues: ${issue_count:-0}"
-  fi
 }
 
 # =======================================================
@@ -125,7 +118,7 @@ cd\t📁 Change Directory to $repo_name" |
 # =======================================================
 
 _fgh_pr_browser() {
-  local pr selected action pr_number
+  local result key pr pr_number action
 
   # Check if gh is available
   if ! command -v gh >/dev/null 2>&1; then
@@ -135,28 +128,54 @@ _fgh_pr_browser() {
 
   while true; do
     # Get PR list
-    pr=$(gh pr list --limit 50 --json number,title,author,state,updatedAt,headRefName,labels 2>/dev/null |
+    result=$(gh pr list --limit 50 --json number,title,author,state,updatedAt,headRefName,labels 2>/dev/null |
          jq -r '.[] | "#\(.number)\t\(.title)\t@\(.author.login)\t[\(.state)]\t\(.headRefName)"' |
          fzf --ansi \
              --delimiter='\t' \
              --with-nth=1,2,3,4 \
-             --preview='_fgh_pr_preview {1}' \
+             --expect=ctrl-v,ctrl-o,ctrl-d \
+             --preview='
+               pr_num=$(echo {1} | sed "s/#//")
+               gh pr view "$pr_num" 2>/dev/null || echo "Unable to load PR details"
+             ' \
              --preview-window='right:65%:wrap' \
-             --header='[Enter]=Actions [Ctrl-V]=View Web [Ctrl-C]=Checkout [Ctrl-D]=Diff [ESC]=Back' \
+             --header='[Enter]=Actions [Ctrl-V]=View Web [Ctrl-O]=Checkout [Ctrl-D]=Diff [ESC]=Back' \
              --prompt="PR > " \
              --pointer="→" \
-             --marker="✓" \
-             --bind='ctrl-v:execute(gh pr view {1} --web)' \
-             --bind='ctrl-c:execute(gh pr checkout {1})+abort' \
-             --bind='ctrl-d:execute(gh pr diff {1} --color=always | bat --language=diff --paging=always)')
+             --marker="✓")
 
     # Exit if no PR selected
+    [[ -z "$result" ]] && return
+
+    # Parse result
+    key=$(echo "$result" | head -1)
+    pr=$(echo "$result" | tail -1)
+
+    # Exit if no PR in result
     [[ -z "$pr" ]] && return
 
     # Extract PR number
     pr_number=$(echo "$pr" | cut -f1 | sed 's/#//')
 
-    # Show action menu
+    # Handle quick actions from ctrl keys
+    case "$key" in
+      ctrl-v)
+        gh pr view "$pr_number" --web
+        continue
+        ;;
+      ctrl-o)
+        gh pr checkout "$pr_number"
+        echo "✅ Checked out PR #$pr_number"
+        read -k 1 "?Press any key to continue..."
+        continue
+        ;;
+      ctrl-d)
+        gh pr diff "$pr_number" --color=always | bat --language=diff --paging=always
+        continue
+        ;;
+    esac
+
+    # Show action menu for Enter key
     action=$(_fgh_pr_action_menu "$pr_number")
 
     case "$action" in
@@ -232,15 +251,6 @@ _fgh_pr_browser() {
 }
 
 # =======================================================
-# PR Preview
-# =======================================================
-
-_fgh_pr_preview() {
-  local pr_number=$(echo "$1" | sed 's/#//')
-  gh pr view "$pr_number" 2>/dev/null || echo "Unable to load PR details"
-}
-
-# =======================================================
 # PR Action Menu
 # =======================================================
 
@@ -270,7 +280,7 @@ web\t🌐 Open in Browser" |
 # =======================================================
 
 _fgh_issue_browser() {
-  local issue selected action issue_number
+  local result key issue issue_number action
 
   # Check if gh is available
   if ! command -v gh >/dev/null 2>&1; then
@@ -279,23 +289,50 @@ _fgh_issue_browser() {
   fi
 
   while true; do
-    issue=$(gh issue list --limit 50 --json number,title,state,author,labels 2>/dev/null |
+    result=$(gh issue list --limit 50 --json number,title,state,author,labels 2>/dev/null |
             jq -r '.[] | "#\(.number)\t\(.title)\t@\(.author.login)\t[\(.state)]"' |
             fzf --ansi \
                 --delimiter='\t' \
                 --with-nth=1,2,3,4 \
-                --preview='gh issue view {1}' \
+                --expect=ctrl-v,ctrl-o,ctrl-r \
+                --preview='
+                  issue_num=$(echo {1} | sed "s/#//")
+                  gh issue view "$issue_num" 2>/dev/null || echo "Unable to load issue details"
+                ' \
                 --preview-window='right:65%:wrap' \
-                --header='[Enter]=Actions [Ctrl-V]=View Web [Ctrl-C]=Close [Ctrl-R]=Reopen [ESC]=Back' \
+                --header='[Enter]=Actions [Ctrl-V]=View Web [Ctrl-O]=Close [Ctrl-R]=Reopen [ESC]=Back' \
                 --prompt="Issue > " \
-                --pointer="→" \
-                --bind='ctrl-v:execute(gh issue view {1} --web)' \
-                --bind='ctrl-c:execute(gh issue close {1})' \
-                --bind='ctrl-r:execute(gh issue reopen {1})')
+                --pointer="→")
+
+    [[ -z "$result" ]] && return
+
+    # Parse result
+    key=$(echo "$result" | head -1)
+    issue=$(echo "$result" | tail -1)
 
     [[ -z "$issue" ]] && return
 
     issue_number=$(echo "$issue" | cut -f1 | sed 's/#//')
+
+    # Handle quick actions from ctrl keys
+    case "$key" in
+      ctrl-v)
+        gh issue view "$issue_number" --web
+        continue
+        ;;
+      ctrl-o)
+        gh issue close "$issue_number"
+        echo "✅ Closed issue #$issue_number"
+        read -k 1 "?Press any key to continue..."
+        continue
+        ;;
+      ctrl-r)
+        gh issue reopen "$issue_number"
+        echo "✅ Reopened issue #$issue_number"
+        read -k 1 "?Press any key to continue..."
+        continue
+        ;;
+    esac
 
     action=$(_fgh_issue_action_menu "$issue_number")
 
@@ -322,7 +359,7 @@ _fgh_issue_browser() {
         read -k 1 "?Press any key to continue..."
         ;;
       web)
-        gh pr view "$issue_number" --web
+        gh issue view "$issue_number" --web
         ;;
       *)
         return
@@ -357,25 +394,56 @@ web\t🌐 Open in Browser" |
 # =======================================================
 
 _fgh_branch_manager() {
-  local branch action
+  local result key branch action
 
   while true; do
-    branch=$(git branch --all --sort=-committerdate |
+    result=$(git branch --all --sort=-committerdate |
              grep -v HEAD |
              sed 's/^[* ]*//' |
              sed 's#remotes/origin/##' |
              awk '!seen[$0]++' |
              fzf --ansi \
+                 --expect=ctrl-d,ctrl-m,ctrl-p \
                  --preview='git log --graph --pretty=format:"%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset" --color=always {} -10' \
                  --preview-window='right:65%:wrap' \
-                 --header='[Enter]=Checkout [Ctrl-D]=Delete [Ctrl-M]=Merge [Ctrl-P]=Pull [ESC]=Back' \
+                 --header='[Enter]=Menu [Ctrl-D]=Delete [Ctrl-M]=Merge [Ctrl-P]=Pull [ESC]=Back' \
                  --prompt="Branch > " \
-                 --pointer="→" \
-                 --bind='ctrl-d:execute(git branch -d {})' \
-                 --bind='ctrl-m:execute(git merge {})+abort' \
-                 --bind='ctrl-p:execute(git pull origin {})+abort')
+                 --pointer="→")
+
+    [[ -z "$result" ]] && return
+
+    # Parse result
+    key=$(echo "$result" | head -1)
+    branch=$(echo "$result" | tail -1)
 
     [[ -z "$branch" ]] && return
+
+    # Handle quick actions from ctrl keys
+    case "$key" in
+      ctrl-d)
+        echo "⚠️  Delete branch '$branch'? [y/N]"
+        read -k 1 confirm
+        echo
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+          git branch -d "$branch" 2>/dev/null || git branch -D "$branch"
+          echo "✅ Deleted branch: $branch"
+        fi
+        read -k 1 "?Press any key to continue..."
+        continue
+        ;;
+      ctrl-m)
+        git merge "$branch"
+        echo "✅ Merged branch: $branch"
+        read -k 1 "?Press any key to continue..."
+        continue
+        ;;
+      ctrl-p)
+        git pull origin "$branch"
+        echo "✅ Pulled branch: $branch"
+        read -k 1 "?Press any key to continue..."
+        continue
+        ;;
+    esac
 
     action=$(_fgh_branch_action_menu "$branch")
 
