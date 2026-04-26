@@ -48,9 +48,32 @@ setup() {
   [[ "$slug" == "my-repo" ]]
 }
 
+@test "cbox::repo_slug strips leading dashes to avoid option injection" {
+  local slug
+  slug=$(cbox::repo_slug "/x/-foo")
+  [[ "$slug" == "foo" ]]
+  slug=$(cbox::repo_slug "/x/--bar")
+  [[ "$slug" == "bar" ]]
+}
+
+@test "cbox::repo_slug falls back to 'repo' when sanitising leaves nothing" {
+  local slug
+  slug=$(cbox::repo_slug "/x/???")
+  [[ "$slug" == "repo" ]]
+}
+
+@test "cbox::repo_slug truncates to 40 chars" {
+  local long
+  long=$(printf 'a%.0s' {1..50})
+  local slug
+  slug=$(cbox::repo_slug "/x/${long}")
+  [[ ${#slug} -eq 40 ]]
+}
+
 @test "cbox::log_err writes to stderr with prefix" {
-  run -1 bash -c "source '${CBOX_LIB}/common.sh'; cbox::log_err 'boom'; exit 1"
-  [[ "$output" == *"cbox: boom"* ]]
+  run --separate-stderr -1 bash -c "source '${CBOX_LIB}/common.sh'; cbox::log_err 'boom'; exit 1"
+  [[ "$stderr" == *"cbox: boom"* ]]
+  [[ -z "$output" ]]
 }
 
 @test "cbox::require_cmd succeeds for an existing binary" {
@@ -58,7 +81,7 @@ setup() {
 }
 
 @test "cbox::require_cmd fails clearly for a missing binary" {
-  run cbox::require_cmd no-such-binary-12345
+  run --separate-stderr cbox::require_cmd no-such-binary-12345
   [[ "$status" -ne 0 ]]
-  [[ "$output" == *"required command not found: no-such-binary-12345"* ]]
+  [[ "$stderr" == *"required command not found: no-such-binary-12345"* ]]
 }
