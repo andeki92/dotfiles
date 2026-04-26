@@ -1,5 +1,6 @@
 /.superpowers/
 /docs/superpowers/
+/worktrees/
 
 # Negate global *.local pattern from ~/.config/git/ignore for stow modules
 # whose targets land under ~/.local/ (e.g. cbox/.local/bin/, cbox/.local/share/).
