@@ -21,6 +21,7 @@ cbox::state_init() {
   state=$(cbox::_state_file)
   mkdir -p "$dir"
   if [[ ! -f "$state" ]]; then
+    # Future migrations: branch on `.version` here before mutating sessions.
     printf '{"version":"1","sessions":[]}\n' > "$state"
   fi
 }
@@ -51,25 +52,32 @@ cbox::_state_with_lock() {
     ) 9>"$lock_file"
     rc=$?
   else
-    # mkdir-based mutex with bounded spin.
-    local waited=0
-    while ! mkdir "$lock_dir" 2>/dev/null; do
-      sleep 0.05
-      waited=$((waited + 1))
-      if [[ "$waited" -gt 600 ]]; then  # 30s ceiling
-        cbox::log_err "timed out waiting for state lock at ${lock_dir}"
-        return 1
+    # mkdir-based mutex with bounded spin. Wrap in a subshell so the trap that
+    # cleans up $lock_dir on Ctrl-C / TERM is scoped to this critical section
+    # and doesn't leak into the caller's shell.
+    (
+      local waited=0
+      while ! mkdir "$lock_dir" 2>/dev/null; do
+        sleep 0.05
+        waited=$((waited + 1))
+        if [[ "$waited" -gt 600 ]]; then  # 30s ceiling
+          cbox::log_err "timed out waiting for state lock at ${lock_dir}"
+          cbox::log_err "  if no other cbox process is running, remove this directory: rmdir '${lock_dir}'"
+          exit 1
+        fi
+      done
+      # Lock acquired — install trap so SIGINT/SIGTERM/clean exit all release it.
+      trap 'rmdir "$lock_dir" 2>/dev/null || true' EXIT INT TERM
+      tmp=$(mktemp "${state}.XXXXXX")
+      if "$cb" "$state" "$tmp" "$@"; then
+        mv "$tmp" "$state"
+      else
+        local cb_rc=$?
+        rm -f "$tmp"
+        exit "$cb_rc"
       fi
-    done
-    tmp=$(mktemp "${state}.XXXXXX")
-    if "$cb" "$state" "$tmp" "$@"; then
-      mv "$tmp" "$state"
-      rc=0
-    else
-      rc=$?
-      rm -f "$tmp"
-    fi
-    rmdir "$lock_dir" 2>/dev/null || true
+    )
+    rc=$?
   fi
   return "$rc"
 }
@@ -78,6 +86,10 @@ cbox::_state_with_lock() {
 cbox::_state_cb_add() {
   local in="$1" out="$2"
   local id="$3" repo="$4" worktree="$5" branch="$6" tmux="$7" now="$8"
+  if jq -e --arg id "$id" 'any(.sessions[]; .id == $id)' "$in" >/dev/null; then
+    cbox::log_err "session id '$id' already exists in state"
+    return 1
+  fi
   jq --arg id "$id" \
      --arg repo "$repo" \
      --arg wt "$worktree" \

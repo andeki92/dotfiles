@@ -74,6 +74,24 @@ setup() {
   [[ "$count" == "2" ]]
 }
 
+@test "cbox::state_add rejects duplicate id" {
+  cbox::state_init
+  cbox::state_add "k3p9xa" "r1" "/tmp/x" "b1" "t1"
+  run cbox::state_add "k3p9xa" "r2" "/tmp/y" "b2" "t2"
+  [[ "$status" -ne 0 ]]
+  # Only the original record remains.
+  [[ "$(jq -r '.sessions | length' "$(cbox::state_dir)/sessions.json")" == "1" ]]
+  [[ "$(jq -r '.sessions[0].repo' "$(cbox::state_dir)/sessions.json")" == "r1" ]]
+}
+
+@test "cbox::state_remove of non-existent id is a no-op (idempotent)" {
+  cbox::state_init
+  cbox::state_add "aaa222" "r" "/tmp/x" "b" "t"
+  cbox::state_remove "nonexistent"  # should succeed without error
+  [[ "$(jq -r '.sessions | length' "$(cbox::state_dir)/sessions.json")" == "1" ]]
+  [[ "$(jq -r '.sessions[0].id' "$(cbox::state_dir)/sessions.json")" == "aaa222" ]]
+}
+
 @test "concurrent cbox::state_add invocations do not lose records" {
   cbox::state_init
   for i in $(seq 1 10); do
