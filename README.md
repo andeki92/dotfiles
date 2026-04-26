@@ -102,6 +102,9 @@ cd ~/.dotfiles
 # Stow everything
 stow .
 
+# Link platform-specific git config (one-time per machine)
+./scripts/post-stow.sh
+
 # Stow specific applications
 stow zsh git 
 
