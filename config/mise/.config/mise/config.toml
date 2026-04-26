@@ -20,8 +20,6 @@ kubectx = "0.9.5"
 kubens = "0.9.5"
 lefthook = "2.0.1"
 neovim = "0.11.4"
-node = "22.21.0"
-"npm:@anthropic-ai/claude-code" = "2.0.27"
 "npm:markdownlint-cli2" = "0.18.1"
 opentofu = "1.10.6"
 python = "3.14.0"
@@ -38,6 +36,7 @@ lua = "5.4.8" # MUST be 5.1
 lazygit = "0.55.1"
 "github:luarocks/luarocks" = "3.12.2"
 "cargo:tree-sitter-cli" = "0.25.10"
+java = "21"
 
 [settings]
 experimental = true
