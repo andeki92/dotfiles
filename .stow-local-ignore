@@ -1,0 +1,14 @@
+^/README.*
+^/CLAUDE\.md
+^/\.github
+^/\.claude
+^/docs
+^/scripts
+^/worktrees
+^/\.stow-local-ignore
+^/\.editorconfig
+^/\.gitmodules
+^/\.gitignore
+^/\.yamllint\.yaml
+^/lefthook\.yaml
+\.DS_Store
