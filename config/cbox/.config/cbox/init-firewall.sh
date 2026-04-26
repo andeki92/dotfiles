@@ -48,29 +48,40 @@ PROJECT_HOSTS=()
 
 resolve_to_set() {
   local host="$1"
-  local ip
-  while read -r ip; do
+  local addrs
+  addrs=$(getent ahostsv4 "$host" | awk '/STREAM/ {print $1}' | sort -u || true)
+  if [[ -z "$addrs" ]]; then
+    log "WARNING: $host did not resolve; not added to allow-list"
+    return 1
+  fi
+  while IFS= read -r ip; do
     [[ -n "$ip" ]] || continue
     log "  $host -> $ip"
-    ipset add cbox-allow "$ip" 2>/dev/null || true
-  done < <(getent ahostsv4 "$host" | awk '/STREAM/ {print $1}' | sort -u)
+    ipset add cbox-allow "$ip" 2>/dev/null || log "WARNING: ipset add failed for $ip"
+  done <<< "$addrs"
 }
 
 allow_default() {
   log "allowing $1 (default)"
-  DEFAULT_HOSTS+=("$1")
-  resolve_to_set "$1"
+  if resolve_to_set "$1"; then
+    DEFAULT_HOSTS+=("$1")
+  else
+    DEFAULT_HOSTS+=("$1 (unresolved)")
+  fi
 }
 
 allow_project() {
   log "allowing $1 (project)"
-  PROJECT_HOSTS+=("$1")
-  resolve_to_set "$1"
+  if resolve_to_set "$1"; then
+    PROJECT_HOSTS+=("$1")
+  else
+    PROJECT_HOSTS+=("$1 (unresolved)")
+  fi
 }
 
 allow_cidr() {
   log "allowing CIDR $1"
-  ipset add cbox-allow "$1" 2>/dev/null || true
+  ipset add cbox-allow "$1" || log "WARNING: ipset add failed for $1"
 }
 
 # === Default allow-list (slim) ===
@@ -88,6 +99,7 @@ allow_default codeload.github.com
 log "fetching GitHub IP CIDRs"
 if curl -fsSL --max-time 10 https://api.github.com/meta 2>/dev/null \
    | jq -r '.web[]?,.api[]?,.git[]?' 2>/dev/null \
+   | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$' \
    | sort -u > /tmp/gh-cidrs; then
   while read -r cidr; do
     [[ -n "$cidr" ]] && allow_cidr "$cidr"
@@ -131,24 +143,28 @@ if curl -fsS --max-time 3 -o /dev/null https://example.com 2>/dev/null; then
 fi
 
 # Write the ground-truth file the agent can read.
-NETFILE=/workspace/.cbox-network
-log "writing $NETFILE"
-{
-  printf '# cbox active network allow-list\n'
-  printf '# Generated: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf '# This file lists the hosts the firewall accepts outbound traffic for.\n'
-  printf '# All other destinations are REJECTed.\n\n'
-  printf '[default]\n'
-  for h in "${DEFAULT_HOSTS[@]}"; do printf '%s\n' "$h"; done
-  printf 'DNS: 1.1.1.1, 8.8.8.8\n\n'
-  printf '[per-project]\n'
-  if [[ ${#PROJECT_HOSTS[@]} -eq 0 ]]; then
-    printf '# (no per-project allow-list mounted at /cbox/allowlist)\n'
-  else
-    for h in "${PROJECT_HOSTS[@]}"; do printf '%s\n' "$h"; done
-  fi
-} > "$NETFILE"
-chown agent:agent "$NETFILE" 2>/dev/null || true
-chmod 0644 "$NETFILE"
+if [[ ! -d /workspace ]]; then
+  log "WARNING: /workspace not mounted; skipping ground-truth file"
+else
+  NETFILE=/workspace/.cbox-network
+  log "writing $NETFILE"
+  {
+    printf '# cbox active network allow-list\n'
+    printf '# Generated: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf '# This file lists the hosts the firewall accepts outbound traffic for.\n'
+    printf '# All other destinations are REJECTed.\n\n'
+    printf '[default]\n'
+    for h in "${DEFAULT_HOSTS[@]}"; do printf '%s\n' "$h"; done
+    printf 'DNS: 1.1.1.1, 8.8.8.8\n\n'
+    printf '[per-project]\n'
+    if [[ ${#PROJECT_HOSTS[@]} -eq 0 ]]; then
+      printf '# (no per-project allow-list mounted at /cbox/allowlist)\n'
+    else
+      for h in "${PROJECT_HOSTS[@]}"; do printf '%s\n' "$h"; done
+    fi
+  } > "$NETFILE"
+  chown agent:agent "$NETFILE" 2>/dev/null || true
+  chmod 0644 "$NETFILE"
+fi
 
 log "firewall ready"
