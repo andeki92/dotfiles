@@ -57,12 +57,13 @@ RUN curl -fsSL https://mise.run | sh \
  && mv /root/.local/bin/mise /usr/local/bin/mise
 
 # Non-root user matched to the host UID/GID.
-# If GID already exists in the base image (e.g. macOS users on GID 20 = dialout
-# in debian), reuse it instead of failing with "GID already exists".
+# If GID already exists in the base image (e.g. macOS users on GID 20 = debian
+# dialout), reuse it instead of failing with "GID already exists". chown by
+# numeric ids since the group might not be named "agent".
 RUN if ! getent group ${GID} >/dev/null; then groupadd -g ${GID} agent; fi \
- && useradd -m -u ${UID} -g ${GID} -s /bin/bash agent \
+ && useradd -m -u ${UID} -g ${GID} -s /bin/bash --no-user-group agent \
  && mkdir -p /home/agent/.cache /home/agent/.config /home/agent/.local/share \
- && chown -R agent:agent /home/agent
+ && chown -R ${UID}:${GID} /home/agent
 
 # Passwordless sudo only for the firewall init script.
 COPY init-firewall.sh /usr/local/bin/init-firewall.sh
