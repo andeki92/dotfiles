@@ -49,7 +49,11 @@ cbox::_session_spawn_tmux() {
   # against an existing-but-not-attached container; first-time session_new
   # calls us with no prior container.) The image's CMD ("sleep infinity")
   # keeps it alive until session_stop / session_rm tear it down explicitly.
-  if "$cli" inspect "$container_name" >/dev/null 2>&1; then
+  #
+  # NB: apple/container's `inspect` returns 0 with `[]` even for unknown
+  # IDs — exit-code-only check would always claim "exists". Match the
+  # actual ID via `list -a --quiet` instead.
+  if "$cli" list -a --quiet 2>/dev/null | grep -qx "$container_name"; then
     cbox::log "reusing existing container ${container_name}"
   else
     if ! cbox::engine_run_detached "${engine_args[@]}"; then
@@ -249,9 +253,11 @@ cbox::session_attach() {
   fi
 
   # tmux is dead — check whether the container is still around. The container
-  # name === tmux session name (set by runtime_args via --name).
+  # name === tmux session name (set by runtime_args via --name). apple/container
+  # `inspect` returns 0 even for unknown IDs, so use `list -a --quiet` for the
+  # exists check.
   local cli; cli=$(cbox::engine_cli)
-  if "$cli" inspect "$tmux_session" >/dev/null 2>&1; then
+  if "$cli" list -a --quiet 2>/dev/null | grep -qx "$tmux_session"; then
     cbox::log "tmux session was closed but container ${tmux_session} is still alive; reattaching"
     cbox::session_up "$id"
     return $?
