@@ -47,10 +47,16 @@ cbox::engine_ready() {
 cbox::engine_build() {
   local image="${1:?image}" ctx="${2:?context}"
   local cli; cli=$(cbox::engine_cli) || return 1
-  cbox::log "building $image via $cli"
+  # apple/container's `build` rejects symlinked context dirs (it lstat()s
+  # the path rather than following it). Resolve to the canonical real path
+  # so a Stow-managed ~/.config/cbox works the same as a literal dir.
+  local real_ctx
+  real_ctx=$(cd "$ctx" 2>/dev/null && pwd -P) || {
+    cbox::log_err "build context not accessible: $ctx"; return 1; }
+  cbox::log "building $image via $cli (context: $real_ctx)"
   "$cli" build -t "$image" \
     --build-arg "UID=$(id -u)" --build-arg "GID=$(id -g)" \
-    "$ctx"
+    "$real_ctx"
 }
 
 cbox::engine_image_exists() {
