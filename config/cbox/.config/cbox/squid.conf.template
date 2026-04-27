@@ -18,6 +18,11 @@ cache deny all                           # we are not a cache, just a filter
 cache_mem 8 MB                           # minimal
 maximum_object_size 0 KB
 
+# Squid 7.x on macOS: when ulimit -n is unlimited, Squid computes the fd table
+# size as (size_t)-1 and xcalloc() fatals at startup. Pin a sane ceiling so the
+# daemon comes up regardless of the parent shell's RLIMIT_NOFILE.
+max_filedescriptors 1024
+
 # Standard SSL ports — connection target must be one of these.
 acl SSL_ports port 443
 acl Safe_ports port 80
@@ -31,12 +36,12 @@ acl CONNECT method CONNECT
 http_access deny CONNECT !SSL_ports
 http_access deny !Safe_ports
 
-# Per-acl http_access rules are appended by proxy.sh after this template
-# (one `http_access allow CONNECT <name> SSL_ports` line per ACL).
-
-# Final fall-through.
-http_access deny all
+# Per-acl http_access allow rules + the final fall-through `http_access deny
+# all` are appended by proxy.sh after this template. (Squid evaluates
+# http_access top-to-bottom, first match wins, so the final deny MUST come
+# after the per-acl allows — keeping both in proxy.sh ensures correct order.)
 
 # Don't dns-helper-spawn or background-rebuild — we're a foreground filter.
-dns_v4_first on
+# (dns_v4_first was removed in Squid 7.x; preferential A-record handling no
+# longer supported.)
 shutdown_lifetime 0 seconds

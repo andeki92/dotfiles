@@ -108,16 +108,17 @@ cbox::proxy_render_config() {
     fi
   done < "$tpl"
 
-  # Append per-acl http_access rules after the template body. Squid evaluates
-  # http_access rules top-to-bottom; the template's `deny CONNECT !SSL_ports`
-  # / `deny !Safe_ports` come first, then these allows, then the final
-  # `deny all`. So an unmatched ACL falls through to the final deny.
+  # Append per-acl http_access rules + a final fall-through deny. Squid
+  # evaluates http_access top-to-bottom, first match wins. The template's
+  # `deny CONNECT !SSL_ports` / `deny !Safe_ports` come first; then these
+  # allows; then the final `deny all` for any host the allow-lists missed.
   {
     printf '\n# Per-acl http_access rules (appended by proxy.sh).\n'
     local rule
     for rule in "${access_lines[@]}"; do
       printf '%s\n' "$rule"
     done
+    printf '\n# Final fall-through.\nhttp_access deny all\n'
   } >> "$out"
 }
 
