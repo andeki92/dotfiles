@@ -10,7 +10,13 @@
 #   %%ACL_NAMES%%   → space-separated acl names (legacy slot, replaced
 #                     by appended http_access lines after the template)
 
-http_port %%PORT%%
+# Listen on loopback (host-side debugging) AND the apple/container vmnet
+# gateway IP (container traffic) — but NOT all interfaces. A bare
+# `http_port 3128` exposes the proxy to the LAN, which on public WiFi
+# means a hostile peer can use the host as an unauthenticated proxy to
+# the allow-list.
+http_port 127.0.0.1:%%PORT%%
+http_port 192.168.64.1:%%PORT%%
 pid_filename %%PIDFILE%%
 cache_log %%LOGFILE%%
 access_log %%LOGFILE%%.access squid
