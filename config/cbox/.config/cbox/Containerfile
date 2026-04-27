@@ -39,14 +39,22 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
 # Claude Code (latest at build time).
 RUN npm install -g @anthropic-ai/claude-code
 
-# GitHub + GitLab CLIs.
+# GitHub CLI (apt repo, GPG-signed).
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
         -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
         > /etc/apt/sources.list.d/github-cli.list \
- && curl -fsSL https://gitlab.com/gitlab-org/cli/-/raw/main/scripts/install.sh | bash \
  && apt-get update && apt-get install -y --no-install-recommends gh \
  && rm -rf /var/lib/apt/lists/*
+
+# GitLab CLI — glab has no apt repo, so install the .deb directly from
+# GitLab's Generic Packages API. Pinned for deterministic rebuilds.
+ARG GLAB_VERSION=1.93.0
+RUN ARCH="$(dpkg --print-architecture)" \
+ && curl -fsSL "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/packages/generic/glab/${GLAB_VERSION}/glab_${GLAB_VERSION}_linux_${ARCH}.deb" \
+        -o /tmp/glab.deb \
+ && dpkg -i /tmp/glab.deb \
+ && rm /tmp/glab.deb
 
 # fzf — small enough; no need to use the host's.
 RUN apt-get update && apt-get install -y --no-install-recommends fzf \
