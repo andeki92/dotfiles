@@ -31,8 +31,13 @@ cbox::runtime_args() {
   image="${CBOX_IMAGE:-cbox:latest}"
 
   # Core flags ----------------------------------------------------------------
+  # We pass -i (keep stdin open) but NOT -t. The container is wrapped in a
+  # tmux pane which already provides a pty; allocating a second one inside
+  # the container conflicts on apple/container 0.11 ("Operation not supported
+  # by device") and is redundant on podman. Claude reads/writes through tmux's
+  # pty via stdin/stdout, which is sufficient for the TUI.
   printf '%s\n' --rm
-  printf '%s\n' -it
+  printf '%s\n' -i
   printf '%s\n' --name "$session_name"
   printf '%s\n' --hostname "cbox-${id}"
 
