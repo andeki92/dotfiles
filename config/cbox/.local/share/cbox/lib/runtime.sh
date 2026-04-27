@@ -44,8 +44,9 @@ cbox::runtime_args() {
   # No --rm either: we destroy the container explicitly via engine_stop on
   # session_rm, so the user can `cbox up` after a tmux detach without losing
   # any in-container state (caches, package installs, running processes).
+  # apple/container 0.11 has no --hostname; the in-container hostname is
+  # auto-set to --name, which is good enough for our purposes.
   printf '%s\n' --name "$session_name"
-  printf '%s\n' --hostname "cbox-${id}"
 
   # Proxy + identity env ------------------------------------------------------
   printf '%s\n' -e "HTTPS_PROXY=http://${proxy_host}:${proxy_port}"

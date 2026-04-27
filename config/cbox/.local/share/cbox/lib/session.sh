@@ -198,7 +198,15 @@ cbox::session_new() {
   cbox::_session_build_engine_args "$worktree" "$id" "$tmux_session"
 
   if ! cbox::_session_spawn_tmux "$tmux_session" "$worktree" "${_CBOX_ENGINE_ARGS[@]}"; then
-    cbox::log_err "failed to spawn tmux session ${tmux_session}"
+    cbox::log_err "failed to spawn session ${id}; rolling back"
+    # Order matters: kill the engine first (it may have started detached
+    # before tmux failed), then state, then worktree, then proxy.
+    cbox::engine_stop "$tmux_session"
+    cbox::engine_rm   "$tmux_session"
+    cbox::state_remove "$id" || true
+    git -C "$repo" worktree remove --force "$worktree" 2>/dev/null || rm -rf "$worktree"
+    git -C "$repo" branch -D "$branch" 2>/dev/null || true
+    cbox::proxy_stop_if_idle
     return 1
   fi
 
