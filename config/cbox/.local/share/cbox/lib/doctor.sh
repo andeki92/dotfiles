@@ -224,7 +224,27 @@ cbox::doctor_run() {
   fi
 
   # ------------------------------------------------------------------
-  # 14. Claude auth — at least one of:
+  # 14a. ~/.cbox/ permissions — must be 700 (owner-only). On macOS where
+  #     the primary group is `staff` (shared by every Mac user account),
+  #     anything more permissive exposes worktree paths, squid logs, and
+  #     potentially the OAuth token to other local users.
+  # ------------------------------------------------------------------
+  local _cbox_home
+  _cbox_home=$(cbox::home)
+  if [[ -d "$_cbox_home" ]]; then
+    local _hmode
+    _hmode=$(stat -f '%Lp' "$_cbox_home" 2>/dev/null || stat -c '%a' "$_cbox_home" 2>/dev/null)
+    if [[ "$_hmode" != "700" ]]; then
+      cbox::_check_warn "${_cbox_home} mode is ${_hmode}; tightening to 700"
+      chmod 700 "$_cbox_home" 2>/dev/null && cbox::_check_ok "  fixed: ${_cbox_home} now 700" \
+        || cbox::_check_fail "  could not chmod 700 ${_cbox_home}"
+    else
+      cbox::_check_ok "${_cbox_home} mode 700"
+    fi
+  fi
+
+  # ------------------------------------------------------------------
+  # 14b. Claude auth — at least one of:
   #       (a) ~/.cbox/oauth-token (mode 600), generated via `claude setup-token`
   #       (b) CLAUDE_CODE_OAUTH_TOKEN env var on host
   #       (c) ANTHROPIC_API_KEY env var on host
