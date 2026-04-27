@@ -45,11 +45,17 @@ cbox::_session_spawn_tmux() {
   cbox::require_cmd tmux || return 1
   local cli; cli=$(cbox::engine_cli) || return 1
 
-  # Start the container detached. The image's CMD ("sleep infinity") keeps
-  # it alive until session_stop / session_rm tear it down explicitly.
-  if ! cbox::engine_run_detached "${engine_args[@]}"; then
-    cbox::log_err "failed to start container ${container_name}"
-    return 1
+  # Start the container detached if it isn't already. (session_up calls us
+  # against an existing-but-not-attached container; first-time session_new
+  # calls us with no prior container.) The image's CMD ("sleep infinity")
+  # keeps it alive until session_stop / session_rm tear it down explicitly.
+  if "$cli" inspect "$container_name" >/dev/null 2>&1; then
+    cbox::log "reusing existing container ${container_name}"
+  else
+    if ! cbox::engine_run_detached "${engine_args[@]}"; then
+      cbox::log_err "failed to start container ${container_name}"
+      return 1
+    fi
   fi
 
   # Build the in-pane command: exec into the running container with -i -t,
@@ -225,17 +231,36 @@ cbox::session_new() {
 }
 
 # cbox::session_attach [<id>]
+#
+# If the tmux session is alive: attach to it.
+# If the tmux session is dead but the container is alive (the user exited
+#   Claude with `/quit` or Ctrl-C; container kept running on `sleep infinity`):
+#   transparently fall back to `cbox up <id>` so the user gets their session
+#   back without thinking about the lifecycle distinction.
+# If both are gone, the user wants `cbox` to start fresh — say so.
 cbox::session_attach() {
   local id; id=$(cbox::_session_resolve_or_pick "${1:-}") || return 1
   local row tmux_session
   row=$(cbox::state_get "$id") || return 1
   tmux_session=$(printf '%s' "$row" | jq -r '.tmux')
 
-  if ! cbox::_session_tmux_alive "$tmux_session"; then
-    cbox::log_err "tmux session '$tmux_session' is not running. Try: cbox up $id"
-    return 1
+  if cbox::_session_tmux_alive "$tmux_session"; then
+    exec tmux attach -t "$tmux_session"
   fi
-  exec tmux attach -t "$tmux_session"
+
+  # tmux is dead — check whether the container is still around. The container
+  # name === tmux session name (set by runtime_args via --name).
+  local cli; cli=$(cbox::engine_cli)
+  if "$cli" inspect "$tmux_session" >/dev/null 2>&1; then
+    cbox::log "tmux session was closed but container ${tmux_session} is still alive; reattaching"
+    cbox::session_up "$id"
+    return $?
+  fi
+
+  cbox::log_err "session ${id} has no live tmux and no live container."
+  cbox::log_err "  worktree is preserved at $(printf '%s' "$row" | jq -r '.worktree')"
+  cbox::log_err "  run \`cbox rm ${id}\` to clean up, or \`cbox up ${id}\` to start a fresh container against the worktree"
+  return 1
 }
 
 # cbox::session_stop [<id>]

@@ -126,17 +126,28 @@ cbox::runtime_args() {
     printf '%s\n' -e "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}"
   fi
 
-  # Claude plugins + settings — mount read-only so the agent can USE
-  # installed plugins (rust-skills, superpowers, etc.) but cannot install
-  # new ones, modify the host plugin set, or read other ~/.claude state
-  # (credentials, projects, conversation history). Plugin code is code the
-  # agent could already write; the security boundary that matters is the
-  # writable scope, not the readable scope.
+  # Claude plugins — directory bind-mount (read-only) so the agent can
+  # USE installed plugins (rust-skills, superpowers, etc.) but cannot
+  # install new ones, modify the host plugin set, or read other ~/.claude
+  # state (credentials, projects, conversation history). Plugin code is
+  # code the agent could already write; the security boundary that matters
+  # is the writable scope, not the readable scope.
+  #
+  # We do NOT mount ~/.claude/settings.json. Single-file bind mounts are
+  # silently dropped by apple/container 0.11, AND the host's settings.json
+  # leaks per-project Bash permission allowlists into every session. The
+  # entrypoint synthesizes a fresh settings.json from the host's plugin
+  # keys (forwarded via CBOX_HOST_CLAUDE_SETTINGS env) instead.
   if [[ -d "$HOME/.claude/plugins" ]]; then
     printf '%s\n' -v "$HOME/.claude/plugins:/home/agent/.claude/plugins:ro"
   fi
-  if [[ -f "$HOME/.claude/settings.json" ]]; then
-    printf '%s\n' -v "$HOME/.claude/settings.json:/home/agent/.claude/settings.json:ro"
+  if [[ -f "$HOME/.claude/settings.json" ]] && command -v jq >/dev/null 2>&1; then
+    # Extract only plugin-relevant keys (drop permissions, voice, project
+    # state, etc.). Pass to the container as a single-line JSON env var
+    # for the entrypoint to merge into the synthesized settings.json.
+    local _claude_settings
+    _claude_settings=$(jq -c '{enabledPlugins, extraKnownMarketplaces, installedPlugins} | with_entries(select(.value != null))' "$HOME/.claude/settings.json" 2>/dev/null || printf '{}')
+    printf '%s\n' -e "CBOX_HOST_CLAUDE_SETTINGS=${_claude_settings}"
   fi
 
   # Host package caches — only mount the ones that already exist so we don't
