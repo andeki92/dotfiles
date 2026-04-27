@@ -1,0 +1,88 @@
+# cbox container image — sandbox for running Claude Code (and other coding
+# agents) under --dangerously-skip-permissions. Egress is filtered at the
+# host by Squid (HTTPS_PROXY env), not in-container.
+# All credentials (ssh-agent, gpg-agent socket; ~/.gitconfig and ~/.claude r/o)
+# are mounted at runtime by the host wrapper (`cbox`); nothing sensitive lives
+# in this image.
+ARG BASE=debian:trixie-slim
+FROM ${BASE}
+
+ARG UID=1000
+ARG GID=1000
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    NODE_VERSION=22 \
+    MISE_DATA_DIR=/home/agent/.local/share/mise \
+    MISE_CACHE_DIR=/home/agent/.cache/mise
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl wget gnupg \
+        git git-lfs \
+        ripgrep fd-find jq bat less \
+        dnsutils iputils-ping iptables \
+        openssh-client \
+        build-essential pkg-config \
+        python3 python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Symlink debian's renamed tools to expected names.
+RUN ln -sf /usr/bin/fdfind /usr/local/bin/fd \
+ && ln -sf /usr/bin/batcat /usr/local/bin/bat
+
+# Node.js 22 from NodeSource.
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
+ && apt-get install -y nodejs \
+ && rm -rf /var/lib/apt/lists/*
+
+# Claude Code (latest at build time).
+RUN npm install -g @anthropic-ai/claude-code
+
+# GitHub CLI (apt repo, GPG-signed).
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+ && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+        > /etc/apt/sources.list.d/github-cli.list \
+ && apt-get update && apt-get install -y --no-install-recommends gh \
+ && rm -rf /var/lib/apt/lists/*
+
+# GitLab CLI — glab has no apt repo, so install the .deb directly from
+# GitLab's Generic Packages API. Pinned for deterministic rebuilds.
+ARG GLAB_VERSION=1.93.0
+RUN ARCH="$(dpkg --print-architecture)" \
+ && curl -fsSL "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/packages/generic/glab/${GLAB_VERSION}/glab_${GLAB_VERSION}_linux_${ARCH}.deb" \
+        -o /tmp/glab.deb \
+ && dpkg -i /tmp/glab.deb \
+ && rm /tmp/glab.deb
+
+# fzf — small enough; no need to use the host's.
+RUN apt-get update && apt-get install -y --no-install-recommends fzf \
+ && rm -rf /var/lib/apt/lists/*
+
+# mise — single binary install.
+RUN curl -fsSL https://mise.run | sh \
+ && mv /root/.local/bin/mise /usr/local/bin/mise
+
+# Non-root user matched to the host UID/GID. If GID already exists in the
+# base image (e.g. macOS users on GID 20 = debian dialout), reuse it.
+RUN if ! getent group ${GID} >/dev/null; then groupadd -g ${GID} agent; fi \
+ && useradd -m -u ${UID} -g ${GID} -s /bin/bash --no-user-group agent \
+ && mkdir -p /home/agent/.cache /home/agent/.config /home/agent/.local/share \
+ && chown -R ${UID}:${GID} /home/agent
+
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY init-firewall.sh /usr/local/bin/init-firewall.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/init-firewall.sh
+
+USER agent
+WORKDIR /workspace
+
+# The container starts long-lived (sleep infinity) so cbox can `exec` into it
+# from within a tmux pane that already owns a real PTY. apple/container 0.11
+# rejects -i + -t when stdin isn't a tty at run-time, so a TUI like Claude
+# Code can't be the entrypoint when wrapped in `tmux new-session -d`. The
+# entrypoint script (mise install + the requested command) is invoked via
+# `cbox::engine_exec` against this running container.
+ENTRYPOINT ["/usr/bin/sleep", "infinity"]
+CMD []
