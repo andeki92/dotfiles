@@ -133,12 +133,15 @@ iptables -A OUTPUT -j LOG --log-prefix "cbox-firewall-blocked: " --log-level 4
 iptables -A OUTPUT -j REJECT --reject-with icmp-host-unreachable
 
 # Boot verification: anthropic reachable, example.com blocked.
+# Note: api.anthropic.com returns 404 on /, so don't use -f (which fails on 4xx).
+# We only care that the connection succeeded (curl exit 0 = HTTP response received,
+# any status; non-zero = network-level failure like REJECT/timeout/DNS fail).
 log "verifying api.anthropic.com is reachable..."
-if ! curl -fsS --max-time 5 -o /dev/null https://api.anthropic.com; then
+if ! curl -s --max-time 5 -o /dev/null https://api.anthropic.com; then
   fail "api.anthropic.com unreachable after firewall init"
 fi
 log "verifying example.com is blocked..."
-if curl -fsS --max-time 3 -o /dev/null https://example.com 2>/dev/null; then
+if curl -s --max-time 3 -o /dev/null https://example.com 2>/dev/null; then
   fail "example.com reachable; firewall did not engage"
 fi
 
