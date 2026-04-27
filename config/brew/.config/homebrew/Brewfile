@@ -6,7 +6,9 @@ brew "coreutils"                # GNU core utilities
 brew "git" if OS.mac?           # Version control
 brew "git-lfs"                  # Git extension for versioning large files
 brew "mise"                     # Tool version manager (replacing asdf, nvm, etc)
+brew "podman" if OS.mac?        # Container runtime (mise-shipped podman lacks gvproxy needed for `podman machine`)
 brew "stow"                     # Symlink farm manager for dotfiles
+brew "tmux"                     # Terminal multiplexer (used by cbox for session lifecycle)
 brew "tree"                     # Display directory structure
 
 # Shells and CLI Utilities
