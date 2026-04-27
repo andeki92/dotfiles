@@ -22,12 +22,12 @@ is_wsl() {
 # Ensure PATH elements are unique to prevent duplication during reload
 typeset -U path
 
-# Platform-specific settings (minimal)
+# Platform-specific settings (minimal).
+# Note: ~/.config/git/config-platform is set up once by scripts/post-stow.sh,
+# not on every shell startup.
 if is_macos; then
   # macOS-specific minimal settings
   path=(/usr/local/bin /usr/bin /bin /usr/sbin /sbin $HOME/.local/bin $path)
-
-   ln -sf ~/.config/git/config-macos ~/.config/git/config-platform
 elif is_linux; then
   # Linux-specific minimal settings
   path=(/usr/local/bin /usr/bin /bin /usr/local/sbin /usr/sbin /sbin $path)
@@ -39,10 +39,6 @@ elif is_linux; then
 
     export GIT_EXEC_PATH="$(git --exec-path)"
     export WSLENV=$WSLENV:GIT_EXEC_PATH/wp
-
-     ln -sf ~/.config/git/config-wsl ~/.config/git/config-platform
-  else
-     ln -sf ~/.config/git/config-linux ~/.config/git/config-platform
   fi
 fi
 

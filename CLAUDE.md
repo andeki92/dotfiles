@@ -25,6 +25,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # Apply all configurations
 stow .
+./scripts/post-stow.sh   # link platform-specific git config (one-time per machine)
 
 # Apply specific tool configurations
 stow zsh git brew
