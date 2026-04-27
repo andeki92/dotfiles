@@ -1,13 +1,29 @@
 # cbox engine — abstracts apple/container (macOS) vs rootful podman (Linux).
+#
+# Architectural note: cbox uses a long-lived container per session that does
+# nothing but `sleep infinity`. The user-facing TUI (claude) is launched via
+# `engine_exec -i -t` from inside a tmux pane that already has a real PTY.
+# Apple's `container` 0.11 returns "Operation not supported by device" when
+# given -i + -t at run-time if stdin isn't a tty (which it isn't under
+# `tmux new-session -d`), so we cannot make Claude the entrypoint directly.
+# `container exec -it` from within an attached tmux pane works correctly.
+# See: https://github.com/apple/container/issues/378
+#
 # Functions exported to callers (runtime.sh, session.sh, doctor.sh):
 #
-#   cbox::engine_name      → "container" or "podman" (string identifier)
-#   cbox::engine_cli       → bare CLI binary name on PATH (alias of engine_name)
+#   cbox::engine_name             → "container" or "podman" (string)
+#   cbox::engine_cli              → bare CLI binary name (alias of engine_name)
+#   cbox::engine_ready            → 0 if engine usable; logs+nonzero otherwise
 #   cbox::engine_build IMAGE CONTEXT_DIR
-#   cbox::engine_run [args...] IMAGE
 #   cbox::engine_image_exists IMAGE
-#   cbox::engine_rm CONTAINER_NAME (force-remove a stopped container; ignored if missing)
-#   cbox::engine_ready   (returns 0 if engine is usable; logs+nonzero otherwise)
+#   cbox::engine_run_detached <args...> IMAGE
+#                                 → start a long-lived container in background
+#                                   (no -i, no -t — caller's args + image)
+#   cbox::engine_exec_tty NAME <cmd...>
+#                                 → exec interactively into running container
+#                                   (-i -t for the TUI; tmux pane gives PTY)
+#   cbox::engine_stop NAME        → graceful stop then remove
+#   cbox::engine_rm NAME          → force-remove (use when graceful failed)
 #
 # Image tag is "cbox:latest" (no registry prefix); both engines understand it.
 
@@ -72,15 +88,43 @@ cbox::engine_image_exists() {
   esac
 }
 
-cbox::engine_run() {
-  # All args including the image name and the in-container command.
-  # Caller is responsible for assembling the full argv (mounts, env, etc.).
+cbox::engine_run_detached() {
+  # Start a container in the background with the caller-provided args
+  # (mounts, env, --name, etc.). The image's CMD ("sleep infinity") keeps
+  # it alive. Returns 0 on success.
+  #
+  # Important: NO -i / -t here. Detached + interactive flags collide on
+  # apple/container ("Operation not supported by device").
   local cli; cli=$(cbox::engine_cli) || return 1
-  exec "$cli" run "$@"
+  "$cli" run -d "$@"
+}
+
+cbox::engine_exec_tty() {
+  # exec a command inside a running container with a real interactive TTY.
+  # Caller invokes this from a tmux pane (which provides the PTY).
+  # `exec` here = bash exec (replace cbox shell), so the user gets the
+  # container's stdin/stdout directly inside their tmux pane.
+  local name="${1:?name}"; shift
+  local cli; cli=$(cbox::engine_cli) || return 1
+  exec "$cli" exec -i -t "$name" "$@"
+}
+
+cbox::engine_stop() {
+  # Graceful stop then remove. Apple/container's `stop` accepts a timeout
+  # via --signal/--timeout; podman uses --time. We rely on default 10s for
+  # both, which is plenty for `sleep infinity`.
+  local name="${1:?name}"
+  local cli; cli=$(cbox::engine_cli) || return 1
+  "$cli" stop "$name" 2>/dev/null || true
+  "$cli" rm "$name" 2>/dev/null || true
 }
 
 cbox::engine_rm() {
+  # Force-remove (used as a fallback / for cleanup of stopped containers).
   local name="${1:?name}"
   local cli; cli=$(cbox::engine_cli) || return 1
-  "$cli" rm -f "$name" 2>/dev/null || true
+  case "$cli" in
+    container) "$cli" rm "$name" 2>/dev/null || true ;;
+    podman)    "$cli" rm -f "$name" 2>/dev/null || true ;;
+  esac
 }

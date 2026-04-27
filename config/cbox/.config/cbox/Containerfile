@@ -77,5 +77,11 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 USER agent
 WORKDIR /workspace
 
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["claude", "--dangerously-skip-permissions"]
+# The container starts long-lived (sleep infinity) so cbox can `exec` into it
+# from within a tmux pane that already owns a real PTY. apple/container 0.11
+# rejects -i + -t when stdin isn't a tty at run-time, so a TUI like Claude
+# Code can't be the entrypoint when wrapped in `tmux new-session -d`. The
+# entrypoint script (mise install + the requested command) is invoked via
+# `cbox::engine_exec` against this running container.
+ENTRYPOINT ["/usr/bin/sleep", "infinity"]
+CMD []

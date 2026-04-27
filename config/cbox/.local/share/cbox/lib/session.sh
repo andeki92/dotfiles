@@ -30,26 +30,43 @@ cbox::_session_build_engine_args() {
   done < <(cbox::runtime_args "$worktree" "$id" "$name" "$extra_mounts")
 }
 
-# Spawn a detached tmux session that runs the engine. The engine `run`
-# command line is shell-quoted so paths/env values with spaces survive
-# tmux's word-splitting.
+# Start the long-lived container in the background, then spawn a detached
+# tmux session whose pane runs `engine exec -it <name> entrypoint <cmd>`.
+# The exec call (run from a tmux pane that owns a real PTY) is what gives
+# Claude the interactive terminal it needs — see the engine.sh header for
+# why we can't make claude the entrypoint directly.
 cbox::_session_spawn_tmux() {
   local tmux_session="${1:?tmux session}" worktree="${2:?worktree}"
   shift 2
   local -a engine_args=("$@")
-
-  local cli; cli=$(cbox::engine_cli) || return 1
-  local env_args=()  # TODO V2-9: from cbox::secrets_env_args
+  # Container name === tmux session name (set by runtime_args via --name).
+  local container_name="$tmux_session"
 
   cbox::require_cmd tmux || return 1
+  local cli; cli=$(cbox::engine_cli) || return 1
 
+  # Start the container detached. The image's CMD ("sleep infinity") keeps
+  # it alive until session_stop / session_rm tear it down explicitly.
+  if ! cbox::engine_run_detached "${engine_args[@]}"; then
+    cbox::log_err "failed to start container ${container_name}"
+    return 1
+  fi
+
+  # Build the in-pane command: exec into the running container with -i -t,
+  # invoke the entrypoint (mise install + exec) with claude as the argument.
+  # Each piece is %q-quoted so paths/env with spaces survive tmux parsing.
   local cmd
-  printf -v cmd '%s run %s%s' \
+  printf -v cmd '%s exec -i -t %s /usr/local/bin/entrypoint.sh %s %s' \
     "$cli" \
-    "$(printf '%q ' "${env_args[@]}")" \
-    "$(printf '%q ' "${engine_args[@]}")"
+    "$(printf '%q' "$container_name")" \
+    "$(printf '%q' 'claude')" \
+    "$(printf '%q' '--dangerously-skip-permissions')"
 
-  tmux new-session -d -s "$tmux_session" -c "$worktree" "$cmd"
+  if ! tmux new-session -d -s "$tmux_session" -c "$worktree" "$cmd"; then
+    cbox::log_err "tmux new-session failed"
+    cbox::engine_stop "$container_name"
+    return 1
+  fi
 }
 
 # Returns 0 if a tmux session with the given name exists.
@@ -213,10 +230,10 @@ cbox::session_stop() {
   local row tmux_session container_name
   row=$(cbox::state_get "$id") || return 1
   tmux_session=$(printf '%s' "$row" | jq -r '.tmux')
-  # Container name === tmux session name (set in session_new via _spawn_tmux).
   container_name="$tmux_session"
 
-  cbox::engine_rm "$container_name"
+  # Graceful container stop (sends SIGTERM, then removes when stopped).
+  cbox::engine_stop "$container_name"
   if cbox::_session_tmux_alive "$tmux_session"; then
     tmux kill-session -t "$tmux_session" 2>/dev/null || true
   fi
@@ -283,7 +300,8 @@ cbox::session_rm() {
     fi
   fi
 
-  cbox::engine_rm "$container_name"
+  cbox::engine_stop "$container_name"
+  cbox::engine_rm   "$container_name"   # belt-and-braces if stop+rm race
   if cbox::_session_tmux_alive "$tmux_session"; then
     tmux kill-session -t "$tmux_session" 2>/dev/null || true
   fi

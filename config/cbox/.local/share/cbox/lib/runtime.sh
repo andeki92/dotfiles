@@ -1,4 +1,4 @@
-# cbox runtime — pure builder for the engine `run` argv.
+# cbox runtime — pure builder for the engine `run -d` argv.
 #
 # Sourced by lib/session.sh. No side effects beyond reading the host
 # environment (existence of files/sockets). Prints one argv element per
@@ -6,7 +6,16 @@
 #
 # Caller pattern (session.sh):
 #   mapfile -t engine_args < <(cbox::runtime_args "$wt" "$id" "$name" "$mounts")
-#   cbox::engine_run "${engine_args[@]}"
+#   cbox::engine_run_detached "${engine_args[@]}"
+#
+# The container CMD is `sleep infinity` (set in the Containerfile) — keeps
+# the container alive so cbox can `exec` into it from a tmux pane that owns
+# a real PTY. The user-facing TUI (claude) is launched via engine_exec_tty.
+#
+# We deliberately do NOT pass -i or -t in this argv. -d (detached) is added
+# by engine_run_detached itself; -i + -t collide with -d on apple/container
+# 0.11 ("Operation not supported by device"). Interactivity comes from the
+# subsequent `container exec -it`.
 #
 # The image tag defaults to "cbox:latest"; override with $CBOX_IMAGE.
 
@@ -31,13 +40,10 @@ cbox::runtime_args() {
   image="${CBOX_IMAGE:-cbox:latest}"
 
   # Core flags ----------------------------------------------------------------
-  # We pass -i (keep stdin open) but NOT -t. The container is wrapped in a
-  # tmux pane which already provides a pty; allocating a second one inside
-  # the container conflicts on apple/container 0.11 ("Operation not supported
-  # by device") and is redundant on podman. Claude reads/writes through tmux's
-  # pty via stdin/stdout, which is sufficient for the TUI.
-  printf '%s\n' --rm
-  printf '%s\n' -i
+  # No -i / -t — see file header. -d is added by engine_run_detached.
+  # No --rm either: we destroy the container explicitly via engine_stop on
+  # session_rm, so the user can `cbox up` after a tmux detach without losing
+  # any in-container state (caches, package installs, running processes).
   printf '%s\n' --name "$session_name"
   printf '%s\n' --hostname "cbox-${id}"
 
