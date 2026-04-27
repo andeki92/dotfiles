@@ -53,11 +53,28 @@ cbox::_session_spawn_tmux() {
   # NB: apple/container's `inspect` returns 0 with `[]` even for unknown
   # IDs — exit-code-only check would always claim "exists". Match the
   # actual ID via `list -a --quiet` instead.
+  local _is_fresh=0
   if "$cli" list -a --quiet 2>/dev/null | grep -qx "$container_name"; then
     cbox::log "reusing existing container ${container_name}"
   else
     if ! cbox::engine_run_detached "${engine_args[@]}"; then
       cbox::log_err "failed to start container ${container_name}"
+      return 1
+    fi
+    _is_fresh=1
+  fi
+
+  # Apply the in-VM egress firewall once per fresh container. iptables in
+  # the container forces all egress through the host-side Squid proxy,
+  # closing the non-HTTP bypass (ICMP, raw TCP, plain DNS, ssh, etc.) that
+  # an HTTP-only proxy alone can't enforce. Each apple/container session
+  # is its own VM with its own kernel, so iptables actually works here
+  # (unlike the rootless-podman-on-macOS case from v1).
+  if [[ "$_is_fresh" == "1" ]]; then
+    if ! "$cli" exec -u root "$container_name" /usr/local/bin/init-firewall.sh; then
+      cbox::log_err "failed to apply in-VM firewall in ${container_name}"
+      "$cli" stop "$container_name" >/dev/null 2>&1 || true
+      "$cli" rm   "$container_name" >/dev/null 2>&1 || true
       return 1
     fi
   fi
