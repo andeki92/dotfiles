@@ -6,17 +6,32 @@ agents) inside a per-session container with a host-side egress allow-list.
 - macOS: `apple/container` per-VM isolation. Linux: rootful Podman.
 - Egress filtered by a host-side Squid proxy in CONNECT-only mode.
 - Per-session git worktree at `~/.cbox/worktrees/<repo>-<id>/`, owned by tmux.
-- Credentials (ssh-agent, gpg-agent, ~/.gitconfig, ~/.claude) mounted r/o or
-  via socket forwarding — no key bytes ever enter the container.
+- Credentials (ssh-agent, gpg-agent, ~/.gitconfig) mounted r/o or via socket
+  forwarding — no key bytes ever enter the container. Claude auth is forwarded
+  as `CLAUDE_CODE_OAUTH_TOKEN` (env), not as a bind-mount, so the host's
+  `~/.claude` is never exposed to the agent.
 
 ## Quick start
 
 ```bash
+# One-time setup: generate a long-lived (~1y) Claude OAuth token
+claude setup-token   # follow prompts; copy the token it prints
+mkdir -p ~/.cbox && chmod 700 ~/.cbox
+read -rs token && printf '%s\n' "$token" > ~/.cbox/oauth-token \
+  && chmod 600 ~/.cbox/oauth-token && unset token
+
+# Per-machine setup
 cbox doctor          # check the host
 cbox build           # build cbox:latest (first time only)
+
+# Per-session use
 cd ~/code/some-repo
 cbox                 # spawn a new sandboxed Claude session
 ```
+
+Alternative auth: if `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` is set
+in your shell, cbox uses that and the token-file step is unnecessary. The
+file path takes precedence over env vars so you can override per-machine.
 
 ## Commands
 

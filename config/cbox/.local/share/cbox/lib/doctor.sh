@@ -224,7 +224,33 @@ cbox::doctor_run() {
   fi
 
   # ------------------------------------------------------------------
-  # 14. sops + age key (only if *.sops files exist)
+  # 14. Claude auth — at least one of:
+  #       (a) ~/.cbox/oauth-token (mode 600), generated via `claude setup-token`
+  #       (b) CLAUDE_CODE_OAUTH_TOKEN env var on host
+  #       (c) ANTHROPIC_API_KEY env var on host
+  #     Without one of these, every cbox session falls into Claude's
+  #     first-run flow (theme picker + OAuth login) inside the container.
+  # ------------------------------------------------------------------
+  local _token_file
+  _token_file="$(cbox::home)/oauth-token"
+  if [[ -f "$_token_file" ]]; then
+    local _mode
+    _mode=$(stat -f '%Lp' "$_token_file" 2>/dev/null || stat -c '%a' "$_token_file" 2>/dev/null)
+    if [[ "$_mode" != "600" ]]; then
+      cbox::_check_warn "${_token_file} mode is ${_mode}; should be 600 (chmod 600 ${_token_file})"
+    else
+      cbox::_check_ok "Claude OAuth token configured (~/.cbox/oauth-token)"
+    fi
+  elif [[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
+    cbox::_check_ok "Claude OAuth token configured (CLAUDE_CODE_OAUTH_TOKEN env)"
+  elif [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+    cbox::_check_ok "Anthropic API key configured (ANTHROPIC_API_KEY env)"
+  else
+    cbox::_check_fail "no Claude auth configured — run \`claude setup-token\` on host then save the output to ~/.cbox/oauth-token (chmod 600)"
+  fi
+
+  # ------------------------------------------------------------------
+  # 15. sops + age key (only if *.sops files exist)
   # ------------------------------------------------------------------
   local _sops_files=()
   local _env_d="${_cfg_dir}/env.d"

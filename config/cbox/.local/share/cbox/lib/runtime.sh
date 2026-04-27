@@ -99,9 +99,31 @@ cbox::runtime_args() {
     fi
   fi
 
-  # Optional ~/.claude (read-only, holds CLI auth + skills).
-  if [[ -d "$HOME/.claude" ]]; then
-    printf '%s\n' -v "$HOME/.claude:/home/agent/.claude:ro"
+  # Claude auth — forwarded as env var, never as a mount.
+  #
+  # Anthropic explicitly warns that mounting host ~/.claude into a
+  # --dangerously-skip-permissions container exposes credentials. Their
+  # devcontainer reference uses a separate volume; their headless guide
+  # recommends `claude setup-token` → CLAUDE_CODE_OAUTH_TOKEN env var.
+  # We adopt the env-var approach so cbox sessions are stateless w.r.t.
+  # auth: no first-run wizard, no theme picker, no host-config tampering
+  # surface.
+  #
+  # Precedence (matches Anthropic's documented auth precedence):
+  #   1. CLAUDE_CODE_OAUTH_TOKEN from ~/.cbox/oauth-token (mode 600)
+  #   2. CLAUDE_CODE_OAUTH_TOKEN from host env
+  #   3. ANTHROPIC_API_KEY from host env
+  # If none are set, the container will land in Claude's first-run flow
+  # — `cbox doctor` warns about this earlier.
+  local _cbox_token_file="$(cbox::home)/oauth-token"
+  if [[ -f "$_cbox_token_file" ]]; then
+    local _tok
+    _tok=$(< "$_cbox_token_file")
+    [[ -n "$_tok" ]] && printf '%s\n' -e "CLAUDE_CODE_OAUTH_TOKEN=${_tok}"
+  elif [[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
+    printf '%s\n' -e "CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}"
+  elif [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+    printf '%s\n' -e "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}"
   fi
 
   # Host package caches — only mount the ones that already exist so we don't
