@@ -193,6 +193,14 @@ cbox::session_new() {
     cbox::log_err "git worktree add failed"
     return 1
   fi
+  # Defuse the .git/hooks/ persistence path: an agent inside cbox could
+  # write a pre-commit / post-checkout hook that the user later runs on
+  # the host with full credentials. Pointing hooksPath at /dev/null means
+  # git silently skips any executable in .git/hooks/ — both for this
+  # worktree (when the user inspects with `git status` etc.) and from
+  # inside the container (where it's harmless anyway). The user can still
+  # opt back in by editing the worktree's local config.
+  git -C "$worktree" config --local core.hooksPath /dev/null 2>/dev/null || true
 
   # Record state FIRST (under flock), then bring up proxy. If proxy_ensure
   # fails we roll back so we don't leave a phantom session that keeps the
