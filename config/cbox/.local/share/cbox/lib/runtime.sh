@@ -150,19 +150,28 @@ cbox::runtime_args() {
     printf '%s\n' -e "CBOX_HOST_CLAUDE_SETTINGS=${_claude_settings}"
   fi
 
-  # Host package caches — only mount the ones that already exist so we don't
-  # silently create empty cache dirs the user never asked for.
-  local cache
-  for cache in \
-      "$HOME/.cache/mise" \
-      "$HOME/.cache/cargo" \
-      "$HOME/.npm" \
-      "$HOME/.cache/pip" \
-      "$HOME/.cache/go-build"; do
-    if [[ -d "$cache" ]]; then
-      printf '%s\n' -v "${cache}:${cache}:rw"
-    fi
-  done
+  # Host package caches — DISABLED by default. The 2025-2026 npm/PyPI worm
+  # campaigns actively poison these dirs (planting binaries that the host's
+  # next `cargo install` / `npm i` runs as the user). A single bad transitive
+  # dep installed inside cbox = host pwn.
+  #
+  # Opt back in with CBOX_SHARE_HOST_CACHES=1 if you accept the trade — the
+  # speedup of warm caches vs. the supply-chain risk. The agent won't have
+  # offline-installed-toolchains by default; first-session `mise install` runs
+  # against the network, gated by Squid.
+  if [[ "${CBOX_SHARE_HOST_CACHES:-0}" == "1" ]]; then
+    local cache
+    for cache in \
+        "$HOME/.cache/mise" \
+        "$HOME/.cache/cargo" \
+        "$HOME/.npm" \
+        "$HOME/.cache/pip" \
+        "$HOME/.cache/go-build"; do
+      if [[ -d "$cache" ]]; then
+        printf '%s\n' -v "${cache}:${cache}:rw"
+      fi
+    done
+  fi
 
   # Caller-supplied extra mounts (raw "src:dst[:flags]" strings) -------------
   if [[ -n "$extra_mounts" && "$extra_mounts" != "[]" ]]; then
