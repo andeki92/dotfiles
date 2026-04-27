@@ -9,16 +9,33 @@ IFS=$'\n\t'
 
 log() { printf '[entry] %s\n' "$*" >&2; }
 
-# Pre-seed Claude's onboarding state. Without ~/.claude.json (note: dotfile
-# in $HOME, NOT inside ~/.claude/) holding hasCompletedOnboarding=true,
-# the TUI shows the theme picker + login wizard on every launch — even
-# when CLAUDE_CODE_OAUTH_TOKEN is set. The env-var token is only honoured
-# in non-interactive (--print) mode unless this onboarding flag is also
-# present.
+# Pre-seed Claude's onboarding + trust state. Without ~/.claude.json
+# (note: dotfile in $HOME, NOT inside ~/.claude/) holding the relevant
+# flags, the TUI shows the theme picker + login wizard + trust-folder
+# prompt on every launch even when CLAUDE_CODE_OAUTH_TOKEN is set.
+#
+# Flags we set:
+#   hasCompletedOnboarding=true   skip the theme picker + login wizard
+#   projects./workspace.hasTrustDialogAccepted=true
+#                                  skip the trust prompt for /workspace
+#   bypassPermissionsModeAccepted=true
+#                                  acknowledge --dangerously-skip-permissions
 if [[ ! -f "$HOME/.claude.json" ]]; then
-  printf '{"hasCompletedOnboarding":true,"installMethod":"native"}\n' \
-    > "$HOME/.claude.json"
-  log "seeded ${HOME}/.claude.json (skip first-run wizard)"
+  cat > "$HOME/.claude.json" <<'JSON'
+{
+  "hasCompletedOnboarding": true,
+  "installMethod": "native",
+  "bypassPermissionsModeAccepted": true,
+  "projects": {
+    "/workspace": {
+      "hasTrustDialogAccepted": true,
+      "hasCompletedProjectOnboarding": true,
+      "allowedTools": []
+    }
+  }
+}
+JSON
+  log "seeded ${HOME}/.claude.json (skip wizard + trust /workspace)"
 fi
 
 # mise: install toolchains if a config exists at /workspace.
