@@ -48,10 +48,16 @@ Tracked in PR #41 review; not blocking the v2 merge.
 18. **Pin BASE image by digest in Containerfile.** Currently `FROM debian:trixie-slim`
     floats; a registry compromise could swap the base. Replace with
     `FROM debian:trixie-slim@sha256:...` and update on `cbox build`.
-19. **OAuth token: drop env-var path entirely.** v2 entrypoint writes the token to
-    `~/.claude/.credentials.json` then `unset`s the env, but the var is still set at
-    container creation time and visible to `container exec <name> env` (host-side).
-    Cleaner: pass via per-session writable mount instead, never as -e.
+19. **OAuth token subprocess-inheritance risk.** `CLAUDE_CODE_OAUTH_TOKEN` is set as
+    a container-level env var, so any subprocess `claude` spawns (npm install, mise
+    downloads, etc.) inherits the token via `process.env` — a malicious dep can exfil
+    it to api.anthropic.com (which IS proxy-allowed). The natural fix (write to
+    `~/.claude/.credentials.json` + `unset`) is NOT possible: setup-token tokens
+    lack the refresh/expires fields the credentials file requires (env-var is the
+    only supported path per Anthropic docs). Real mitigation is item #15 — replace
+    OAuth token forwarding with a per-session deploy key / scoped PAT for git ops
+    and rotate the OAuth token frequently. Or: wait for Anthropic to ship a
+    setup-token-compatible credentials file format.
 20. **Plugin source secret scan.** `cbox doctor` greps `~/.claude/plugins` for
     high-entropy strings / common secret patterns and warns if a user committed
     secrets into a personal skill.
