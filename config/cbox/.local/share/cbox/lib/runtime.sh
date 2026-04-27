@@ -126,6 +126,19 @@ cbox::runtime_args() {
     printf '%s\n' -e "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}"
   fi
 
+  # Claude plugins + settings — mount read-only so the agent can USE
+  # installed plugins (rust-skills, superpowers, etc.) but cannot install
+  # new ones, modify the host plugin set, or read other ~/.claude state
+  # (credentials, projects, conversation history). Plugin code is code the
+  # agent could already write; the security boundary that matters is the
+  # writable scope, not the readable scope.
+  if [[ -d "$HOME/.claude/plugins" ]]; then
+    printf '%s\n' -v "$HOME/.claude/plugins:/home/agent/.claude/plugins:ro"
+  fi
+  if [[ -f "$HOME/.claude/settings.json" ]]; then
+    printf '%s\n' -v "$HOME/.claude/settings.json:/home/agent/.claude/settings.json:ro"
+  fi
+
   # Host package caches — only mount the ones that already exist so we don't
   # silently create empty cache dirs the user never asked for.
   local cache

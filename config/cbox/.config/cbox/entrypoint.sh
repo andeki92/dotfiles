@@ -24,7 +24,7 @@ if [[ ! -f "$HOME/.claude.json" ]]; then
   cat > "$HOME/.claude.json" <<'JSON'
 {
   "hasCompletedOnboarding": true,
-  "installMethod": "native",
+  "installMethod": "global",
   "bypassPermissionsModeAccepted": true,
   "projects": {
     "/workspace": {
