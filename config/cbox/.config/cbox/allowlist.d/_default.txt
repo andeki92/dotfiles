@@ -4,8 +4,9 @@
 # Squid syntax: leading dot matches subdomains too (e.g. .github.com matches
 # api.github.com, codeload.github.com, etc.).
 
-# Anthropic
+# Anthropic — model API + account/OAuth (platform.claude.com)
 .anthropic.com
+.claude.com
 .statsig.anthropic.com
 .sentry.io
 
