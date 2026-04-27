@@ -57,20 +57,11 @@ JSON
   fi
 fi
 
-# Persist the OAuth token to ~/.claude/.credentials.json (mode 600) and
-# unset the env var. Otherwise every subprocess (npm install, mise tool
-# downloads, etc.) inherits the token via process.env — and a single
-# malicious dependency can exfil it to api.anthropic.com (which IS in
-# the proxy allow-list). Claude Code reads the credentials file when
-# the env var is absent, so this is functionally equivalent without the
-# subprocess-inheritance risk.
-if [[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
-  install -m 600 /dev/null "$HOME/.claude/.credentials.json"
-  printf '{"claudeAiOauth":{"accessToken":"%s"}}\n' \
-    "$CLAUDE_CODE_OAUTH_TOKEN" > "$HOME/.claude/.credentials.json"
-  unset CLAUDE_CODE_OAUTH_TOKEN
-  log "stored OAuth token in ~/.claude/.credentials.json (mode 600); env var cleared"
-fi
+# NOTE: setup-token tokens (sk-ant-oat01-...) are env-var-only by design.
+# They lack refreshToken/expiresAt fields, so writing them to
+# ~/.claude/.credentials.json produces an invalid file Claude treats as
+# "not logged in". Subprocess inheritance of CLAUDE_CODE_OAUTH_TOKEN is
+# tracked as cbox-backlog item #15 (per-session deploy key / scoped PAT).
 
 # mise: install toolchains if a config exists at /workspace.
 if [[ -f /workspace/.mise.toml || -f /workspace/mise.toml || -f /workspace/.tool-versions ]]; then
