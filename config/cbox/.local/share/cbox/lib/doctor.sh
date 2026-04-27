@@ -144,20 +144,27 @@ cbox::doctor_run() {
   fi
 
   # ------------------------------------------------------------------
-  # 8. GPG agent socket (only if commit.gpgsign = true)
+  # 8. GPG agent socket (only if commit.gpgsign = true AND gpg.format != ssh)
   # ------------------------------------------------------------------
-  local _gpgsign
+  local _gpgsign _gpgformat
   _gpgsign=$(git config --global --get commit.gpgsign 2>/dev/null || true)
-  if [[ "$_gpgsign" == "true" ]]; then
-    local _gpg_sock
-    _gpg_sock=$(gpgconf --list-dirs agent-socket 2>/dev/null || true)
-    if [[ -z "$_gpg_sock" || ! -S "$_gpg_sock" ]]; then
-      cbox::_check_fail "gpg signing enabled but agent socket missing — run: gpgconf --launch gpg-agent"
+  _gpgformat=$(git config --global --get gpg.format 2>/dev/null || true)
+  if [[ "$_gpgsign" == "true" && "$_gpgformat" != "ssh" ]]; then
+    if ! command -v gpgconf >/dev/null 2>&1; then
+      cbox::_check_fail "gpg signing enabled but gpgconf not installed — install gnupg or set gpg.format=ssh"
     else
-      cbox::_check_ok "gpg agent socket present"
+      local _gpg_sock
+      _gpg_sock=$(gpgconf --list-dirs agent-socket 2>/dev/null || true)
+      if [[ -z "$_gpg_sock" || ! -S "$_gpg_sock" ]]; then
+        cbox::_check_fail "gpg signing enabled but agent socket missing — run: gpgconf --launch gpg-agent"
+      else
+        cbox::_check_ok "gpg agent socket present"
+      fi
     fi
+  elif [[ "$_gpgsign" == "true" && "$_gpgformat" == "ssh" ]]; then
+    cbox::_check_ok "ssh-key commit signing enabled (no gpg-agent needed)"
   fi
-  # else: skip silently
+  # else: signing off, skip silently
 
   # ------------------------------------------------------------------
   # 9. ~/.gitconfig with user.email and user.name
