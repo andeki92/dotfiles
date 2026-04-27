@@ -71,7 +71,12 @@ cbox::proxy_render_config() {
     done < "$file"
 
     if (( ${#hosts[@]} > 0 )); then
+      # bin/cbox sets IFS=$'\n\t' which would join host array entries with
+      # newlines, producing broken multi-line acl rules. Force a space here.
+      local _saved_ifs="$IFS"
+      IFS=' '
       acl_lines+=("acl ${name} dstdomain ${hosts[*]}")
+      IFS="$_saved_ifs"
       access_lines+=("http_access allow CONNECT ${name} SSL_ports")
       total_hosts=$((total_hosts + ${#hosts[@]}))
     fi
@@ -160,11 +165,13 @@ cbox::proxy_ensure() {
     return 1
   fi
 
-  # Wait briefly for the pid file to materialize.
+  # Wait for the pid file to materialize. 15s is generous for cold start on
+  # a system with high IO load (e.g. apple/container kernel just booted, brew
+  # cache warming up).
   local pid_file waited
   pid_file=$(cbox::_proxy_pid_file)
   waited=0
-  while (( waited < 50 )); do
+  while (( waited < 150 )); do
     if [[ -f "$pid_file" ]] && cbox::_proxy_alive_pid >/dev/null; then
       cbox::log_ok "squid started (pid $(<"$pid_file"))"
       return 0
@@ -173,7 +180,7 @@ cbox::proxy_ensure() {
     waited=$((waited + 1))
   done
 
-  cbox::log_err "squid pid file did not appear within 5s (check $(cbox::_proxy_log_file))"
+  cbox::log_err "squid pid file did not appear within 15s (check $(cbox::_proxy_log_file))"
   return 1
 }
 
