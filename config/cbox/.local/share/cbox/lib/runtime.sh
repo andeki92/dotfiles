@@ -19,9 +19,20 @@
 #
 # The image tag defaults to "cbox:latest"; override with $CBOX_IMAGE.
 
-# Hostname apple/container exposes for host-loopback services. Podman uses
-# the same name when configured, so a single constant suffices for v2.
-cbox::runtime_proxy_host() { printf '%s\n' 'host.containers.internal'; }
+# Host address the container should use to reach the host's loopback. Differs
+# by engine because apple/container 0.11 does NOT inject host.containers.internal
+# (or host.docker.internal) into the VM's resolver — but podman does.
+#
+# For apple/container: the vmnet gateway is the host. The default subnet is
+# 192.168.64.0/24 with gateway .1; check `/etc/resolv.conf` inside the VM,
+# whose first nameserver line is the gateway.
+cbox::runtime_proxy_host() {
+  case "$(cbox::engine_name)" in
+    container) printf '%s\n' '192.168.64.1' ;;
+    podman)    printf '%s\n' 'host.containers.internal' ;;
+    *)         printf '%s\n' 'host.containers.internal' ;;
+  esac
+}
 
 # cbox::runtime_args <worktree_dir> <id> <session_name> <extra_mounts_json>
 #
@@ -57,7 +68,13 @@ cbox::runtime_args() {
   printf '%s\n' -e "TERM=${TERM:-xterm}"
 
   # Workspace -----------------------------------------------------------------
-  printf '%s\n' -v "${worktree}:/workspace:rw"
+  # Resolve to canonical real path. apple/container 0.11 silently no-ops
+  # bind mounts whose source traverses a macOS symlink (e.g. /tmp →
+  # /private/tmp), leaving /workspace empty inside the container.
+  # See https://github.com/apple/containerization/issues/256.
+  local real_worktree
+  real_worktree=$(cd "$worktree" 2>/dev/null && pwd -P) || real_worktree="$worktree"
+  printf '%s\n' -v "${real_worktree}:/workspace:rw"
 
   # Optional gitconfig --------------------------------------------------------
   if [[ -f "$HOME/.gitconfig" ]]; then

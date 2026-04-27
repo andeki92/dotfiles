@@ -53,14 +53,24 @@ cbox::_session_spawn_tmux() {
   fi
 
   # Build the in-pane command: exec into the running container with -i -t,
-  # invoke the entrypoint (mise install + exec) with claude as the argument.
-  # Each piece is %q-quoted so paths/env with spaces survive tmux parsing.
+  # invoke the entrypoint (mise install + exec) — but wrap the final claude
+  # command in script(1) to forge a fresh PTY pair around it.
+  #
+  # apple/container's `exec -i -t` reports stdin as a TTY to the immediate
+  # child but Node's process.stdin.isTTY check returns false for processes
+  # started further down the chain, which makes Claude Code 2.x flip into
+  # `--print` mode and exit with "Input must be provided…". The standard
+  # workaround (per anthropics/claude-code#34430) is `script -qc <cmd> /dev/null`,
+  # which synthesizes a clean PTY pair satisfying isTTY for the wrapped process.
+  local inner_cmd
+  printf -v inner_cmd 'script -qc %s /dev/null' \
+    "$(printf '%q' 'claude --dangerously-skip-permissions')"
   local cmd
   printf -v cmd '%s exec -i -t %s /usr/local/bin/entrypoint.sh %s %s' \
     "$cli" \
     "$(printf '%q' "$container_name")" \
-    "$(printf '%q' 'claude')" \
-    "$(printf '%q' '--dangerously-skip-permissions')"
+    "$(printf '%q' '/bin/bash')" \
+    "$(printf '%q' "-c") $(printf '%q' "$inner_cmd")"
 
   if ! tmux new-session -d -s "$tmux_session" -c "$worktree" "$cmd"; then
     cbox::log_err "tmux new-session failed"
