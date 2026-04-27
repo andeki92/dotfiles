@@ -1,0 +1,22 @@
+# cbox default egress allow-list. Hostnames the agent is always permitted to
+# reach. Per-project additions go in <repo>.txt files alongside this one.
+# Lines starting with # are comments. Blank lines ignored.
+# Squid syntax: leading dot matches subdomains too (e.g. .github.com matches
+# api.github.com, codeload.github.com, etc.).
+
+# Anthropic — model API + account/OAuth (platform.claude.com)
+.anthropic.com
+.claude.com
+.statsig.anthropic.com
+.sentry.io
+
+# GitHub
+.github.com
+.githubusercontent.com
+
+# GitLab
+.gitlab.com
+
+# Host services (uncomment to allow agent to reach host's local services
+# e.g. Ollama on localhost:11434)
+# host.containers.internal

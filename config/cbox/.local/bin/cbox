@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# cbox — code sandbox harness. See ~/.config/cbox/README.md.
+set -euo pipefail
+IFS=$'\n\t'
+
+CBOX_BIN="${BASH_SOURCE[0]}"
+while [[ -L "$CBOX_BIN" ]]; do
+  link_target=$(readlink "$CBOX_BIN")
+  if [[ "$link_target" = /* ]]; then CBOX_BIN="$link_target"
+  else CBOX_BIN="$(cd "$(dirname "$CBOX_BIN")" && cd "$(dirname "$link_target")" && pwd)/$(basename "$link_target")"; fi
+done
+CBOX_LIB="$(cd "$(dirname "$CBOX_BIN")/../share/cbox/lib" && pwd)"
+
+source "${CBOX_LIB}/common.sh"
+source "${CBOX_LIB}/state.sh"
+source "${CBOX_LIB}/config.sh"
+source "${CBOX_LIB}/secrets.sh"
+source "${CBOX_LIB}/engine.sh"
+source "${CBOX_LIB}/proxy.sh"
+source "${CBOX_LIB}/runtime.sh"
+source "${CBOX_LIB}/session.sh"
+source "${CBOX_LIB}/doctor.sh"
+
+usage() {
+  cat <<'USAGE'
+cbox — code sandbox for Claude Code (and friends).
+
+Usage:
+  cbox                       Start a new sandboxed Claude session in CWD (must be a git repo).
+  cbox ls                    List active sessions.
+  cbox attach [<id>]         Reattach to a session (fzf if no id).
+  cbox stop   [<id>]         Stop container + kill tmux (worktree preserved).
+  cbox up      <id>          Restart against an existing worktree.
+  cbox rm     [<id>] [-f]    Remove worktree + delete branch if no upstream.
+  cbox prune  [--apply]      Remove sessions whose tmux is gone (dry-run by default).
+  cbox doctor                Diagnose host health.
+  cbox build                 Rebuild cbox:latest for the active engine.
+  cbox proxy {start,stop,status,reload}
+  cbox -h | --help
+
+USAGE
+}
+
+cbox_build() {
+  cbox::engine_ready || return 1
+  cbox::engine_build cbox:latest "$(cbox::config_dir)"
+  mkdir -p "$(cbox::state_dir)"
+  date -u +%Y-%m-%dT%H:%M:%SZ > "$(cbox::state_dir)/last-build"
+  cbox::log_ok "image built"
+}
+
+cbox_proxy() {
+  case "${1:-status}" in
+    start)   cbox::proxy_ensure ;;
+    stop)    cbox::proxy_stop_if_idle ;;
+    reload)  cbox::proxy_reload ;;
+    status)  cbox::proxy_status ;;
+    *)       cbox::log_err "unknown proxy subcommand: ${1}"; usage; exit 1 ;;
+  esac
+}
+
+main() {
+  local cmd="${1:-__new__}"
+  case "$cmd" in
+    -h|--help)        usage ;;
+    __new__)          cbox::session_new "$PWD" ;;
+    ls)               cbox::session_ls ;;
+    attach)           shift; cbox::session_attach "${1:-}" ;;
+    stop)             shift; cbox::session_stop  "${1:-}" ;;
+    up)               shift; cbox::session_up    "${1:?cbox up requires an id}" ;;
+    rm)               shift; cbox::session_rm    "$@" ;;
+    prune)            shift; cbox::session_prune "${1:-}" ;;
+    doctor)           cbox::doctor_run ;;
+    build)            cbox_build ;;
+    proxy)            shift; cbox_proxy "${1:-status}" ;;
+    *)                cbox::log_err "unknown command: $cmd"; usage; exit 1 ;;
+  esac
+}
+
+main "$@"
