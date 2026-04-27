@@ -32,8 +32,19 @@ iptables -A OUTPUT  -o lo -j ACCEPT
 iptables -A INPUT   -i lo -j ACCEPT
 iptables -A INPUT   -m state --state ESTABLISHED,RELATED -j ACCEPT
 
-# DNS — UDP/TCP 53 to public resolvers.
-for dns in 1.1.1.1 8.8.8.8; do
+# DNS — allow whatever resolvers /etc/resolv.conf actually points at, plus
+# 1.1.1.1 and 8.8.8.8 as a fallback. Rootless podman with pasta networking
+# typically injects 169.254.1.1 and the host gateway, neither of which are
+# our well-known public resolvers, so we read the live config.
+declare -a RESOLVERS=()
+if [[ -r /etc/resolv.conf ]]; then
+  while read -r kw addr _; do
+    [[ "$kw" == "nameserver" && -n "$addr" ]] && RESOLVERS+=("$addr")
+  done < /etc/resolv.conf
+fi
+RESOLVERS+=(1.1.1.1 8.8.8.8)
+for dns in "${RESOLVERS[@]}"; do
+  log "allowing DNS to $dns"
   iptables -A OUTPUT -p udp --dport 53 -d "$dns" -j ACCEPT
   iptables -A OUTPUT -p tcp --dport 53 -d "$dns" -j ACCEPT
 done
