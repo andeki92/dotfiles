@@ -19,7 +19,7 @@
             "automerge": false
         },
         {
-            "matchManagers": ["regex", "toml"],
+            "matchManagers": ["custom.regex",  "toml"],
             "matchPackageNames": ["lua"],
             "enabled": false
         }
