@@ -2,7 +2,7 @@
 # These environment variables must be set early as they affect FZF's behavior at initialization
 
 # Set default FZF configuration options
-export FZF_DEFAULT_OPTS="--height 50% --layout=reverse --border=rounded --inline-info --preview-window=right:60%:wrap --pointer=→"
+export FZF_DEFAULT_OPTS="--ansi --height 50% --layout=reverse --border=rounded --inline-info --pointer=→"
 
 # Use fd (https://github.com/sharkdp/fd) for more efficient file finding
 if command -v fd &> /dev/null; then
@@ -48,13 +48,13 @@ export FZF_CTRL_R_OPTS="--ansi --prompt='History > ' --header='Command history (
 if [[ $- == *i* ]]; then
   # Ctrl+P - Quick project switching (fp function must be defined in another file)
   bindkey -s '^p' 'fp^M'
-  
+
   # Ctrl+O - Directory navigation (fcd function must be defined in another file)
   bindkey -s '^o' 'fcd^M'
-  
-  # Ctrl+F - File navigation with fe() 
+
+  # Ctrl+F - File navigation with fe()
   bindkey -s '^f' 'fe^M'
-  
+
   # Ctrl+H - History search
   bindkey -s '^h' 'fh^M'
 fi
