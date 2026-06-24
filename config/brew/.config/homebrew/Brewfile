@@ -12,6 +12,7 @@ brew "tmux"                     # Terminal multiplexer (used by cbox for session
 brew "tree"                     # Display directory structure
 
 # Shells and CLI Utilities
+brew "bash"              # Modern GNU bash (macOS ships an ancient 3.2)
 brew "curl"              # URL transfer tool
 brew "eza" if OS.mac?    # Modern ls replacement
 brew "mas" if OS.mac?    # Mac App Store CLI
