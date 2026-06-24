@@ -8,6 +8,9 @@
   "agentPushNotifEnabled": true,
   "tui": "fullscreen",
   "permissions": {
+    "allow": [
+      "Bash(claude --version)"
+    ],
     "deny": []
   },
   "hooks": {
