@@ -1,12 +1,5 @@
 {
-  "enabledPlugins": {
-    "superpowers@claude-plugins-official": true
-  },
-  "skipWorkflowUsageWarning": true,
   "includeCoAuthoredBy": false,
-  "theme": "auto",
-  "agentPushNotifEnabled": true,
-  "tui": "fullscreen",
   "permissions": {
     "allow": [
       "Bash(claude --version)"
@@ -36,5 +29,12 @@
         ]
       }
     ]
-  }
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
+  },
+  "tui": "fullscreen",
+  "skipWorkflowUsageWarning": true,
+  "theme": "auto",
+  "agentPushNotifEnabled": true
 }
