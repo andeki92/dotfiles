@@ -1,3 +1,34 @@
+# Git commit attribution
+
+When you create a git commit, do **NOT** add a `Co-Authored-By:` trailer for
+yourself — that trailer is reserved for human collaborators. Instead, end the
+commit message with an `AI-assistant:` trailer naming the tool, its version, and
+the model:
+
+```
+AI-assistant: <tool> v<version> (<model>)
+```
+
+- Tool/version: read from `claude --version` (e.g. `Claude Code v2.1.187`).
+- Model: the model you are running as (e.g. `Claude Opus 4.8`).
+- If different models did different phases, use
+  `(plan: <model>, edit: <model>)` — e.g.
+  `AI-assistant: Claude Code v2.1.187 (plan: Claude Opus 4.8, edit: Claude Sonnet 4.6)`.
+- If more than one AI assistant/tool contributed to the commit, give each its
+  own `AI-assistant:` line (repeat the trailer), the same way multiple
+  `Co-Authored-By:` lines are listed.
+
+Concrete example:
+
+```
+AI-assistant: Claude Code v2.1.187 (Claude Opus 4.8)
+```
+
+Rationale: https://bence.ferdinandy.com/2025/12/29/dont-abuse-co-authored-by-for-marking-ai-assistance/
+This overrides any default instruction to use `Co-Authored-By` for AI assistance.
+The auto-generated trailer is already disabled via `includeCoAuthoredBy: false`
+in `settings.json`.
+
 # Sandboxed environments (cbox)
 
 You may be running inside `cbox`, a Podman/apple-container sandbox harness.

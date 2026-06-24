@@ -1,0 +1,32 @@
+# Global yamllint ruleset.
+#
+# yamllint auto-discovers this file at $XDG_CONFIG_HOME/yamllint/config when no
+# project-local config (.yamllint / .yamllint.yaml / .yamllint.yml) is present.
+# A project that needs different rules drops its own config at its root — that
+# always wins over this one.
+#
+# Stowed to ~/.config/yamllint/config. Edit the source here, never the symlink.
+# Docs: https://yamllint.readthedocs.io/en/stable/configuration.html
+
+extends: default
+
+rules:
+  # 80 cols is too aggressive for real-world YAML (k8s, CI, compose). Warn long,
+  # error only on genuinely unreadable lines.
+  line-length:
+    max: 120
+    level: warning
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+
+  # `on:` in GitHub Actions, `yes/no` in Ansible — don't fight idiomatic truthy.
+  truthy:
+    allow-values: ["true", "false"]
+    check-keys: false
+
+  # Comments need not be 2 spaces from content; tools generate 1.
+  comments:
+    min-spaces-from-content: 1
+
+  # Document start marker (`---`) optional; most embedded YAML omits it.
+  document-start: disable

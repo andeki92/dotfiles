@@ -1,0 +1,26 @@
+{
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
+  },
+  "skipWorkflowUsageWarning": true,
+  "includeCoAuthoredBy": false,
+  "theme": "auto",
+  "agentPushNotifEnabled": true,
+  "tui": "fullscreen",
+  "permissions": {
+    "deny": []
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/lint-dispatch.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}
