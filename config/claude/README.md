@@ -152,3 +152,9 @@ echo '{"tool_input":{"file_path":"/path/to/some.yaml"}}' \
 
 To see hooks fire live inside Claude Code, run with `claude --debug`, or inspect
 the configured hooks with the `/hooks` command.
+
+The `block-bash-file-edits.sh` guard has a bats suite under `hooks/test/`:
+
+```bash
+bats config/claude/.claude/hooks/test
+```
