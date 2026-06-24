@@ -17,6 +17,9 @@ AI-assistant: <tool> v<version> (<model>)
 - If more than one AI assistant/tool contributed to the commit, give each its
   own `AI-assistant:` line (repeat the trailer), the same way multiple
   `Co-Authored-By:` lines are listed.
+- The trailer marks AI authorship of the *changes*, not the act of committing.
+  If a human wrote the changes and you are merely creating the commit on their
+  behalf, omit the trailer entirely.
 
 Concrete example:
 
