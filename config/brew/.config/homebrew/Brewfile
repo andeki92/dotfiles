@@ -26,11 +26,9 @@ cask "macfuse"            # EXT support
 cask "obsidian"           # Markdown note-taking app
 cask "orbstack"           # Alternative to Docker desktop
 
-# Development Applications
-cask "intellij-idea"     # IDE for JVM languages
-cask "zed"		 # IDE
-
-# Git Credentials
+# Development Tools
+cask "intellij-idea"            # IDE for JVM languages
+cask "zed"		                # IDE
 cask "git-credential-manager"
 
 # Fonts
