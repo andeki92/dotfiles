@@ -1,0 +1,7 @@
+# Local, machine-specific Zed state — never track these.
+
+# Binary LMDB prompt-library database
+prompts/
+
+# User themes directory; Catppuccin is supplied by the auto-installed extension
+themes/
