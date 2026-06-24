@@ -81,6 +81,58 @@ looks_like_source() {
   return 1
 }
 
+# Strip heredoc *bodies* — the lines between `<<DELIM` and the closing DELIM.
+# Content fed to a command's stdin (a commit message in `git commit -F - <<EOF`,
+# a PR body in `gh pr create <<EOF`) is data, not shell, and must never be
+# parsed for redirects or edit idioms — otherwise prose like "Latte <-> Mocha"
+# reads as `> Mocha`. The `<<DELIM` operator itself is kept, so a genuine
+# `cat > file <<EOF` write is still detected via its real `>` redirect below.
+strip_heredoc_bodies() {
+  local line delim='' inhd=0 out=''
+  local hd_re='<<-?[[:space:]]*["'\'']?([A-Za-z_][A-Za-z0-9_]*)'
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [ "$inhd" = 1 ]; then
+      local trimmed="${line#"${line%%[![:space:]]*}"}"   # ltrim (covers <<- tabs)
+      [ "$trimmed" = "$delim" ] && inhd=0
+      continue
+    fi
+    out+="$line"$'\n'
+    # A here-string (<<<) has no body; don't mistake it for a heredoc.
+    if [ "${line#*'<<<'}" = "$line" ] && [[ "$line" =~ $hd_re ]]; then
+      delim="${BASH_REMATCH[1]}"
+      inhd=1
+    fi
+  done < <(printf '%s' "$1")
+  printf '%s' "$out"
+}
+
+# Blank out the *contents* of quoted strings (and their quotes) so prose inside
+# echo / commit-message / -m arguments — "done -> next", "x > y", "use sed -i" —
+# is never parsed as a redirect or edit idiom. Real redirects and idioms live
+# OUTSIDE quotes and survive untouched. Escapes are handled leniently; per the
+# precision bias, a missed block beats a false one.
+strip_quoted() {
+  local s="$1" out='' q='' ch i n=${#1}
+  for (( i = 0; i < n; i++ )); do
+    ch="${s:i:1}"
+    if [ -n "$q" ]; then
+      [ "$ch" = "$q" ] && q=''
+      continue
+    fi
+    if [ "$ch" = "'" ] || [ "$ch" = '"' ]; then
+      q="$ch"
+      continue
+    fi
+    out+="$ch"
+  done
+  printf '%s' "$out"
+}
+
+# From here on, match against the de-data'd command: heredoc bodies removed and
+# quoted-string contents blanked, leaving only the shell skeleton.
+cmd="$(strip_heredoc_bodies "$cmd")"
+cmd="$(strip_quoted "$cmd")"
+
 # --- 1. In-place stream editors. Near-zero false positives. -----------------
 # sed -i / --in-place / -i.bak / -ri ; perl -i / -pi ; ruby -i ; gawk -i inplace.
 # `[^|;&<>]*` keeps the flag on the SAME simple command as the tool name, so a
