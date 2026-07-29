@@ -36,5 +36,7 @@
   "tui": "fullscreen",
   "skipWorkflowUsageWarning": true,
   "theme": "auto",
-  "agentPushNotifEnabled": true
+  "switchModelsOnFlag": false,
+  "agentPushNotifEnabled": true,
+  "model": "opus[1m]"
 }
