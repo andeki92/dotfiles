@@ -6,6 +6,7 @@
     ],
     "deny": []
   },
+  "model": "fable",
   "hooks": {
     "PreToolUse": [
       {
@@ -33,10 +34,10 @@
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true
   },
+  "effortLevel": "xhigh",
   "tui": "fullscreen",
   "skipWorkflowUsageWarning": true,
   "theme": "auto",
   "switchModelsOnFlag": false,
-  "agentPushNotifEnabled": true,
-  "model": "opus[1m]"
+  "agentPushNotifEnabled": true
 }

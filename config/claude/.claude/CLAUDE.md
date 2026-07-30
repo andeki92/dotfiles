@@ -32,6 +32,13 @@ This overrides any default instruction to use `Co-Authored-By` for AI assistance
 The auto-generated trailer is already disabled via `includeCoAuthoredBy: false`
 in `settings.json`.
 
+# Design work
+
+Before writing code for a new feature, component, or behaviour change — and
+before entering plan mode — use the **`pair-programming`** skill. It is the
+entry point for design work: we settle the constraints together, it writes the
+spec, and it carries that spec through review and implementation.
+
 # Sandboxed environments (cbox)
 
 You may be running inside `cbox`, a Podman/apple-container sandbox harness.

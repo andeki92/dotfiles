@@ -11,6 +11,8 @@ config/claude/.claude/
 ├── settings.json          # global Claude Code settings (hooks, deny-list, UI)
 ├── CLAUDE.md              # global instructions injected into every session
 ├── commands/              # custom slash commands
+├── skills/                # personal skills (see "Skills" below)
+│   └── pair-programming/  # design → spec → critique → implement
 └── hooks/                 # event-driven automation (see "Hooks" below)
     ├── lint-dispatch.sh   # PostToolUse entrypoint
     └── linters/           # one script per file type
@@ -18,6 +20,65 @@ config/claude/.claude/
         ├── json.sh
         └── sh.sh
 ```
+
+---
+
+## Skills
+
+Skills are *instructions* Claude loads on demand — the opposite end of the lever
+from hooks. A hook fires deterministically and the model has no say; a skill is
+read by the model when it judges the skill relevant, or when you invoke it by
+name as `/<skill-name>`.
+
+Each skill is a directory with a `SKILL.md` whose YAML frontmatter carries two
+fields: `name`, and a `description` that tells Claude *when* to reach for it.
+Supporting files sit alongside and are read only when the workflow needs them,
+so they cost no context until they do.
+
+```
+skills/pair-programming/
+├── SKILL.md               # the workflow itself
+├── spec-template.md       # output format: design doc + EARS requirements
+├── spec-lint.py           # mechanical spec checks — runs before any model pass
+├── test_spec_lint.py      # its test suite (python3 test_spec_lint.py)
+├── critic-prompt.md       # adversarial spec review, fresh context
+├── implementer-prompt.md  # TDD implementation, fresh context
+└── reviewer-prompt.md     # code review against the spec, fresh context
+```
+
+### pair-programming
+
+The entry point for design work, wired up in `CLAUDE.md` so it applies before
+any feature, component, or behaviour change. Two lanes: **small** (one
+behaviour, one commit — spec'd, built, shown, no subagents) and **standard**,
+whose stages each run in a fresh context:
+
+1. **Pin the constraints** — an actual back-and-forth in the session. Probe,
+   challenge, commit, close. No menus of options to pick from.
+2. **Lint** — `spec-lint.py` catches everything mechanically decidable before
+   a model is paid to look.
+3. **Critic** (subagent) — a fresh model that never saw the conversation
+   attacks the spec for false premises, uncovered cases, and security holes.
+4. **Gate** — you approve the spec; the `Base` sha is recorded, so bailing
+   later is one `git reset` and an `abandoned` status.
+5. **Implementer** (subagent) — builds unit by unit with TDD, commits nothing.
+6. **Show the work** — you see the diff and test output before anything lands
+   in git; tweaks fold straight in, commits are cut on your go.
+7. **Review** (subagent) — judges the committed diff against the spec, two
+   rounds maximum.
+
+Artifacts live in `<repo>/.specs/` and are excluded via `.git/info/exclude`, so
+nothing lands in a tracked file and nothing gets committed.
+
+### Adding a skill
+
+1. Create `skills/<name>/SKILL.md` with `name` + `description` frontmatter.
+   Write the description as triggering conditions ("Use when…"), not as a
+   summary of what the skill does — a description that summarises the workflow
+   gets followed *instead of* the skill body.
+2. Put anything heavy (templates, reference material, subagent prompts) in
+   sibling files and link to them relatively.
+3. `stow -R claude`, then confirm with `/<name>` in a fresh session.
 
 ---
 
