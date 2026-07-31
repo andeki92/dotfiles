@@ -52,6 +52,15 @@ or `may`. Numbered so findings, tests and reviews can cite them; the numbers
 are stable — a deleted requirement's number retires with it, gaps are fine,
 renumbering breaks every citation.
 
+| Pattern | Shape |
+|---|---|
+| Ubiquitous | The `<system>` shall `<response>` |
+| Event-driven | When `<trigger>`, the `<system>` shall `<response>` |
+| State-driven | While `<state>`, the `<system>` shall `<response>` |
+| Unwanted behaviour | If `<condition>`, then the `<system>` shall `<response>` |
+| Optional feature | Where `<feature>`, the `<system>` shall `<response>` |
+| Complex | While `<state>`, when `<trigger>`, the `<system>` shall `<response>` |
+
 `Verify by` is `test`, `inspection`, `analysis`, or `demonstration`. Prefer
 `test:<path>::<name>` — naming the test makes coverage a string match rather
 than a judgement call.
@@ -66,6 +75,10 @@ than a judgement call.
 
 Components involved and how data moves between them. Prose or a small diagram —
 whichever is shorter for the shape being described.
+
+Prefer references to real artifacts over fresh description: name the existing
+function, schema, or test that already has the shape you mean, and for UI work
+link a mockup — an HTML mockup beats a paragraph describing one.
 
 ### Files
 

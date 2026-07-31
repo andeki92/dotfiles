@@ -107,9 +107,7 @@ prompt: |
 ## Re-review
 
 Only when the round contained something Blocking. Same agent shape, over the
-fix diff alone. Cheap tier when the fix is mechanical; when the finding was
-security, concurrency, or subtle correctness, use the tier the original review
-ran at — the smallest diffs carry the highest-stakes judgements.
+fix diff alone; pick the tier by the standard-lane rules.
 
 ```
 prompt: |
