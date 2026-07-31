@@ -31,9 +31,7 @@
       }
     ]
   },
-  "enabledPlugins": {
-    "superpowers@claude-plugins-official": true
-  },
+  "enabledPlugins": {},
   "effortLevel": "xhigh",
   "tui": "fullscreen",
   "skipWorkflowUsageWarning": true,
