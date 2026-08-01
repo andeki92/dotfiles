@@ -80,6 +80,25 @@ Prefer references to real artifacts over fresh description: name the existing
 function, schema, or test that already has the shape you mean, and for UI work
 link a mockup — an HTML mockup beats a paragraph describing one.
 
+### Subsystems
+
+Standard lane, when the slice is fat enough to want more than one implementer.
+Name the parts this splits into and what each owns. A subsystem is a boundary
+you can write an interface across — not a folder, and not a layer you named
+because layers exist.
+
+Decide this here, with your partner, rather than leaving it to be discovered
+later: it is a design fact about the feature, and the critic checks this section
+against the real codebase, so naming it buys a free sanity check.
+
+| Subsystem | Owns | Depends on |
+|---|---|---|
+| schema | migration, `db::` accessors | — |
+| handlers | routing, request handling | schema |
+
+`—` in Depends on means it can start immediately. Anything every subsystem
+depends on is the seam: it is built first, alone, before the rest start.
+
 ### Files
 
 Required in the standard lane — the critic checks these paths against the
@@ -93,6 +112,12 @@ codebase, so a spec without them loses its false-premise check.
 
 Exact signatures the implementer must produce or consume, where later work
 depends on the names.
+
+**Required once Subsystems names more than one.** Separate implementers cannot
+agree on a name they were never given, and an interface invented twice is the
+cheapest kind of drift to prevent and the most tedious to repair. If you cannot
+write the signature before either side exists, that is the boundary telling you
+it is not one — merge the two subsystems and move on.
 
 ## Data and schema changes
 

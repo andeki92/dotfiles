@@ -9,8 +9,14 @@ the resume depends on.
 Hand artifacts between stages **as file paths, never as pasted content**, and
 name the model on every dispatch — an omitted model inherits your session's,
 usually the most expensive one available. Critic: most capable. Implementer:
-scale to the work. Reviewer: scale to the diff. Fix rounds: one tier above
-whoever got stuck.
+scale to the work. Reviewer: scale to the diff. Finisher: cheap.
+
+**An agent's every turn re-bills its whole context, so a long-lived agent gets
+expensive faster than it gets useful.** The implementer is the one that grows —
+it holds the build — so its life is deliberately short: it stops at the approved
+tree and never commits. Committing and fixing run in a fresh agent that starts
+from files. Resume an agent to keep context it genuinely needs; retire it the
+moment the next job can be done from what is written down.
 
 ## 1. The critic
 
@@ -44,17 +50,52 @@ describes — the review diff and the abort path both start there.
 
 Work happens on the current branch; do not create one unless your partner asks.
 
-Dispatch [implementer-prompt.md](implementer-prompt.md) with the spec path and
-the report path. It returns its unit list as `PLAN_PROPOSED` and stops before
+Settle how many implementers this takes first (below) — usually one. Then
+dispatch [implementer-prompt.md](implementer-prompt.md) with the spec path and a
+report path. Each returns its unit list as `PLAN_PROPOSED` and stops before
 writing code. Check the list yourself — every `R` carried, no Non-goal climbed,
-each unit worth committing alone — then approve or correct it and resume the
+each unit worth committing alone — then approve or correct it and resume that
 same agent.
+
+### One implementer, or several
+
+Default to one. A single implementer that stays under about 150k is cheaper and
+more coherent than any split, and most slices are that size. Split only when the
+spec's **Subsystems** table names more than one — your partner settled that at
+Stage 1, so you are reading a decision here, not making one.
+
+The split buys two different things, and you can take the first without the
+second:
+
+| | What it buys | What it costs |
+|---|---|---|
+| **A fresh implementer per subsystem, dispatched in sequence** | The tokens. Each starts cold and finishes before it grows; three agents peaking at 120k cost a fraction of one reaching 500k, because every turn re-bills the whole context. | One dispatch per subsystem, each re-reading the spec and its corner of the code. |
+| **Running independent subsystems at the same time** | The clock, and nothing else. An agent's context is identical either way, so this saves no tokens at all. | They share one working tree, so their files must be genuinely disjoint. Concurrent test runs contend on the project's build lock — in a language that compiles a whole crate per run, this can hand back most of the clock it saved. |
+
+Take the sequential win by default; add concurrency only where the subsystems
+share no files and running two suites at once is actually faster. Check that
+last part rather than assuming it.
+
+**The seam goes first.** Whatever every subsystem depends on — shared types,
+helpers, the migration — is built alone, in the first wave, before any other
+implementer starts. Later workers then build against compiled code instead of a
+described contract, which turns a disagreement about an interface into a
+compile error rather than a review finding.
+
+**Against the split.** Every worker you add is a dialect: separate agents
+reinvent helpers, name the same concept two ways, and drift apart in style —
+and the reviewer's Fit and Scope checks then spend their attention on damage you
+chose to cause. Coordination grows as the square of the workers, so three is a
+plan and eight is a project. If a subsystem is less than about a fifth of the
+work, fold it into its neighbour; the cold start costs more than the split saves.
+
+Each implementer writes its own `report-<subsystem>.md` and is scoped to its own
+units and files. Approve each unit list the same way you approve one.
 
 | It returns | You do |
 |---|---|
 | `DONE` | Confirm the suite output is in the report and the tree holds the work uncommitted, then show the work (next stage). |
 | `DONE_WITH_CONCERNS` | Correctness or scope: hand the concern to the reviewer. Observations: note and proceed. |
-| `COMMITTED` | Verify the commits exist (`git log --oneline <Base>..HEAD`), then review. |
 | `NEEDS_CONTEXT` | Answer and resume. If the answer is an Open question, it is your partner's. |
 | `BLOCKED` | Missing context → resume with it. Needs more reasoning → fresh agent, one tier up. Too large → split the unit list. **Spec is wrong** → stop, take it to your partner. |
 
@@ -70,13 +111,26 @@ test output, one line per unit. Ask what they would change.
 
 This is the pairing loop, and it is cheap on purpose. Hand each piece of
 feedback to the resumed implementer verbatim; it applies, re-runs the covering
-tests, and you show the result again — as many rounds as the work needs.
+tests, and you show the result again — as many rounds as the work needs. Where
+the build was split, show the tree as one piece of work and route each note to
+the implementer that owns those files; a worker that has already returned `DONE`
+is resumed only if the feedback lands in its subsystem.
 Feedback here is part of the build, not a new spec run: it touches the spec
 only when it overturns a settled Decision or adds behaviour no requirement
 covers, and then as a one-line edit to the table, not a return to Stage 1.
 
-When your partner is happy, resume the implementer with the approval. It
-commits unit by unit and returns `COMMITTED`.
+When your partner is happy, resume each implementer once more to refresh its
+report's Commit plan against the final tree — then retire them. Everything left
+to do is written down, and an implementer is by now the most expensive agent in
+the run.
+
+Dispatch [finisher-prompt.md](finisher-prompt.md) on a cheap model with the
+reports **in dependency order**, the spec, repo root and `Base` sha — the seam
+commits before what builds on it. It cuts one commit per entry and returns
+`COMMITTED`; verify the commits exist (`git log --oneline <Base>..HEAD`) and
+that the tree is clean. `MISMATCH` means the plan and the tree disagree — read
+the specifics yourself and correct the plan, rather than letting a cold agent
+guess.
 
 ## 5. The review
 
@@ -89,13 +143,18 @@ paths:
 { git log --oneline BASE..HEAD; echo; git diff --stat BASE..HEAD; echo; git diff -U10 BASE..HEAD; } > <artifacts>/diff-1.txt
 ```
 
-Blocking and Important findings go back to the implementer verbatim; Advisory
-findings go in the Review Log. It fixes, re-runs the covering tests and the
-linter, and appends to its report. Re-review only the fix diff, and only when
+Blocking and Important findings go back to the **finisher** verbatim — resume
+it, not the implementer, which is retired; Advisory findings go in the Review
+Log. It fixes, re-runs the covering tests and the linter, commits, and appends
+to the report. `NEEDS_IMPLEMENTER` means the finding is real implementation
+work, not a fix: dispatch a fresh implementer scoped to that finding alone.
+`CONTESTED` is your partner's call, not yours.
+
+Re-review only the fix diff, and only when
 something Blocking was in the round — on a cheap tier when the fix is
 mechanical, at the original reviewer's tier when the finding was security,
 concurrency, or subtle correctness; the smallest diffs carry the highest-stakes
-judgements. Important fixes are taken on the implementer's word: re-verification
+judgements. Important fixes are taken on the finisher's word: re-verification
 is spent only where merging broken code is the risk.
 
 Two rounds maximum. Then rule on whatever is still open, recording each ruling

@@ -35,6 +35,41 @@ prompt: |
   - **Open questions** — unresolved. If one blocks you, report NEEDS_CONTEXT
     rather than picking an answer.
 
+  ## Your scope
+
+  **Subsystem:** [SUBSYSTEM — omit this whole section when there is only one
+  implementer]
+
+  You own that subsystem and nothing else. Other implementers are building the
+  others, against the same spec, in the same working tree, at the same time or
+  just after you.
+
+  - **Touch only the files your subsystem owns** in the spec's Files table. A
+    file another subsystem owns is theirs even when your change there would be
+    small and correct — you would be editing under someone else's feet.
+  - **The Interfaces section is fixed.** Produce and consume exactly those
+    signatures. If one is wrong or missing, report NEEDS_CONTEXT — do not repair
+    it locally, because the other side is reading the same spec and will not
+    follow you.
+  - **Do not add shared helpers.** If you need something that would live outside
+    your own files, report it rather than writing it; two implementers each
+    inventing `week_start()` is the whole reason this boundary exists. Inside
+    your own files, write what you need.
+  - **Follow the vocabulary the spec uses.** Where it names a concept, that is
+    the name — in types, functions, columns and tests alike.
+  - Whatever the seam wave already built is real code. Read it and use it rather
+    than reimplementing your own version of it.
+
+  ## Spec IDs stay in the spec
+
+  `D3`, `R7`, `C2`, `U4` and `Q1` address rows in a document that never ships —
+  `.specs/` is not committed, so a reader of this repo cannot resolve one. Never
+  write a spec ID into code, a comment, a docstring, a test name, a migration,
+  documentation, or a commit message. Carry the reasoning across in prose and
+  leave the label behind: `// an empty candidate set means the week is accepted`,
+  never `// D2: the week is accepted`. Your report is the exception — it sits
+  beside the spec, so its tables cite freely.
+
   ## Step 1 — propose the unit list, then stop
 
   Break the spec into units: the smallest pieces that each carry their own test
@@ -62,18 +97,20 @@ prompt: |
   and paste the real output into your report — not a summary of it. Then re-read
   the Requirements table and check each `R<n>` off against the code you wrote.
 
-  ## Step 3 — feedback, then commit
+  ## Step 3 — feedback, then hand off
 
   Your controller shows the work to your partner while the tree is still
   uncommitted. Resumed with feedback: apply it, re-run the covering tests,
-  append what changed to your report, and return the short contract again — as
-  many rounds as it takes. This is the pairing loop, not a defect cycle.
+  append what changed to your report, refresh the Commit plan to match the tree
+  as it now stands, and return the short contract again — as many rounds as it
+  takes. This is the pairing loop, not a defect cycle.
 
-  Resumed with approval: commit unit by unit from your report's map, in order —
-  units whose files overlap merge into one commit. Put the Decisions each
-  commit rests on into its message — `.specs/` is never committed, so the
-  commit message is where the reasoning survives. Never `git add` or commit
-  anything under `.specs/`. Return COMMITTED with the commit range.
+  **You never commit.** When your partner approves, your work is done: return
+  DONE and stop. A separate agent cuts the commits from your Commit plan, and it
+  starts cold — it has your report and the working tree, and nothing else. That
+  is why the plan carries drafted messages rather than a note to write them
+  later: whatever the diff cannot say has to be written now, while you are still
+  the one who knows it.
 
   ## Report
 
@@ -82,11 +119,35 @@ prompt: |
   ```markdown
   # Implementation Report — <feature>
 
-  **Status:** DONE | DONE_WITH_CONCERNS | COMMITTED | BLOCKED | NEEDS_CONTEXT
-  **Branch:** <branch> · **Commits:** none yet | <first7>..<last7>
+  **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+  **Branch:** <branch> · **Base:** <sha>
 
-  ## Units
-  1. <unit> — <files touched> — <commit7 once committed>
+  ## Commit plan
+
+  In commit order. Units whose files overlap merge into one entry — the agent
+  that cuts these does not judge, it executes.
+
+  ### 1. <unit name>
+  **Files:** `path/one`, `path/two`
+  **Message:**
+  ```
+  <type>(<scope>): <subject>
+
+  <body — omit entirely unless the diff cannot say it>
+  ```
+
+  **Most entries want no body at all.** The diff says what changed and the
+  subject says what it is for; a body that narrates either is noise in every
+  `git log` from here on. Write one only where a reader would otherwise undo the
+  work — a rejected alternative that looks like an oversight, a constraint that
+  looks arbitrary, a why that is not visible in the code. Aim at 200 characters
+  and stop at 400.
+
+  Reasoning that will not fit is telling you something rather than asking for
+  room. If it is general, it belongs in `principles.md` — note it under
+  Deviations and concerns so it reaches your partner. If it is specific to this
+  change, the commit is doing too much and wants splitting. A longer message
+  fixes neither.
 
   ## Requirements
   | # | Where implemented | Test |
@@ -109,15 +170,7 @@ prompt: |
   - **DONE** — every requirement implemented, suite and linter green, nothing
     committed. The work is waiting for your partner's eyes.
   - **DONE_WITH_CONCERNS** — complete, but something worried you. Say what.
-  - **COMMITTED** — approval received, commits cut, range reported.
   - **NEEDS_CONTEXT** — you need an answer the spec does not give. Ask it.
   - **BLOCKED** — you cannot proceed. Name what stops you and what would unblock
     it. Do not guess your way past it.
-
-  ## Fix rounds
-
-  Sent review findings after COMMITTED: fix them, re-run the tests covering the
-  amended code, commit the fixes, append a fix round to the same report file
-  (findings addressed, commands run, real output, commit range), and return the
-  short contract again.
 ```

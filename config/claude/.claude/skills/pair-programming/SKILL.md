@@ -73,6 +73,20 @@ guess about the second.
 
 If the request spans several independent subsystems, say so at the first probe.
 
+### When the slice is fat anyway
+
+Some slices are honestly wide — one behaviour that reaches the schema, the
+handlers and the templates at once — and splitting them into separate runs would
+ship nothing useful on its own. Those get built by several implementers instead
+of one, so at Close, name the subsystems: what the parts are, what each owns,
+and which depends on which.
+
+A subsystem is a boundary you can write an interface across, before either side
+exists. If you cannot, it is not a boundary — say so and keep them together.
+Two or three is a plan; one is fine and common. This is a design call and it is
+made here, with your partner, rather than left for a downstream agent to guess
+at from the file list.
+
 ## Pick the lane
 
 At Close, say which lane this is and why, in one line.
@@ -125,9 +139,9 @@ than one commit, stop and move it to the standard lane.
 
 ## Standard lane
 
-The five stages — critic, gate, implementer, show the work, review — live in
-[standard-lane.md](standard-lane.md). Read it when the lane is standard, not
-before.
+The six stages — critic, gate, implementer, show the work, commit, review —
+live in [standard-lane.md](standard-lane.md). Read it when the lane is
+standard, not before.
 
 ## Bailing out
 
@@ -141,7 +155,8 @@ procedure.
 ## Artifacts
 
 `<repo-root>/.specs/<YYYY-MM-DD>-<slug>/` holds `spec.md`, and in the standard
-lane `findings.md`, `report.md`, `review.md`, `diff-<n>.txt`.
+lane `findings.md`, `report.md` — or `report-<subsystem>.md` per implementer
+when the build was split — `review.md`, `diff-<n>.txt`.
 
 Keep it out of git: `git rev-parse --git-common-dir` gives the exclude file's
 directory — in a linked worktree `.git` is a file, so `<repo-root>/.git/info/exclude`
@@ -150,10 +165,25 @@ does not exist and reading it fails. Add `/.specs/` to
 repo, put the artifacts under the working directory and skip this.
 
 **Never `git add`, commit, or propose committing anything under `.specs/`.**
-These are working notes. What survives is the code, the tests, the Decisions in
-the commit messages, and anything promoted into `principles.md` — the code is
-the record of what the system does, and the only things worth writing down
-separately are the ones it cannot tell you.
+These are working notes. What survives is the code, the tests, whatever a commit
+message had to say that its diff could not, and anything promoted into
+`principles.md` — the code is the record of what the system does, and the only
+things worth writing down separately are the ones it cannot tell you.
+
+**Commit messages earn their length.** Most want a subject and nothing else; the
+diff already says what changed, and a body that narrates it is noise in every
+`git log` from here on. Write one only where a reader would otherwise undo the
+work — a rejected alternative that reads as an oversight, a constraint that
+looks arbitrary. Aim at 200 characters and stop at 400. Reasoning that outgrows
+that is either general, and belongs in `principles.md`, or a sign the commit
+should have been two.
+
+**The IDs stay behind too.** `D3`, `R7`, `C2` and `U4` address rows in a
+document that never ships, so `D19` resolves to nothing for whoever reads this
+repo next. Never write one into code, a comment, a docstring, a test name, a
+migration, documentation, or a commit message — carry the reasoning across in
+prose and drop the label. This binds you in the small lane and both agents in
+the standard one.
 
 `**Status:**` in the spec is `drafted → critiqued → approved → implemented →
 reviewed`, or `abandoned` from anywhere in the chain. Set it in the same edit

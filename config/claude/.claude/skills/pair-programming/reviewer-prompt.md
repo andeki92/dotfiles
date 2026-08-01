@@ -44,6 +44,7 @@ prompt: |
   | Error handling | Failures swallowed, retried blindly, or reported without the context needed to act on them. |
   | Fit | Code that ignores the patterns, naming and helpers already in the files it touches. |
   | Scope | Code no requirement needs. Duplication of something the codebase already has. |
+  | Spec IDs | `D3`, `R7`, `C2`, `U4` left in code, comments, docstrings, test names, migrations or commit messages. `.specs/` is never committed, so each one resolves to nothing for every future reader — the concrete failure is a maintainer chasing `D19` to a document that does not exist. Report it as Important; the fix is to spell the reasoning out in prose, not to delete the comment. |
 
   ## Verify, do not assume
 
