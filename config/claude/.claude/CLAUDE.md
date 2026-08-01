@@ -1,3 +1,31 @@
+# Commit messages
+
+These bind every commit you create, in any repo and any workflow.
+
+**Format.** `<type>(<scope>): <subject>` — imperative, lowercase, no trailing
+period. The subject says what the change is *for*, not which files moved.
+
+**One commit, one logical change.** Stage exactly the paths that belong to it.
+Never `git add -A`, `git add .`, or `git commit -a` — a commit that sweeps up
+whatever happened to be dirty is not reviewable.
+
+**Bodies earn their length.** Most commits want a subject and nothing else; the
+diff already says what changed, and a body that narrates it is noise in every
+`git log` from here on. Write one only where a reader would otherwise undo the
+work — a rejected alternative that reads as an oversight, a constraint that
+looks arbitrary, a why that is not visible in the code. Aim at 200 characters
+and stop at 400.
+
+Reasoning that outgrows that is telling you something rather than asking for
+room: either it is general, and belongs in the project's own documentation, or
+the commit is doing too much and wants splitting. A longer message fixes
+neither.
+
+**Every reference must resolve for someone holding only this repo.** No IDs
+from working notes, no paths that are not committed, no shorthand from the
+session that produced the change. Carry the reasoning across in prose and drop
+the label.
+
 # Git commit attribution
 
 When you create a git commit, do **NOT** add a `Co-Authored-By:` trailer for

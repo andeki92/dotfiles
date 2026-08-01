@@ -170,13 +170,10 @@ message had to say that its diff could not, and anything promoted into
 `principles.md` — the code is the record of what the system does, and the only
 things worth writing down separately are the ones it cannot tell you.
 
-**Commit messages earn their length.** Most want a subject and nothing else; the
-diff already says what changed, and a body that narrates it is noise in every
-`git log` from here on. Write one only where a reader would otherwise undo the
-work — a rejected alternative that reads as an oversight, a constraint that
-looks arbitrary. Aim at 200 characters and stop at 400. Reasoning that outgrows
-that is either general, and belongs in `principles.md`, or a sign the commit
-should have been two.
+**Commit messages follow the rules in `~/.claude/CLAUDE.md`** — subject alone
+unless a reader would otherwise undo the work, 200 characters and stop at 400.
+In this skill, reasoning that outgrows that is either general, and belongs in
+`principles.md`, or a sign the commit should have been two.
 
 **The IDs stay behind too.** `D3`, `R7`, `C2` and `U4` address rows in a
 document that never ships, so `D19` resolves to nothing for whoever reads this

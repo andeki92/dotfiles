@@ -136,12 +136,9 @@ prompt: |
   <body — omit entirely unless the diff cannot say it>
   ```
 
-  **Most entries want no body at all.** The diff says what changed and the
-  subject says what it is for; a body that narrates either is noise in every
-  `git log` from here on. Write one only where a reader would otherwise undo the
-  work — a rejected alternative that looks like an oversight, a constraint that
-  looks arbitrary, a why that is not visible in the code. Aim at 200 characters
-  and stop at 400.
+  **Most entries want no body at all.** Draft every message to the commit rules
+  in `~/.claude/CLAUDE.md` — subject alone unless a reader would otherwise undo
+  the work, aim at 200 characters, stop at 400.
 
   Reasoning that will not fit is telling you something rather than asking for
   room. If it is general, it belongs in `principles.md` — note it under
