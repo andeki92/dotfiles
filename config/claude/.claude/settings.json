@@ -6,7 +6,7 @@
     ],
     "deny": []
   },
-  "model": "fable",
+  "model": "opus",
   "hooks": {
     "PreToolUse": [
       {
