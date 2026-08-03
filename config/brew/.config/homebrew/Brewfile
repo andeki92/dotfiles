@@ -19,6 +19,7 @@ brew "mas" if OS.mac?    # Mac App Store CLI
 brew "wget"              # Internet file retriever
 brew "zsh"               # Improved shell
 brew "zsh-completions"   # Additional completions for zsh
+brew "herdr"             # Agent Multiplexer
 
 # Applications
 cask "ghostty"            # Terminal emulator
