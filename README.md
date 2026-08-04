@@ -99,14 +99,15 @@ git clone https://github.com/username/dotfiles.git ~/.dotfiles
 # Navigate to the repository
 cd ~/.dotfiles
 
-# Stow everything
-stow .
+# Create the config dir if it doesn't already exist
+mkdir -p ~/.config
+
+# Stow specific applications
+stow brew git starship zsh mise 
 
 # Link platform-specific git config (one-time per machine)
 ./scripts/post-stow.sh
 
-# Stow specific applications
-stow zsh git 
 
 # Update after changes
 stow -R .
