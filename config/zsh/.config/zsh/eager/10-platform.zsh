@@ -30,7 +30,7 @@ if is_macos; then
   path=(/usr/local/bin /usr/bin /bin /usr/sbin /sbin $HOME/.local/bin $path)
 elif is_linux; then
   # Linux-specific minimal settings
-  path=(/usr/local/bin /usr/bin /bin /usr/local/sbin /usr/sbin /sbin $path)
+  path=(/usr/local/bin /usr/bin /bin /usr/local/sbin /usr/sbin /sbin $HOME/.local/bin $path)
 
   if is_wsl; then
     # WSL-specific minimal settings
