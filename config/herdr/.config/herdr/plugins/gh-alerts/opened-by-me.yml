@@ -1,0 +1,3 @@
+prSections:
+  - title: Opened by me
+    filters: is:open archived:false author:@me

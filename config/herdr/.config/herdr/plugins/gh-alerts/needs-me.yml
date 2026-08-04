@@ -1,0 +1,5 @@
+prSections:
+  - title: Needs you
+    filters: is:open archived:false review-requested:@me
+  - title: Assigned to me
+    filters: is:open archived:false assignee:@me

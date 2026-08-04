@@ -1,0 +1,5 @@
+prSections:
+  - title: Renovate
+    filters: is:open archived:false owner:andeki92 author:app/renovate-andeki92
+  - title: Dependabot
+    filters: is:open archived:false owner:andeki92 author:app/dependabot
