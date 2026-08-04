@@ -79,7 +79,7 @@ __pycache__/
 *.bak
 *.tmp
 
-# Dynamically created with platform setupø
+# Dynamically created with platform setup
 config-platform
 
 # Never comitt local claude settings

@@ -1,62 +1,60 @@
 # Best-practice Git configuration options
 [user]
-	name = Anders Kirkeby
-	email = anders@klever-kirkeby.com
+name = Anders Kirkeby
+email = anders@bacheklever.no
 
 [init]
-	defaultBranch = main
+defaultBranch = main
 
 [push]
-	autoSetupRemote = true
-	followTags = true
+autoSetupRemote = true
+followTags = true
 
 [fetch]
-	prune = true
-	pruneTags = true
+prune = true
+pruneTags = true
 
 [pull]
-	rebase = true
+rebase = true
 
 [merge]
-	conflictstyle = zdiff3
+conflictstyle = zdiff3
 
 [diff]
-	algorithm = histogram
-	colorMoved = plain
-	mnemonicPrefix = true
-	renames = true
+algorithm = histogram
+colorMoved = plain
+mnemonicPrefix = true
+renames = true
 
 [branch]
-	sort = -committerdate
+sort = -committerdate
 
 [tag]
-	sort = version:refname
+sort = version:refname
 
 [column]
-	ui = auto
+ui = auto
 
 [commit]
-	verbose = true
+verbose = true
 
 [rerere]
-	enabled = true
-	autoupdate = true
+enabled = true
+autoupdate = true
 
 [core]
-	excludesfile = ~/.config/git/ignore
+excludesfile = ~/.config/git/ignore
 
 [rebase]
-	autoSquash = true
-	autoStash = true
-	updateRefs = true
+autoSquash = true
+autoStash = true
+updateRefs = true
 
 [help]
-	autocorrect = prompt
+autocorrect = prompt
 
 [include]
-    path = ~/.config/git/config-platform
-[credential]
-	helper = 
-	helper = /usr/local/share/gcm-core/git-credential-manager
+path = ~/.config/git/config-platform
+
 [credential "https://dev.azure.com"]
-	useHttpPath = true
+useHttpPath = true
