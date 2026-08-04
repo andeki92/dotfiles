@@ -37,6 +37,13 @@ elif is_linux; then
     # Add Windows interop settings here if needed
     path=(/home/linuxbrew/.linuxbrew $path)
 
+    # Load shrc directory shell files
+    for file in $HOME/.shrc.d/*; do
+      if [[ -r "$file" ]] && [[ "$file" =~ \.(sh|zsh)$ ]]; then
+        source "$file"
+      fi
+    done
+
     export GIT_EXEC_PATH="$(git --exec-path)"
     export WSLENV=$WSLENV:GIT_EXEC_PATH/wp
   fi
