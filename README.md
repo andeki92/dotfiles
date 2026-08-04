@@ -108,7 +108,6 @@ stow brew git starship zsh mise
 # Link platform-specific git config (one-time per machine)
 ./scripts/post-stow.sh
 
-
 # Update after changes
 stow -R .
 ```
