@@ -1,5 +1,5 @@
-id = "dotfiles.gh-alerts"
-name = "GitHub Alerts"
+id = "dotfiles.gitlab-alerts"
+name = "GitLab Alerts"
 version = "0.1.0"
 min_herdr_version = "0.7.0"
 platforms = ["linux", "macos"]
@@ -7,21 +7,21 @@ platforms = ["linux", "macos"]
 [[panes]]
 id = "waiting-for-you"
 title = "Waiting for you"
-command = ["bash", "waiting-for-you.sh"]
+command = ["bash", "waiting-for-you-launch.sh"]
 
 [[panes]]
 id = "waiting-for-others"
 title = "Waiting for others"
-command = ["bash", "waiting-for-others.sh"]
+command = ["bash", "waiting-for-others-launch.sh"]
 
 [[actions]]
 id = "open-waiting-for-you"
 title = "Open: Waiting for you"
 contexts = ["workspace"]
-command = ["bash", "open-in-github-workspace.sh", "waiting-for-you"]
+command = ["bash", "open-in-gitlab-workspace.sh", "waiting-for-you"]
 
 [[actions]]
 id = "open-waiting-for-others"
 title = "Open: Waiting for others"
 contexts = ["workspace"]
-command = ["bash", "open-in-github-workspace.sh", "waiting-for-others"]
+command = ["bash", "open-in-gitlab-workspace.sh", "waiting-for-others"]

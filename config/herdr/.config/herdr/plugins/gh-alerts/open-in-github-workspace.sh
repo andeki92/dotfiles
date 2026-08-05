@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ENTRYPOINT="$1"   # needs-me | opened-by-me | renovate
+ENTRYPOINT="$1"   # needs-me | opened-by-me
 
 case "$ENTRYPOINT" in
-  needs-me)      TAB_LABEL="Needs you" ;;
-  opened-by-me)  TAB_LABEL="Waiting on others" ;;
-  renovate)      TAB_LABEL="Renovate" ;;
+  waiting-for-you)     TAB_LABEL="Waiting for you" ;;
+  waiting-for-others)  TAB_LABEL="Waiting for others" ;;
   *)             TAB_LABEL="$ENTRYPOINT" ;;
 esac
 

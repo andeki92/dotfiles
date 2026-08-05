@@ -1,0 +1,9 @@
+prSections:
+  - title: Needs you
+    filters: is:open archived:false review-requested:@me
+  - title: Assigned to me
+    filters: is:open archived:false assignee:@me
+  - title: Renovate (andeki92)
+    filters: is:open archived:false owner:andeki92 author:app/renovate-andeki92
+  - title: Dependabot (andeki92)
+    filters: is:open archived:false owner:andeki92 author:app/dependabot

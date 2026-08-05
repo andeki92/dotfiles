@@ -11,21 +11,3 @@ show_agent_labels_on_pane_borders = false
 
 [experimental]
 switch_ascii_input_source_in_prefix = false
-
-[[keys.command]]
-key = "prefix+alt+n"
-type = "plugin_action"
-command = "dotfiles.gh-alerts.open-needs-me"
-description = "gh-alerts: needs me"
-
-[[keys.command]]
-key = "prefix+alt+o"
-type = "plugin_action"
-command = "dotfiles.gh-alerts.open-opened-by-me"
-description = "gh-alerts: opened by me"
-
-[[keys.command]]
-key = "prefix+alt+r"
-type = "plugin_action"
-command = "dotfiles.gh-alerts.open-renovate"
-description = "gh-alerts: renovate"
