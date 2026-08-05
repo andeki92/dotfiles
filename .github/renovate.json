@@ -1,10 +1,9 @@
 {
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-    "extends": ["config:recommended"],
-    "schedule": ["before 5am on monday"],
+    "extends": ["config:recommended", ":disableDependencyDashboard"],
     "groupName": "all dependencies",
     "separateMajorMinor": true,
-    "minimumReleaseAge": "3 days",
+    "minimumReleaseAge": "7 days",
     "packageRules": [
         {
             "description": "Group all GitHub Actions updates",
@@ -19,12 +18,11 @@
             "automerge": false
         },
         {
-            "matchManagers": ["regex", "toml"],
+            "description": "Pin lua — nvim requires a specific version, don't auto-update",
+            "matchManagers": ["mise"],
             "matchPackageNames": ["lua"],
             "enabled": false
         }
     ],
-    "mise": {
-        "enabled": true
-    }
+    "mise": { "enabled": true }
 }
