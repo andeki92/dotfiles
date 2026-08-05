@@ -1,28 +1,44 @@
 {
-    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-    "extends": ["config:recommended", ":disableDependencyDashboard"],
-    "groupName": "all dependencies",
-    "separateMajorMinor": true,
-    "minimumReleaseAge": "7 days",
-    "packageRules": [
-        {
-            "description": "Group all GitHub Actions updates",
-            "matchManagers": ["github-actions"],
-            "groupName": "GitHub Actions",
-            "automerge": false
-        },
-        {
-            "description": "Group all mise tool updates",
-            "matchManagers": ["mise"],
-            "groupName": "mise tools",
-            "automerge": false
-        },
-        {
-            "description": "Pin lua — nvim requires a specific version, don't auto-update",
-            "matchManagers": ["mise"],
-            "matchPackageNames": ["lua"],
-            "enabled": false
-        }
-    ],
-    "mise": { "enabled": true }
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "prCreation": "immediate",
+  "separateMajorMinor": true,
+  "minimumReleaseAge": "7 days",
+  "packageRules": [
+    {
+      "description": "GitHub Actions — minor/patch",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "GitHub Actions (minor)",
+      "automerge": false
+    },
+    {
+      "description": "GitHub Actions — major",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "GitHub Actions (major)",
+      "automerge": false
+    },
+    {
+      "description": "mise tools — minor/patch",
+      "matchManagers": ["mise"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "mise tools (minor)",
+      "automerge": false
+    },
+    {
+      "description": "mise tools — major",
+      "matchManagers": ["mise"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "mise tools (major)",
+      "automerge": false
+    },
+    {
+      "description": "Pin lua — nvim requires a specific version, don't auto-update",
+      "matchManagers": ["mise"],
+      "matchPackageNames": ["lua"],
+      "enabled": false
+    }
+  ],
+  "mise": { "enabled": true }
 }
