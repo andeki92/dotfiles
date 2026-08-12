@@ -10,7 +10,7 @@ alias .....='cd ../../../..'
 # General
 alias c='clear'
 alias h='history'
-alias rl='typeset -U path && unset __ZSHRC_ALREADY_LOADED && source ~/.zshrc'
+alias rl='typeset -U path && unset __ZSHRC_ALREADY_LOADED && source ~/.zshrc && clear'
 
 # Listing
 alias l='ls -lah'
