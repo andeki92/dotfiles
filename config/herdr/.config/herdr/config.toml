@@ -15,3 +15,4 @@ switch_ascii_input_source_in_prefix = false
 
 [keys]
 prefix = "ctrl+a"
+reload_config = "prefix+shift+r"
