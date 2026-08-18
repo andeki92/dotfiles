@@ -37,11 +37,13 @@ the model:
 AI-assistant: <tool> v<version> (<model>)
 ```
 
-- Tool/version: read from `claude --version` (e.g. `Claude Code v2.1.187`).
+- Tool/version: read from `claude --version` **at commit time** — never copy the
+  version from this file or from an earlier commit; it goes stale the moment
+  the tool updates.
 - Model: the model you are running as (e.g. `Claude Opus 4.8`).
 - If different models did different phases, use
   `(plan: <model>, edit: <model>)` — e.g.
-  `AI-assistant: Claude Code v2.1.187 (plan: Claude Opus 4.8, edit: Claude Sonnet 4.6)`.
+  `AI-assistant: Claude Code vX.Y.Z (plan: Claude Opus 4.8, edit: Claude Sonnet 4.6)`.
 - If more than one AI assistant/tool contributed to the commit, give each its
   own `AI-assistant:` line (repeat the trailer), the same way multiple
   `Co-Authored-By:` lines are listed.
@@ -49,10 +51,11 @@ AI-assistant: <tool> v<version> (<model>)
   If a human wrote the changes and you are merely creating the commit on their
   behalf, omit the trailer entirely.
 
-Concrete example:
+Concrete example — `X.Y.Z` is a placeholder; substitute the real, freshly
+checked version:
 
 ```
-AI-assistant: Claude Code v2.1.187 (Claude Opus 4.8)
+AI-assistant: Claude Code vX.Y.Z (Claude Opus 4.8)
 ```
 
 Rationale: https://bence.ferdinandy.com/2025/12/29/dont-abuse-co-authored-by-for-marking-ai-assistance/
