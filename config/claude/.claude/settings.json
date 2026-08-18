@@ -28,6 +28,15 @@
             "command": "\"$HOME/.claude/hooks/lint-dispatch.sh\""
           }
         ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/herdr-tab-sync.sh\""
+          }
+        ]
       }
     ],
     "Stop": [

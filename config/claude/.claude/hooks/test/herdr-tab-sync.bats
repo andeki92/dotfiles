@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
 #
-# Tests for ../herdr-tab-sync.sh — the Stop hook that mirrors Claude Code's
-# auto-generated terminal title into the herdr tab label.
+# Tests for ../herdr-tab-sync.sh — the hook that mirrors either Claude Code's
+# auto-generated terminal title (on Stop) or a background-dispatch's own
+# description (on PostToolUse for Agent/Task) into the herdr tab label.
 #
 # Run:  bats config/claude/.claude/hooks/test
 # Needs: bats (mise: aqua:bats-core/bats-core), jq.
@@ -39,10 +40,17 @@ EOF
   export HERDR_FAKE_TITLE=""
 }
 
-# Runs the hook with an explicit PATH, scoped to this one invocation only —
-# never mutates the test process's own PATH, which bats' own cleanup needs.
+# Runs the hook with an explicit PATH and stdin payload, scoped to this one
+# invocation only — never mutates the test process's own PATH, which bats'
+# own cleanup needs.
+run_hook_with_payload() {
+  run env PATH="$1" bash "$HOOK" <<<"$2"
+}
+
+# Same, with no stdin payload — matches a Stop event's branch (anything
+# other than hook_event_name "PostToolUse" takes the title-fetch path).
 run_hook_with_path() {
-  run env PATH="$1" bash "$HOOK"
+  run_hook_with_payload "$1" ""
 }
 
 run_hook() {
@@ -128,6 +136,29 @@ EOF
   run_hook_with_path "$no_timeout_bin"
   [ "$status" -eq 0 ]
   grep -qx "tab rename w1:t1 claude-some-title" "$CALLS"
+}
+
+@test "still renames from title on an explicit Stop-shaped payload" {
+  export HERDR_FAKE_TITLE="Some title"
+  run_hook_with_payload "$FAKE_BIN:$PATH" '{"hook_event_name":"Stop"}'
+  [ "$status" -eq 0 ]
+  grep -qx "tab rename w1:t1 claude-some-title" "$CALLS"
+}
+
+@test "renames from a PostToolUse Agent dispatch's description, not the title" {
+  export HERDR_FAKE_TITLE="Unrelated stale title"
+  payload='{"hook_event_name":"PostToolUse","tool_name":"Agent","tool_input":{"description":"Research better tab-sync trigger than Stop hook"}}'
+  run_hook_with_payload "$FAKE_BIN:$PATH" "$payload"
+  [ "$status" -eq 0 ]
+  grep -qx "tab rename w1:t1 claude-research-better-tab-sync" "$CALLS"
+}
+
+@test "skips the rename when a PostToolUse payload has no description" {
+  export HERDR_FAKE_TITLE="Unrelated stale title"
+  payload='{"hook_event_name":"PostToolUse","tool_name":"Agent","tool_input":{}}'
+  run_hook_with_payload "$FAKE_BIN:$PATH" "$payload"
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALLS" ]
 }
 
 @test "no-ops when jq is not on PATH" {
