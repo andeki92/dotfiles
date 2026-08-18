@@ -29,6 +29,16 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/herdr-tab-sync.sh\""
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {
