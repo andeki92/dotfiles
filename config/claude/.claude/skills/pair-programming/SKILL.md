@@ -100,6 +100,24 @@ Most changes are small. Running a small change through the standard lane costs
 four model passes to protect a two-line diff; that is the failure this skill
 exists to avoid, not a safe default.
 
+### Worktree
+
+Standard lane only, and only when this session is not already inside a
+worktree: ask your partner whether to build this in an isolated git worktree,
+before `spec.md` is written. Small lane never asks and never creates one — it
+stays quick-and-dirty by design.
+
+Their "yes" is itself the explicit, in-the-moment instruction `EnterWorktree`
+requires — call it right there. `EnterWorktree` defaults to branching from
+`origin/<default-branch>`, which can silently drop local commits the
+originating checkout has that the remote does not. So immediately after
+entering, compare the new worktree's HEAD against the originating checkout's
+HEAD. If they differ, name the specific missing commit(s) to your partner —
+not just the fact of a difference — and proceed as-is unless they ask for
+them; if they do, merge the originating checkout's HEAD into the worktree
+branch before continuing. Either way, this all happens before `spec.md` is
+written.
+
 ## The spec
 
 Write `spec.md` from [spec-template.md](spec-template.md). Every settled line
@@ -139,9 +157,9 @@ than one commit, stop and move it to the standard lane.
 
 ## Standard lane
 
-The six stages — critic, gate, implementer, show the work, commit, review —
-live in [standard-lane.md](standard-lane.md). Read it when the lane is
-standard, not before.
+The five stages — critic, gate, implementer, show the work, review — live in
+[standard-lane.md](standard-lane.md). Read it when the lane is standard, not
+before.
 
 ## Bailing out
 
@@ -186,6 +204,13 @@ the standard one.
 reviewed`, or `abandoned` from anywhere in the chain. Set it in the same edit
 that closes the stage; with the files present it tells you where to resume when
 your context no longer does.
+
+**Worktrees hold their own copy of this directory.** When a worktreed run
+reaches `**Status:** reviewed` or `abandoned`, surface its branch and path to
+your partner — merging, exiting the session, or removing the worktree is
+theirs to call, never automatic. If they choose to remove it, copy its
+`.specs/<slug>/` directory back into the originating checkout at the same
+relative path first, so the record survives a worktree that does not.
 
 ## Red flags
 
