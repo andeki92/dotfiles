@@ -21,7 +21,7 @@ rules:
 
   # `on:` in GitHub Actions, `yes/no` in Ansible — don't fight idiomatic truthy.
   truthy:
-    allow-values: ["true", "false"]
+    allowed-values: ["true", "false"]
     check-keys: false
 
   # Comments need not be 2 spaces from content; tools generate 1.

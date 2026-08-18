@@ -37,6 +37,7 @@ cask "orbstack"           # Alternative to Docker desktop
 cask "intellij-idea"            # IDE for JVM languages
 cask "zed"		                # IDE
 cask "git-credential-manager"
+cask "gdal"                     # GeoSpatial Data Abstraction (for postGIS)
 
 # Fonts
 cask "font-jetbrains-mono-nerd-font"   # Developer font with programming ligatures and icons
