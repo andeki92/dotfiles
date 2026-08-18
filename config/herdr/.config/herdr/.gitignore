@@ -1,0 +1,6 @@
+# Sessions are not stored in git
+session.json
+
+# Ignore logs and sockets
+*.sock
+*.log
