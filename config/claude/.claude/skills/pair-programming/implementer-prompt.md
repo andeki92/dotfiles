@@ -107,7 +107,9 @@ prompt: |
   sha and the message you actually used in your report as you go.
 
   **Never stage or commit anything under `.specs/`. Never use `git add -A`,
-  `git add .`, or `git commit -a`. Never create a branch.**
+  `git add .`, or `git commit -a`. Never create a branch. Never amend, rebase,
+  or reset a commit you have already cut — land corrections as new commits
+  instead.**
 
   If you are building inside a git worktree, skip any command that installs or
   symlinks into a location outside this repository — this repo's mandatory
