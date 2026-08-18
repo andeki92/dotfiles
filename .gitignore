@@ -7,3 +7,6 @@
 # whose targets land under ~/.local/ (e.g. cbox/.local/bin/, cbox/.local/share/).
 !config/*/.local/
 !config/*/.local/**
+
+# Claude worktrees
+.claude/worktrees
