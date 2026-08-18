@@ -24,13 +24,14 @@ of re-deriving the house style every session.
 
 Cite them: a Decision that follows `P3` says so, and one that departs from `P3`
 says why in the same line. If the file does not exist, work without it and offer
-to start one at the gate — a first principles file is three lines, not a
-document.
+to start one when your partner signs off on the spec — a first principles file
+is three lines, not a document.
 
 **Promotion.** When a Decision turns out to be general rather than about this
-feature, propose promoting it to `principles.md` at the gate. That file is
-committed, so promotion is your partner's call, never yours. This is how the
-skill gets sharper: the arguing happens once, and the next spec starts from it.
+feature, propose promoting it to `principles.md` when your partner signs off on
+the spec. That file is committed, so promotion is your partner's call, never
+yours. This is how the skill gets sharper: the arguing happens once, and the
+next spec starts from it.
 
 ## Stage 1 — Pin the constraints
 
@@ -153,7 +154,10 @@ to `reviewed` — the suite and the linter are the review, so the small lane
 skips `critiqued` and `implemented`.
 
 No critic, no reviewer, no subagents. If it turns out mid-build to be bigger
-than one commit, stop and move it to the standard lane.
+than one commit, stop. Discard the uncommitted diff — nothing was committed
+yet, so this costs nothing — keep the settled Decisions from Stage 1, and move
+to the standard lane at its first stage, the critic, filling in whatever the
+standard lane's spec requires that the small lane's did not.
 
 ## Standard lane
 

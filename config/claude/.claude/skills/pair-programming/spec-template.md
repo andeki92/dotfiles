@@ -153,7 +153,8 @@ section, so a reader can tell a closed question from a forgotten one.
 ## Promote to principles
 
 Decisions here that are general rather than about this feature — candidates for
-`docs/principles.md`. Your partner decides at the gate; you propose.
+`docs/principles.md`. Your partner decides when they sign off on the spec; you
+propose.
 
 - D2 → "…"
 

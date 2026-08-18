@@ -39,6 +39,10 @@ judgement can find — the linter already took the mechanical half.
 - Anything that changes what the feature *does* is not yours to settle. It goes
   to the gate as an open decision.
 
+Set `**Status:**` to `critiqued` once every finding is resolved — immediately,
+if the critic found nothing — the gate presents a critiqued spec, not a
+drafted one.
+
 ## 2. The gate
 
 Stop. Present the spec path; the findings, one line each, with what you did
@@ -127,7 +131,9 @@ covers, and then as a one-line edit to the table, not a return to Stage 1.
 When your partner is happy, the tree is already fully committed — there is
 nothing left to cut. Retire the implementer(s); an implementer is by now the
 most expensive agent in the run, and everything left to do from here either
-already landed or belongs to the review stage next.
+already landed or belongs to the review stage next. Set `**Status:**` to
+`implemented` in the same edit — the review stage next reads a spec that says
+the build is done.
 
 ## 5. The review
 
@@ -164,6 +170,10 @@ Two rounds maximum. Then rule on whatever is still open, recording each ruling
 in the Review Log: contestable or nothing depends on it → park it with the
 reasoning; real and load-bearing, or it exposes a defect in the spec → stop and
 take it to your partner with the fix history.
+
+Once nothing open still blocks merging — everything clean or parked in the
+Review Log — set `**Status:**` to `reviewed` in the same edit. That is the
+run's last edit to the spec.
 
 Never fix findings yourself — a controller's fix skips review and fills the
 context you need to coordinate.
