@@ -142,8 +142,8 @@ paths:
 
 On this cycle's first Blocking or Important finding, dispatch a fresh
 [finisher](finisher-prompt.md) on a cheap model, scoped to that finding, with
-the spec, repo root, `Base` sha, the diff, and the finding text — never the
-implementer, which is retired. Every later finding in the same cycle, whether
+the spec, repo root, `Base` sha, the diff, the finding text, and a report path
+to append fix rounds to — never the implementer, which is retired. Every later finding in the same cycle, whether
 from this round or the next, resumes that same finisher rather than a fresh
 dispatch, so it keeps the context of what it already tried. Advisory findings
 go in the Review Log, not to the finisher.
