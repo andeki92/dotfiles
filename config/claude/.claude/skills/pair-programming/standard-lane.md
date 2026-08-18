@@ -13,10 +13,13 @@ scale to the work. Reviewer: scale to the diff. Finisher: cheap.
 
 **An agent's every turn re-bills its whole context, so a long-lived agent gets
 expensive faster than it gets useful.** The implementer is the one that grows —
-it holds the build — so its life is deliberately short: it stops at the approved
-tree and never commits. Committing and fixing run in a fresh agent that starts
-from files. Resume an agent to keep context it genuinely needs; retire it the
-moment the next job can be done from what is written down.
+it holds the build — so its life is deliberately short: it builds and commits
+unit by unit, then stops once the tree is shown and approved — there is nothing
+left for it to do. Fixing a review finding runs in a separate, fresh-or-resumed
+finisher that starts from the diff and the finding, not from the whole build's
+history. Resume an agent to keep context it genuinely needs — the finisher
+across fix rounds in one review cycle; retire it the moment the next job can be
+done from what is written down.
 
 ## 1. The critic
 
@@ -94,7 +97,7 @@ units and files. Approve each unit list the same way you approve one.
 
 | It returns | You do |
 |---|---|
-| `DONE` | Confirm the suite output is in the report and the tree holds the work uncommitted, then show the work (next stage). |
+| `DONE` | Confirm the suite output is in the report and the tree is committed — each unit landed as its own commit during the build, any post-suite residual as a trailing one — then show the work (next stage). |
 | `DONE_WITH_CONCERNS` | Correctness or scope: hand the concern to the reviewer. Observations: note and proceed. |
 | `NEEDS_CONTEXT` | Answer and resume. If the answer is an Open question, it is your partner's. |
 | `BLOCKED` | Missing context → resume with it. Needs more reasoning → fresh agent, one tier up. Too large → split the unit list. **Spec is wrong** → stop, take it to your partner. |
@@ -104,33 +107,27 @@ something has to change.
 
 ## 4. Show the work
 
-The implementer returns `DONE` with a green suite and an uncommitted tree —
-that is deliberate. Before anything lands in git, show your partner what got
-built: `git diff --stat`, the hunks worth reading or the paths to open, the
-test output, one line per unit. Ask what they would change.
+The implementer returns `DONE` with a green suite and a fully committed tree —
+each unit landed as its own commit while it was built. Show your partner what
+got built: `git log --oneline <Base>..HEAD`, `git diff --stat <Base>..HEAD`,
+the hunks worth reading or the paths to open, the test output, one line per
+unit. Ask what they would change.
 
 This is the pairing loop, and it is cheap on purpose. Hand each piece of
 feedback to the resumed implementer verbatim; it applies, re-runs the covering
-tests, and you show the result again — as many rounds as the work needs. Where
-the build was split, show the tree as one piece of work and route each note to
-the implementer that owns those files; a worker that has already returned `DONE`
-is resumed only if the feedback lands in its subsystem.
+tests, commits the change as a new commit, and you show the result again — as
+many rounds as the work needs. Where the build was split, show the tree as one
+piece of work and route each note to the implementer that owns those files; a
+worker that has already returned `DONE` is resumed only if the feedback lands
+in its subsystem.
 Feedback here is part of the build, not a new spec run: it touches the spec
 only when it overturns a settled Decision or adds behaviour no requirement
 covers, and then as a one-line edit to the table, not a return to Stage 1.
 
-When your partner is happy, resume each implementer once more to refresh its
-report's Commit plan against the final tree — then retire them. Everything left
-to do is written down, and an implementer is by now the most expensive agent in
-the run.
-
-Dispatch [finisher-prompt.md](finisher-prompt.md) on a cheap model with the
-reports **in dependency order**, the spec, repo root and `Base` sha — the seam
-commits before what builds on it. It cuts one commit per entry and returns
-`COMMITTED`; verify the commits exist (`git log --oneline <Base>..HEAD`) and
-that the tree is clean. `MISMATCH` means the plan and the tree disagree — read
-the specifics yourself and correct the plan, rather than letting a cold agent
-guess.
+When your partner is happy, the tree is already fully committed — there is
+nothing left to cut. Retire the implementer(s); an implementer is by now the
+most expensive agent in the run, and everything left to do from here either
+already landed or belongs to the review stage next.
 
 ## 5. The review
 
@@ -143,12 +140,18 @@ paths:
 { git log --oneline BASE..HEAD; echo; git diff --stat BASE..HEAD; echo; git diff -U10 BASE..HEAD; } > <artifacts>/diff-1.txt
 ```
 
-Blocking and Important findings go back to the **finisher** verbatim — resume
-it, not the implementer, which is retired; Advisory findings go in the Review
-Log. It fixes, re-runs the covering tests and the linter, commits, and appends
-to the report. `NEEDS_IMPLEMENTER` means the finding is real implementation
-work, not a fix: dispatch a fresh implementer scoped to that finding alone.
-`CONTESTED` is your partner's call, not yours.
+On this cycle's first Blocking or Important finding, dispatch a fresh
+[finisher](finisher-prompt.md) on a cheap model, scoped to that finding, with
+the spec, repo root, `Base` sha, the diff, and the finding text — never the
+implementer, which is retired. Every later finding in the same cycle, whether
+from this round or the next, resumes that same finisher rather than a fresh
+dispatch, so it keeps the context of what it already tried. Advisory findings
+go in the Review Log, not to the finisher.
+
+It fixes, re-runs the covering tests and the linter, lands the fix as a new
+commit, and appends the round to its report. `NEEDS_IMPLEMENTER` means the
+finding is real implementation work, not a fix: dispatch a fresh implementer
+scoped to that finding alone. `CONTESTED` is your partner's call, not yours.
 
 Re-review only the fix diff, and only when
 something Blocking was in the round — on a cheap tier when the fix is
