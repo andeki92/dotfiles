@@ -128,6 +128,25 @@ argv_has() {
 
 no_provider_calls() { [[ ! -s "$IDEA_STUB_LOG" ]]; }
 
+fail() {
+  echo "$@" >&2
+  return 1
+}
+
+# Every recorded issue or label call must name the repository. Neither CLI
+# resolves its own default from origin, so an unpinned call made inside a fork
+# can land on the upstream's public tracker instead.
+assert_repo_pinned() {
+  local cmd="$1" line
+  while IFS= read -r line; do
+    case "$line" in
+      '') ;;
+      issue*|label*)
+        [[ "$line" == *"--repo owner/repo"* ]] || fail "unpinned ${cmd} call: ${line}" ;;
+    esac
+  done < <(calls "$cmd")
+}
+
 # A canned post-jq row as the provider CLI would emit it: number, state,
 # assignees, labels, title. `idea` asks gh/glab to do the field extraction with
 # their own built-in --jq, so a stub replays what comes back out of it.
@@ -217,6 +236,45 @@ sample_rows() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"gh"* ]]
   [[ "$output" == *"authenticated"* ]]
+}
+
+# --- every call names the repository ---------------------------------------
+
+@test "every repository-scoped github call pins the repository" {
+  stub_out gh-api-user <<< "octocat"
+  sample_rows | stub_out gh-issue-list
+  stub_issue 7 open "" "size:M" "free idea" "a body"
+  row 7 closed "octocat" "abandoned" "given up on" | stub_out gh-issue-view
+
+  run "$IDEA_BIN" new "a title" --size M --tags cli,docs
+  run "$IDEA_BIN" list
+  run "$IDEA_BIN" pick 7 --yes
+  run "$IDEA_BIN" drop 7
+  run "$IDEA_BIN" done 7
+  run "$IDEA_BIN" abandon 7
+  run "$IDEA_BIN" reopen 7
+
+  [ "$(count_calls gh)" -gt 15 ]
+  assert_repo_pinned gh
+}
+
+@test "every repository-scoped gitlab call pins the repository" {
+  set_origin "https://gitlab.com/owner/repo.git"
+  stub_out glab-api-user <<< "octocat"
+  sample_rows opened | stub_out glab-issue-list
+  stub_issue 7 opened "" "size:M" "free idea" "a body" glab
+  row 7 closed "octocat" "abandoned" "given up on" | stub_out glab-issue-view
+
+  run "$IDEA_BIN" new "a title" --size M --tags cli,docs
+  run "$IDEA_BIN" list
+  run "$IDEA_BIN" pick 7 --yes
+  run "$IDEA_BIN" drop 7
+  run "$IDEA_BIN" done 7
+  run "$IDEA_BIN" abandon 7
+  run "$IDEA_BIN" reopen 7
+
+  [ "$(count_calls glab)" -gt 15 ]
+  assert_repo_pinned glab
 }
 
 # --- idea new --------------------------------------------------------------
