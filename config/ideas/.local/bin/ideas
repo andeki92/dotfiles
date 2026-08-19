@@ -205,8 +205,6 @@ ideas::issue_meta() {
   fi
 }
 
-# One tab-separated record per issue: number, lifecycle state, size, tags,
-# title — newest first.
 # Derive an issue's lifecycle state into IDEAS_ROW_STATE. Nothing stores it:
 # open versus closed, who is assigned and whether the abandoned label is on it
 # are all the platform's own atomic, immediately-visible facts. The abandoned
@@ -229,6 +227,8 @@ ideas::lifecycle() {
   fi
 }
 
+# One record per issue: number, lifecycle state, size, tags, title — newest
+# first.
 ideas::classified_rows() {
   local number state assignees labels title
   ideas::ensure_login
