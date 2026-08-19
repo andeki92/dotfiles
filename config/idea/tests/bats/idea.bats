@@ -559,3 +559,99 @@ second line" ]]
   [ "$status" -eq 0 ]
   [[ "$(calls glab | tail -1)" == "issue close 7 --repo owner/repo" ]]
 }
+
+# --- issue-number validation -----------------------------------------------
+
+@test "a non-numeric issue reference is refused before any provider call" {
+  local cmd
+  for cmd in done abandon reopen drop; do
+    : > "$IDEA_STUB_LOG"
+    run "$IDEA_BIN" "$cmd" "https://github.com/other/repo/issues/9"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"issue number"* ]]
+    no_provider_calls
+  done
+}
+
+@test "a missing issue reference is refused before any provider call" {
+  run "$IDEA_BIN" done
+  [ "$status" -ne 0 ]
+  no_provider_calls
+}
+
+# --- idea drop -------------------------------------------------------------
+
+@test "drop removes only the current user on github" {
+  stub_out gh-api-user <<< "octocat"
+  run "$IDEA_BIN" drop 7
+  [ "$status" -eq 0 ]
+  [[ "$(calls gh | tail -1)" == "issue edit 7 --repo owner/repo --remove-assignee octocat" ]]
+}
+
+@test "drop removes only the current user on gitlab, never every assignee" {
+  set_origin "https://gitlab.com/owner/repo.git"
+  stub_out glab-api-user <<< "octocat"
+  run "$IDEA_BIN" drop 7
+  [ "$status" -eq 0 ]
+  [[ "$(calls glab | tail -1)" == "issue update 7 --repo owner/repo --assignee=-octocat" ]]
+  ! argv_has "--unassign" glab 3
+}
+
+# --- idea abandon ----------------------------------------------------------
+
+@test "abandon creates the label, applies it, then closes" {
+  run "$IDEA_BIN" abandon 7
+  [ "$status" -eq 0 ]
+  [[ "$(calls gh | sed -n 2p)" == "label create abandoned --repo owner/repo" ]]
+  [[ "$(calls gh | sed -n 3p)" == "issue edit 7 --repo owner/repo --add-label abandoned" ]]
+  [[ "$(calls gh | sed -n 4p)" == "issue close 7 --repo owner/repo" ]]
+}
+
+@test "abandon creates the label, applies it, then closes on gitlab" {
+  set_origin "https://gitlab.com/owner/repo.git"
+  run "$IDEA_BIN" abandon 7
+  [ "$status" -eq 0 ]
+  [[ "$(calls glab | sed -n 2p)" == "label create --name abandoned --repo owner/repo" ]]
+  [[ "$(calls glab | sed -n 3p)" == "issue update 7 --repo owner/repo --label abandoned" ]]
+  [[ "$(calls glab | sed -n 4p)" == "issue close 7 --repo owner/repo" ]]
+}
+
+# --- idea reopen -----------------------------------------------------------
+
+@test "reopen reopens, then drops the abandoned label and the current user" {
+  stub_out gh-api-user <<< "octocat"
+  row 7 closed "octocat" "abandoned,size:M" "given up on" | stub_out gh-issue-view
+  run "$IDEA_BIN" reopen 7
+  [ "$status" -eq 0 ]
+  [[ "$(calls gh | sed -n 3p)" == "issue view 7 --repo owner/repo"* ]]
+  [[ "$(calls gh | sed -n 4p)" == "issue reopen 7 --repo owner/repo" ]]
+  [[ "$(calls gh | sed -n 5p)" == "issue edit 7 --repo owner/repo --remove-assignee octocat --remove-label abandoned" ]]
+}
+
+@test "reopen leaves an assignment it did not make alone" {
+  stub_out gh-api-user <<< "octocat"
+  row 7 closed "someone-else" "abandoned" "given up on" | stub_out gh-issue-view
+  run "$IDEA_BIN" reopen 7
+  [ "$status" -eq 0 ]
+  [[ "$(calls gh | tail -1)" == "issue edit 7 --repo owner/repo --remove-label abandoned" ]]
+  ! argv_has "someone-else" gh 5
+}
+
+@test "reopen makes no edit call when there is nothing to remove" {
+  stub_out gh-api-user <<< "octocat"
+  row 7 closed "" "size:M" "finished long ago" | stub_out gh-issue-view
+  run "$IDEA_BIN" reopen 7
+  [ "$status" -eq 0 ]
+  [[ "$(calls gh | tail -1)" == "issue reopen 7 --repo owner/repo" ]]
+}
+
+@test "reopen uses gitlab's scoped removal forms" {
+  set_origin "https://gitlab.com/owner/repo.git"
+  stub_out glab-api-user <<< "octocat"
+  row 7 closed "octocat" "abandoned" "given up on" | stub_out glab-issue-view
+  run "$IDEA_BIN" reopen 7
+  [ "$status" -eq 0 ]
+  [[ "$(calls glab | sed -n 4p)" == "issue reopen 7 --repo owner/repo" ]]
+  [[ "$(calls glab | sed -n 5p)" == "issue update 7 --repo owner/repo --assignee=-octocat --unlabel abandoned" ]]
+  ! argv_has "--unassign" glab 5
+}

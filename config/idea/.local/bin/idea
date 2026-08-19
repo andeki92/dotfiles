@@ -31,7 +31,10 @@ Usage:
                               own editor or prompt.
   idea list [filters] [--json]
                               List ideas, newest first.
-  idea done <number>          Close an idea as done.
+  idea drop    <number>       Release an idea you had claimed.
+  idea done    <number>       Close an idea as done.
+  idea abandon <number>       Close an idea as abandoned.
+  idea reopen  <number>       Reopen a closed idea.
   idea -h | --help
 
 Filters:
@@ -155,28 +158,47 @@ idea::split_labels() {
   done
 }
 
-# One tab-separated record per issue straight from the provider: number, state,
-# assignees, labels, title. Both CLIs carry their own jq, so the field
-# extraction rides along with the fetch and `idea` needs no jq of its own. The
-# only server-side narrowing is the page size and the state span; every
-# lifecycle decision is made here, from the same three fields on both
-# providers, so `--status` cannot mean two different things.
-idea::provider_rows() {
-  local expr
+# The jq expression flattening one issue into number, state, assignees, labels
+# and title. Both CLIs carry their own jq, so extraction rides along with the
+# fetch and `idea` needs none of its own; keeping the expression here means the
+# two providers' field names differ in exactly one place. Labels arrive as
+# objects from one and as plain strings from the other, so both are accepted.
+idea::row_expr() {
+  local number_field='.iid' login_field='.username'
   if [[ "$IDEA_PROVIDER" == "github" ]]; then
-    expr='.[] | [(.number|tostring), (.state|ascii_downcase),
-      ([(.assignees // [])[] | .login] | join(",")),
-      ([(.labels // [])[] | if type == "object" then .name else . end] | join(",")),
-      (.title // "")] | @tsv'
+    number_field='.number'
+    login_field='.login'
+  fi
+  printf '%s' "[(${number_field}|tostring), (.state|ascii_downcase), \
+([(.assignees // [])[] | ${login_field}] | join(\",\")), \
+([(.labels // [])[] | if type == \"object\" then .name else . end] | join(\",\")), \
+(.title // \"\")] | @tsv"
+}
+
+# Every issue, one record each. The only server-side narrowing is the page size
+# and the state span; every lifecycle decision is made here instead, from the
+# same three fields on both providers, so `--status` cannot come to mean two
+# different things depending on which one you are on.
+idea::provider_rows() {
+  if [[ "$IDEA_PROVIDER" == "github" ]]; then
     "$IDEA_CLI" issue list --repo "$IDEA_REPO" --state all --limit "$IDEA_FETCH_LIMIT" \
-      --json number,state,assignees,labels,title --jq "$expr"
+      --json number,state,assignees,labels,title --jq ".[] | $(idea::row_expr)"
   else
-    expr='.[] | [(.iid|tostring), (.state|ascii_downcase),
-      ([(.assignees // [])[] | .username] | join(",")),
-      ([(.labels // [])[] | if type == "object" then .name else . end] | join(",")),
-      (.title // "")] | @tsv'
     "$IDEA_CLI" issue list --repo "$IDEA_REPO" --all --per-page "$IDEA_FETCH_LIMIT" \
-      --output json --jq "$expr"
+      --output json --jq ".[] | $(idea::row_expr)"
+  fi
+}
+
+# The same record for a single issue, so `pick` and `reopen` read an issue's
+# assignees and labels through exactly the same shape `list` classifies.
+idea::issue_meta() {
+  local number="$1"
+  if [[ "$IDEA_PROVIDER" == "github" ]]; then
+    "$IDEA_CLI" issue view "$number" --repo "$IDEA_REPO" \
+      --json number,state,assignees,labels,title --jq "$(idea::row_expr)"
+  else
+    "$IDEA_CLI" issue view "$number" --repo "$IDEA_REPO" \
+      --output json --jq "$(idea::row_expr)"
   fi
 }
 
@@ -206,6 +228,13 @@ idea::classified_rows() {
       "$number" "$IDEA_SEP" "$lifecycle" "$IDEA_SEP" "$IDEA_ROW_SIZE" \
       "$IDEA_SEP" "$IDEA_ROW_TAGS" "$IDEA_SEP" "$title"
   done < <(idea::provider_rows | tr '\t' "$IDEA_SEP") | sort -t "$IDEA_SEP" -k1,1nr
+}
+
+idea::require_number() {
+  local ref="${1:-}"
+  [[ -n "$ref" ]] || idea::die "this command needs an issue number"
+  [[ "$ref" =~ ^[0-9]+$ ]] ||
+    idea::die "'${ref}' is not an issue number — idea takes the bare number, such as 42"
 }
 
 idea::valid_status() {
@@ -407,25 +436,90 @@ idea::cmd_new() {
 }
 
 idea::cmd_done() {
-  local number="${1:?idea done requires an issue number}"
+  "$IDEA_CLI" issue close "$1" --repo "$IDEA_REPO"
+}
+
+idea::cmd_abandon() {
+  local number="$1"
+  idea::ensure_label 'abandoned'
+  if [[ "$IDEA_PROVIDER" == "github" ]]; then
+    "$IDEA_CLI" issue edit "$number" --repo "$IDEA_REPO" --add-label abandoned
+  else
+    "$IDEA_CLI" issue update "$number" --repo "$IDEA_REPO" --label abandoned
+  fi
   "$IDEA_CLI" issue close "$number" --repo "$IDEA_REPO"
+}
+
+# Give up only this user's own claim. GitLab's bare `--assignee <user>` would
+# replace the whole assignee list and `--unassign` would empty it, so the
+# scoped `-<user>` form is the only one that touches nothing `idea` did not do.
+idea::cmd_drop() {
+  local number="$1"
+  idea::ensure_login
+  if [[ "$IDEA_PROVIDER" == "github" ]]; then
+    "$IDEA_CLI" issue edit "$number" --repo "$IDEA_REPO" --remove-assignee "$IDEA_LOGIN"
+  else
+    "$IDEA_CLI" issue update "$number" --repo "$IDEA_REPO" --assignee="-${IDEA_LOGIN}"
+  fi
+}
+
+idea::cmd_reopen() {
+  local number="$1" state assignees labels title
+  local -a edit=()
+  idea::ensure_login
+  IFS="$IDEA_SEP" read -r number state assignees labels title \
+    < <(idea::issue_meta "$number" | tr '\t' "$IDEA_SEP")
+  [[ -n "$number" ]] || idea::die "could not read issue ${1} from ${IDEA_PROVIDER}"
+
+  "$IDEA_CLI" issue reopen "$number" --repo "$IDEA_REPO"
+
+  if idea::list_has "$IDEA_LOGIN" "$assignees"; then
+    if [[ "$IDEA_PROVIDER" == "github" ]]; then
+      edit+=(--remove-assignee "$IDEA_LOGIN")
+    else
+      edit+=("--assignee=-${IDEA_LOGIN}")
+    fi
+  fi
+  if idea::list_has 'abandoned' "$labels"; then
+    if [[ "$IDEA_PROVIDER" == "github" ]]; then
+      edit+=(--remove-label abandoned)
+    else
+      edit+=(--unlabel abandoned)
+    fi
+  fi
+  [[ ${#edit[@]} -gt 0 ]] || return 0
+
+  if [[ "$IDEA_PROVIDER" == "github" ]]; then
+    "$IDEA_CLI" issue edit "$number" --repo "$IDEA_REPO" "${edit[@]}"
+  else
+    "$IDEA_CLI" issue update "$number" --repo "$IDEA_REPO" "${edit[@]}"
+  fi
 }
 
 main() {
   local cmd="${1:-}"
   case "$cmd" in
     ''|-h|--help) usage; return 0 ;;
-    new|list|done) shift ;;
+    new|list|done|abandon|reopen|drop) shift ;;
     *) idea::log_err "unknown command: ${cmd}"; usage; exit 1 ;;
+  esac
+
+  # Identifiers are checked before anything reaches the network, so a mistyped
+  # reference cannot become a call against some other repository's issue.
+  case "$cmd" in
+    done|abandon|reopen|drop) idea::require_number "${1:-}" ;;
   esac
 
   idea::detect
   idea::preflight
 
   case "$cmd" in
-    new)  idea::cmd_new  "$@" ;;
-    list) idea::cmd_list "$@" ;;
-    done) idea::cmd_done "$@" ;;
+    new)     idea::cmd_new     "$@" ;;
+    list)    idea::cmd_list    "$@" ;;
+    done)    idea::cmd_done    "$@" ;;
+    abandon) idea::cmd_abandon "$@" ;;
+    reopen)  idea::cmd_reopen  "$@" ;;
+    drop)    idea::cmd_drop    "$@" ;;
   esac
 }
 
