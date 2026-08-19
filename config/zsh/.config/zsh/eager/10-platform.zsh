@@ -37,6 +37,11 @@ elif is_linux; then
     # Add Windows interop settings here if needed
     path=(/home/linuxbrew/.linuxbrew $path)
 
+    # opencode (only if installed under $HOME)
+    if [[ -d "$HOME/.opencode/bin" ]]; then
+        path=("$HOME/.opencode/bin" $path)
+    fi
+
     # Load shrc directory shell files
     for file in $HOME/.shrc.d/*; do
       if [[ -r "$file" ]] && [[ "$file" =~ \.(sh|zsh)$ ]]; then
