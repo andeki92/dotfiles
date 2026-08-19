@@ -16,3 +16,6 @@ alias rl='typeset -U path && unset __ZSHRC_ALREADY_LOADED && source ~/.zshrc && 
 alias l='ls -lah'
 alias la='ls -lAh'
 alias ll='ls -lh'
+
+# AI
+alias oc='opencode'
