@@ -128,6 +128,24 @@ argv_has() {
 
 no_provider_calls() { [[ ! -s "$IDEA_STUB_LOG" ]]; }
 
+# A canned post-jq row as the provider CLI would emit it: number, state,
+# assignees, labels, title. `idea` asks gh/glab to do the field extraction with
+# their own built-in --jq, so a stub replays what comes back out of it.
+row() { printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5"; }
+
+# The <n>th whitespace-separated column of a rendered list line.
+col() { printf '%s\n' "$1" | awk -v n="$2" '{print $n}'; }
+
+# Five issues, one per lifecycle state, deliberately out of number order.
+sample_rows() {
+  local open_state="${1:-open}"
+  row 3 "$open_state" "someone-else" "size:S"        "claimed by someone else"
+  row 5 "$open_state" ""             "size:S,infra"  "nobody has this one"
+  row 1 closed        ""             "size:L"        "finished long ago"
+  row 4 "$open_state" "octocat"      "size:M,cli"    "mine in progress"
+  row 2 closed        ""             "abandoned,doc" "given up on"
+}
+
 # --- provider detection and preflight --------------------------------------
 
 @test "help prints usage and makes no provider call" {
@@ -330,6 +348,201 @@ second line" ]]
   argv_has "--description" glab 2
   argv_has "from the flag" glab 2
   argv_has "--yes" glab 2
+}
+
+# --- idea list -------------------------------------------------------------
+
+@test "list asks github for at least 200 issues in every state" {
+  stub_out gh-api-user <<< "octocat"
+  sample_rows | stub_out gh-issue-list
+  run "$IDEA_BIN" list
+  [ "$status" -eq 0 ]
+  argv_has "--limit" gh 3
+  argv_has "200" gh 3
+  argv_has "--state" gh 3
+  argv_has "all" gh 3
+}
+
+@test "list asks gitlab for at least 200 issues in every state" {
+  set_origin "https://gitlab.com/owner/repo.git"
+  stub_out glab-api-user <<< "octocat"
+  sample_rows opened | stub_out glab-issue-list
+  run "$IDEA_BIN" list
+  [ "$status" -eq 0 ]
+  argv_has "--per-page" glab 3
+  argv_has "200" glab 3
+  argv_has "--all" glab 3
+  argv_has "--output" glab 3
+  argv_has "json" glab 3
+}
+
+@test "list derives all five lifecycle states from the fetched fields" {
+  stub_out gh-api-user <<< "octocat"
+  sample_rows | stub_out gh-issue-list
+  run "$IDEA_BIN" list
+  [ "$status" -eq 0 ]
+  [ "$(col "${lines[0]}" 1)" = "#5" ]
+  [ "$(col "${lines[0]}" 2)" = "open" ]
+  [ "$(col "${lines[1]}" 2)" = "in-progress" ]
+  [ "$(col "${lines[2]}" 2)" = "claimed" ]
+  [ "$(col "${lines[3]}" 2)" = "abandoned" ]
+  [ "$(col "${lines[4]}" 2)" = "done" ]
+}
+
+@test "gitlab's opened state is classified the same as github's open" {
+  set_origin "https://gitlab.com/owner/repo.git"
+  stub_out glab-api-user <<< "octocat"
+  sample_rows opened | stub_out glab-issue-list
+  run "$IDEA_BIN" list
+  [ "$status" -eq 0 ]
+  [ "$(col "${lines[0]}" 2)" = "open" ]
+  [ "$(col "${lines[1]}" 2)" = "in-progress" ]
+  [ "$(col "${lines[2]}" 2)" = "claimed" ]
+}
+
+@test "a closed issue carrying the abandoned label never reads as done" {
+  stub_out gh-api-user <<< "octocat"
+  { row 9 closed "" "abandoned,size:M" "both closed and abandoned"; } | stub_out gh-issue-list
+  run "$IDEA_BIN" list
+  [ "$status" -eq 0 ]
+  [ "$(col "${lines[0]}" 2)" = "abandoned" ]
+}
+
+@test "each line carries number, state, size, tags and title" {
+  stub_out gh-api-user <<< "octocat"
+  { row 4 open "octocat" "size:M,cli,perf" "mine in progress"; } | stub_out gh-issue-list
+  run "$IDEA_BIN" list
+  [ "$status" -eq 0 ]
+  [ "$(col "${lines[0]}" 1)" = "#4" ]
+  [ "$(col "${lines[0]}" 2)" = "in-progress" ]
+  [ "$(col "${lines[0]}" 3)" = "M" ]
+  [ "$(col "${lines[0]}" 4)" = "cli,perf" ]
+  [[ "${lines[0]}" == *"mine in progress" ]]
+}
+
+@test "an issue with no size or tags still shows every column" {
+  stub_out gh-api-user <<< "octocat"
+  { row 4 open "" "" "bare idea"; } | stub_out gh-issue-list
+  run "$IDEA_BIN" list
+  [ "$status" -eq 0 ]
+  [ "$(col "${lines[0]}" 3)" = "-" ]
+  [ "$(col "${lines[0]}" 4)" = "-" ]
+}
+
+@test "list orders newest first" {
+  stub_out gh-api-user <<< "octocat"
+  sample_rows | stub_out gh-issue-list
+  run "$IDEA_BIN" list
+  [ "$status" -eq 0 ]
+  [ "$(col "${lines[0]}" 1)" = "#5" ]
+  [ "$(col "${lines[1]}" 1)" = "#4" ]
+  [ "$(col "${lines[2]}" 1)" = "#3" ]
+  [ "$(col "${lines[3]}" 1)" = "#2" ]
+  [ "$(col "${lines[4]}" 1)" = "#1" ]
+}
+
+@test "the status filter selects on the derived state, not a provider filter" {
+  stub_out gh-api-user <<< "octocat"
+  sample_rows | stub_out gh-issue-list
+  run "$IDEA_BIN" list --status open
+  [ "$status" -eq 0 ]
+  [ "${#lines[@]}" -eq 1 ]
+  [ "$(col "${lines[0]}" 1)" = "#5" ]
+  ! argv_has "--assignee" gh 3
+  ! argv_has "--search" gh 3
+  argv_has "all" gh 3
+}
+
+@test "the tag filter selects on a plain label" {
+  stub_out gh-api-user <<< "octocat"
+  sample_rows | stub_out gh-issue-list
+  run "$IDEA_BIN" list --tag infra
+  [ "$status" -eq 0 ]
+  [ "${#lines[@]}" -eq 1 ]
+  [ "$(col "${lines[0]}" 1)" = "#5" ]
+  ! argv_has "--label" gh 3
+}
+
+@test "the size filter selects on the size label" {
+  stub_out gh-api-user <<< "octocat"
+  sample_rows | stub_out gh-issue-list
+  run "$IDEA_BIN" list --size S
+  [ "$status" -eq 0 ]
+  [ "${#lines[@]}" -eq 2 ]
+  [ "$(col "${lines[0]}" 1)" = "#5" ]
+  [ "$(col "${lines[1]}" 1)" = "#3" ]
+}
+
+@test "filters given together must all match" {
+  stub_out gh-api-user <<< "octocat"
+  sample_rows | stub_out gh-issue-list
+  run "$IDEA_BIN" list --size S --status open
+  [ "$status" -eq 0 ]
+  [ "${#lines[@]}" -eq 1 ]
+  [ "$(col "${lines[0]}" 1)" = "#5" ]
+}
+
+@test "repeating the tag filter requires every tag" {
+  stub_out gh-api-user <<< "octocat"
+  { row 7 open "" "size:M,cli,perf" "both tags"; row 8 open "" "size:M,cli" "one tag"; } |
+    stub_out gh-issue-list
+  run "$IDEA_BIN" list --tag cli --tag perf
+  [ "$status" -eq 0 ]
+  [ "${#lines[@]}" -eq 1 ]
+  [ "$(col "${lines[0]}" 1)" = "#7" ]
+}
+
+@test "an unknown status is rejected" {
+  stub_out gh-api-user <<< "octocat"
+  run "$IDEA_BIN" list --status nonsense
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"nonsense"* ]]
+}
+
+@test "the json flag emits the same fields as the printed line" {
+  stub_out gh-api-user <<< "octocat"
+  { row 4 open "octocat" "size:M,cli,perf" 'mine "in" progress'; } | stub_out gh-issue-list
+  run "$IDEA_BIN" list --json
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"number": 4'* ]]
+  [[ "$output" == *'"state": "in-progress"'* ]]
+  [[ "$output" == *'"size": "M"'* ]]
+  [[ "$output" == *'"tags": ["cli", "perf"]'* ]]
+  [[ "$output" == *'"title": "mine \"in\" progress"'* ]]
+}
+
+@test "the json flag emits null size and an empty tag list when there are none" {
+  stub_out gh-api-user <<< "octocat"
+  { row 4 open "" "" "bare idea"; } | stub_out gh-issue-list
+  run "$IDEA_BIN" list --json
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"size": null'* ]]
+  [[ "$output" == *'"tags": []'* ]]
+}
+
+@test "the json flag emits an empty array when nothing matches" {
+  stub_out gh-api-user <<< "octocat"
+  sample_rows | stub_out gh-issue-list
+  run "$IDEA_BIN" list --json --tag nothing-has-this
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+}
+
+@test "the login lookup asks the provider for the current user" {
+  stub_out gh-api-user <<< "octocat"
+  sample_rows | stub_out gh-issue-list
+  run "$IDEA_BIN" list
+  [ "$status" -eq 0 ]
+  [[ "$(calls gh | sed -n 2p)" == "api user --jq .login" ]]
+}
+
+@test "the gitlab login lookup reads the username field" {
+  set_origin "https://gitlab.com/owner/repo.git"
+  stub_out glab-api-user <<< "octocat"
+  sample_rows opened | stub_out glab-issue-list
+  run "$IDEA_BIN" list
+  [ "$status" -eq 0 ]
+  [[ "$(calls glab | sed -n 2p)" == "api user --jq .username" ]]
 }
 
 # --- idea done -------------------------------------------------------------

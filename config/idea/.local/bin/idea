@@ -29,8 +29,15 @@ Usage:
                               Create an idea. The body comes from --body, from
                               stdin when it is piped, or from the provider's
                               own editor or prompt.
+  idea list [filters] [--json]
+                              List ideas, newest first.
   idea done <number>          Close an idea as done.
   idea -h | --help
+
+Filters:
+  --status <state>            open, in-progress, claimed, abandoned or done
+  --tag <tag>                 repeatable; an idea must carry every tag given
+  --size S|M|L
 
 Ideas live as issues on this repository's origin remote — github.com through
 gh, gitlab.com through glab. The matching CLI must be installed and
@@ -90,6 +97,217 @@ idea::preflight() {
     idea::die "${IDEA_CLI} is not authenticated — run '${IDEA_CLI} auth login'"
 }
 
+# Well above either provider's 30-item default, which would otherwise truncate
+# any backlog worth having a tool for.
+readonly IDEA_FETCH_LIMIT=200
+
+# Records move between the fetch, the filter and the renderers separated by
+# ASCII unit separator rather than by tab: `read` folds runs of tabs together,
+# because a tab is IFS whitespace, which would silently shift every field after
+# an issue with no assignee, no size or no tags.
+readonly IDEA_SEP=$'\037'
+
+# The current user's own login, looked up once per run. `@me` cannot stand in
+# for it: neither provider will compare that shorthand against the assignee
+# list an issue actually returns.
+IDEA_LOGIN=''
+idea::ensure_login() {
+  [[ -n "$IDEA_LOGIN" ]] && return 0
+  if [[ "$IDEA_PROVIDER" == "github" ]]; then
+    IDEA_LOGIN=$("$IDEA_CLI" api user --jq '.login')
+  else
+    IDEA_LOGIN=$("$IDEA_CLI" api user --jq '.username')
+  fi
+  [[ -n "$IDEA_LOGIN" ]] ||
+    idea::die "could not read your ${IDEA_PROVIDER} login from '${IDEA_CLI} api user'"
+}
+
+# True when a comma-separated list contains an exact item.
+idea::list_has() {
+  local needle="$1" rest="$2" item
+  while [[ -n "$rest" ]]; do
+    item="${rest%%,*}"
+    if [[ "$item" == "$rest" ]]; then rest=''; else rest="${rest#*,}"; fi
+    [[ "$item" == "$needle" ]] && return 0
+  done
+  return 1
+}
+
+# Split a label list into the size marker and the plain tags, leaving them in
+# IDEA_ROW_SIZE and IDEA_ROW_TAGS. Both are read once per issue, so writing
+# them here keeps a subshell out of the row loop. The lifecycle labels get
+# their own columns and so are not repeated among the tags.
+IDEA_ROW_SIZE=''
+IDEA_ROW_TAGS=''
+idea::split_labels() {
+  local rest="$1" item
+  IDEA_ROW_SIZE=''
+  IDEA_ROW_TAGS=''
+  while [[ -n "$rest" ]]; do
+    item="${rest%%,*}"
+    if [[ "$item" == "$rest" ]]; then rest=''; else rest="${rest#*,}"; fi
+    case "$item" in
+      '') ;;
+      size:*) IDEA_ROW_SIZE="${item#size:}" ;;
+      abandoned) ;;
+      *) IDEA_ROW_TAGS="${IDEA_ROW_TAGS:+${IDEA_ROW_TAGS},}${item}" ;;
+    esac
+  done
+}
+
+# One tab-separated record per issue straight from the provider: number, state,
+# assignees, labels, title. Both CLIs carry their own jq, so the field
+# extraction rides along with the fetch and `idea` needs no jq of its own. The
+# only server-side narrowing is the page size and the state span; every
+# lifecycle decision is made here, from the same three fields on both
+# providers, so `--status` cannot mean two different things.
+idea::provider_rows() {
+  local expr
+  if [[ "$IDEA_PROVIDER" == "github" ]]; then
+    expr='.[] | [(.number|tostring), (.state|ascii_downcase),
+      ([(.assignees // [])[] | .login] | join(",")),
+      ([(.labels // [])[] | if type == "object" then .name else . end] | join(",")),
+      (.title // "")] | @tsv'
+    "$IDEA_CLI" issue list --repo "$IDEA_REPO" --state all --limit "$IDEA_FETCH_LIMIT" \
+      --json number,state,assignees,labels,title --jq "$expr"
+  else
+    expr='.[] | [(.iid|tostring), (.state|ascii_downcase),
+      ([(.assignees // [])[] | .username] | join(",")),
+      ([(.labels // [])[] | if type == "object" then .name else . end] | join(",")),
+      (.title // "")] | @tsv'
+    "$IDEA_CLI" issue list --repo "$IDEA_REPO" --all --per-page "$IDEA_FETCH_LIMIT" \
+      --output json --jq "$expr"
+  fi
+}
+
+# One tab-separated record per issue: number, lifecycle state, size, tags,
+# title — newest first.
+idea::classified_rows() {
+  local number state assignees labels title lifecycle
+  idea::ensure_login
+  while IFS="$IDEA_SEP" read -r number state assignees labels title; do
+    [[ -n "$number" ]] || continue
+    idea::split_labels "$labels"
+    if [[ "$state" == "open" || "$state" == "opened" ]]; then
+      if [[ -z "$assignees" ]]; then
+        lifecycle='open'
+      elif idea::list_has "$IDEA_LOGIN" "$assignees"; then
+        lifecycle='in-progress'
+      else
+        lifecycle='claimed'
+      fi
+    elif idea::list_has 'abandoned' "$labels"; then
+      # Checked ahead of done, so a closed issue is never both.
+      lifecycle='abandoned'
+    else
+      lifecycle='done'
+    fi
+    printf '%s%s%s%s%s%s%s%s%s\n' \
+      "$number" "$IDEA_SEP" "$lifecycle" "$IDEA_SEP" "$IDEA_ROW_SIZE" \
+      "$IDEA_SEP" "$IDEA_ROW_TAGS" "$IDEA_SEP" "$title"
+  done < <(idea::provider_rows | tr '\t' "$IDEA_SEP") | sort -t "$IDEA_SEP" -k1,1nr
+}
+
+idea::valid_status() {
+  case "$1" in
+    open|in-progress|claimed|abandoned|done) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Normalise a size argument to S, M or L, or fail.
+idea::normalise_size() {
+  local size
+  size=$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')
+  case "$size" in
+    S|M|L) printf '%s' "$size" ;;
+    *) idea::die "--size takes S, M or L (got: ${1})" ;;
+  esac
+}
+
+idea::json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\t'/\\t}"
+  s="${s//$'\r'/\\r}"
+  printf '%s' "$s"
+}
+
+# Filter classified rows on stdin: status, size, then every tag given.
+idea::filter_rows() {
+  local f_status="$1" f_size="$2"
+  shift 2
+  local number state size tags title tag keep
+  while IFS="$IDEA_SEP" read -r number state size tags title; do
+    [[ -n "$f_status" && "$state" != "$f_status" ]] && continue
+    [[ -n "$f_size" && "$size" != "$f_size" ]] && continue
+    keep=1
+    for tag in "$@"; do
+      idea::list_has "$tag" "$tags" || { keep=0; break; }
+    done
+    [[ "$keep" -eq 1 ]] || continue
+    printf '%s%s%s%s%s%s%s%s%s\n' \
+      "$number" "$IDEA_SEP" "$state" "$IDEA_SEP" "$size" \
+      "$IDEA_SEP" "$tags" "$IDEA_SEP" "$title"
+  done
+}
+
+idea::render_rows() {
+  local number state size tags title
+  while IFS="$IDEA_SEP" read -r number state size tags title; do
+    printf '%-5s %-11s %-4s %-16s %s\n' \
+      "#${number}" "$state" "${size:--}" "${tags:--}" "$title"
+  done
+}
+
+idea::render_rows_json() {
+  local number state size tags title first=1 size_json tags_json rest item
+  printf '['
+  while IFS="$IDEA_SEP" read -r number state size tags title; do
+    [[ "$first" -eq 1 ]] && first=0 || printf ','
+    size_json='null'
+    [[ -n "$size" ]] && size_json="\"$(idea::json_escape "$size")\""
+    tags_json=''
+    rest="$tags"
+    while [[ -n "$rest" ]]; do
+      item="${rest%%,*}"
+      if [[ "$item" == "$rest" ]]; then rest=''; else rest="${rest#*,}"; fi
+      tags_json="${tags_json:+${tags_json}, }\"$(idea::json_escape "$item")\""
+    done
+    printf '\n  {"number": %s, "state": "%s", "size": %s, "tags": [%s], "title": "%s"}' \
+      "$number" "$state" "$size_json" "$tags_json" "$(idea::json_escape "$title")"
+  done
+  [[ "$first" -eq 1 ]] || printf '\n'
+  printf ']\n'
+}
+
+idea::cmd_list() {
+  local status='' size='' json=0
+  local -a tags=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --status) status="${2:-}"; shift 2 ;;
+      --tag) tags+=("${2:-}"); shift 2 ;;
+      --size) size="${2:-}"; shift 2 ;;
+      --json) json=1; shift ;;
+      --) shift; break ;;
+      *) idea::die "unknown argument for idea list: $1" ;;
+    esac
+  done
+  [[ -z "$status" ]] || idea::valid_status "$status" ||
+    idea::die "unknown status '${status}' — try open, in-progress, claimed, abandoned or done"
+  [[ -z "$size" ]] || size=$(idea::normalise_size "$size")
+
+  if [[ "$json" -eq 1 ]]; then
+    idea::classified_rows | idea::filter_rows "$status" "$size" "${tags[@]+"${tags[@]}"}" |
+      idea::render_rows_json
+  else
+    idea::classified_rows | idea::filter_rows "$status" "$size" "${tags[@]+"${tags[@]}"}" |
+      idea::render_rows
+  fi
+}
+
 # Split a comma-separated list into one trimmed, non-empty item per line.
 idea::split_commas() {
   local IFS=','
@@ -142,11 +360,8 @@ idea::cmd_new() {
   [[ -n "$title" ]] || idea::die "idea new requires a title"
 
   if [[ -n "$size" ]]; then
-    size=$(printf '%s' "$size" | tr '[:lower:]' '[:upper:]')
-    case "$size" in
-      S|M|L) labels+=("size:${size}") ;;
-      *) idea::die "--size takes S, M or L (got: ${size})" ;;
-    esac
+    size=$(idea::normalise_size "$size")
+    labels+=("size:${size}")
   fi
   while IFS= read -r tag; do
     labels+=("$tag")
@@ -200,7 +415,7 @@ main() {
   local cmd="${1:-}"
   case "$cmd" in
     ''|-h|--help) usage; return 0 ;;
-    new|done) shift ;;
+    new|list|done) shift ;;
     *) idea::log_err "unknown command: ${cmd}"; usage; exit 1 ;;
   esac
 
@@ -209,6 +424,7 @@ main() {
 
   case "$cmd" in
     new)  idea::cmd_new  "$@" ;;
+    list) idea::cmd_list "$@" ;;
     done) idea::cmd_done "$@" ;;
   esac
 }
