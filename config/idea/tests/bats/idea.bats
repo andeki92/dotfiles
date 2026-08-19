@@ -560,6 +560,132 @@ second line" ]]
   [[ "$(calls glab | tail -1)" == "issue close 7 --repo owner/repo" ]]
 }
 
+# --- idea pick -------------------------------------------------------------
+
+# An issue as `pick` reads it: its metadata, then its body, from the two reads
+# behind the detail view.
+stub_issue() {
+  local number="$1" state="$2" assignees="$3" labels="$4" title="$5" body="$6"
+  local cli="${7:-gh}"
+  row "$number" "$state" "$assignees" "$labels" "$title" | stub_out_nth "${cli}-issue-view" 1
+  printf '%s\n' "$body" | stub_out_nth "${cli}-issue-view" 2
+}
+
+@test "pick with a number goes straight to that issue and prints its body" {
+  stub_out gh-api-user <<< "octocat"
+  stub_issue 7 open "" "size:M,cli" "speed up the dispatcher" "the whole body
+across two lines"
+  run bash -c "printf 'n\n' | '$IDEA_BIN' pick 7"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"the whole body"* ]]
+  [[ "$output" == *"across two lines"* ]]
+  [[ "$output" == *"speed up the dispatcher"* ]]
+  [[ "$(calls gh)" != *"issue list"* ]]
+}
+
+@test "pick reads the assignees before it offers the prompt" {
+  stub_out gh-api-user <<< "octocat"
+  stub_issue 7 open "someone-else" "size:M" "already taken" "a body"
+  run bash -c "printf 'n\n' | '$IDEA_BIN' pick 7"
+  [ "$status" -eq 0 ]
+  [[ "$(calls gh | sed -n 3p)" == "issue view 7 --repo owner/repo"* ]]
+  [[ "$(calls gh)" != *"--add-assignee"* ]]
+}
+
+@test "the prompt names an assignee who is someone else" {
+  stub_out gh-api-user <<< "octocat"
+  stub_issue 7 open "someone-else" "size:M" "already taken" "a body"
+  run bash -c "printf 'n\n' | '$IDEA_BIN' pick 7"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"someone-else"* ]]
+}
+
+@test "declining the prompt assigns nothing" {
+  stub_out gh-api-user <<< "octocat"
+  stub_issue 7 open "" "size:M" "free idea" "a body"
+  run bash -c "printf 'n\n' | '$IDEA_BIN' pick 7"
+  [ "$status" -eq 0 ]
+  [[ "$(calls gh)" != *"issue edit"* ]]
+}
+
+@test "confirming the prompt adds the current user without displacing anyone" {
+  stub_out gh-api-user <<< "octocat"
+  stub_issue 7 open "someone-else" "size:M" "already taken" "a body"
+  run bash -c "printf 'y\n' | '$IDEA_BIN' pick 7"
+  [ "$status" -eq 0 ]
+  [[ "$(calls gh | tail -1)" == "issue edit 7 --repo owner/repo --add-assignee octocat" ]]
+}
+
+@test "confirming on gitlab adds without replacing the assignee list" {
+  set_origin "https://gitlab.com/owner/repo.git"
+  stub_out glab-api-user <<< "octocat"
+  stub_issue 7 opened "someone-else" "size:M" "already taken" "a body" glab
+  run bash -c "printf 'y\n' | '$IDEA_BIN' pick 7"
+  [ "$status" -eq 0 ]
+  [[ "$(calls glab | tail -1)" == "issue update 7 --repo owner/repo --assignee=+octocat" ]]
+}
+
+@test "yes with an issue number skips the prompt and starts anyway" {
+  stub_out gh-api-user <<< "octocat"
+  stub_issue 7 open "" "size:M" "free idea" "a body"
+  run "$IDEA_BIN" pick 7 --yes
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"[y/N]"* ]]
+  [[ "$(calls gh | tail -1)" == "issue edit 7 --repo owner/repo --add-assignee octocat" ]]
+}
+
+@test "the body is shown before the issue is claimed even with yes" {
+  stub_out gh-api-user <<< "octocat"
+  stub_issue 7 open "" "size:M" "free idea" "third-party body text"
+  run "$IDEA_BIN" pick 7 --yes
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"third-party body text"* ]]
+  [[ "$(calls gh | tail -1)" == *"--add-assignee"* ]]
+}
+
+@test "a confirmed start points at a Claude Code session" {
+  stub_out gh-api-user <<< "octocat"
+  stub_issue 7 open "" "size:M" "free idea" "a body"
+  run "$IDEA_BIN" pick 7 --yes
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Claude Code"* ]]
+  [[ "$output" == *"7"* ]]
+}
+
+@test "the skill wrapper suppresses the pointer it does not need" {
+  stub_out gh-api-user <<< "octocat"
+  stub_issue 7 open "" "size:M" "free idea" "a body"
+  run env IDEA_FROM_SKILL=1 "$IDEA_BIN" pick 7 --yes
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Claude Code"* ]]
+  [[ "$(calls gh | tail -1)" == *"--add-assignee"* ]]
+}
+
+@test "pick with no number selects over the same filtered set" {
+  stub_out gh-api-user <<< "octocat"
+  sample_rows | stub_out gh-issue-list
+  stub_issue 5 open "" "size:S,infra" "nobody has this one" "body of five"
+  run bash -c "printf '1\nn\n' | PATH='${IDEA_STUB_BIN}:/usr/bin:/bin' '$IDEA_BIN' pick --status open"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"nobody has this one"* ]]
+  [[ "$output" == *"body of five"* ]]
+  [[ "$(calls gh | sed -n 4p)" == "issue view 5 --repo owner/repo"* ]]
+}
+
+@test "pick refuses a non-numeric reference before any provider call" {
+  run "$IDEA_BIN" pick "https://github.com/other/repo/issues/9"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"issue number"* ]]
+  no_provider_calls
+}
+
+@test "pick refuses a non-numeric reference given after a filter" {
+  run "$IDEA_BIN" pick --status open nine
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"issue number"* ]]
+  no_provider_calls
+}
+
 # --- issue-number validation -----------------------------------------------
 
 @test "a non-numeric issue reference is refused before any provider call" {

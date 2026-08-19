@@ -31,6 +31,9 @@ Usage:
                               own editor or prompt.
   idea list [filters] [--json]
                               List ideas, newest first.
+  idea pick [<number>] [--yes] [filters]
+                              Show an idea in full, then claim it and start.
+                              Without a number, choose from the filtered list.
   idea drop    <number>       Release an idea you had claimed.
   idea done    <number>       Close an idea as done.
   idea abandon <number>       Close an idea as abandoned.
@@ -204,30 +207,57 @@ idea::issue_meta() {
 
 # One tab-separated record per issue: number, lifecycle state, size, tags,
 # title — newest first.
+# Derive an issue's lifecycle state into IDEA_ROW_STATE. Nothing stores it:
+# open versus closed, who is assigned and whether the abandoned label is on it
+# are all the platform's own atomic, immediately-visible facts. The abandoned
+# test comes before done so a closed issue can never answer to both.
+IDEA_ROW_STATE=''
+idea::lifecycle() {
+  local state="$1" assignees="$2" labels="$3"
+  if [[ "$state" == "open" || "$state" == "opened" ]]; then
+    if [[ -z "$assignees" ]]; then
+      IDEA_ROW_STATE='open'
+    elif idea::list_has "$IDEA_LOGIN" "$assignees"; then
+      IDEA_ROW_STATE='in-progress'
+    else
+      IDEA_ROW_STATE='claimed'
+    fi
+  elif idea::list_has 'abandoned' "$labels"; then
+    IDEA_ROW_STATE='abandoned'
+  else
+    IDEA_ROW_STATE='done'
+  fi
+}
+
 idea::classified_rows() {
-  local number state assignees labels title lifecycle
+  local number state assignees labels title
   idea::ensure_login
   while IFS="$IDEA_SEP" read -r number state assignees labels title; do
     [[ -n "$number" ]] || continue
     idea::split_labels "$labels"
-    if [[ "$state" == "open" || "$state" == "opened" ]]; then
-      if [[ -z "$assignees" ]]; then
-        lifecycle='open'
-      elif idea::list_has "$IDEA_LOGIN" "$assignees"; then
-        lifecycle='in-progress'
-      else
-        lifecycle='claimed'
-      fi
-    elif idea::list_has 'abandoned' "$labels"; then
-      # Checked ahead of done, so a closed issue is never both.
-      lifecycle='abandoned'
-    else
-      lifecycle='done'
-    fi
+    idea::lifecycle "$state" "$assignees" "$labels"
     printf '%s%s%s%s%s%s%s%s%s\n' \
-      "$number" "$IDEA_SEP" "$lifecycle" "$IDEA_SEP" "$IDEA_ROW_SIZE" \
+      "$number" "$IDEA_SEP" "$IDEA_ROW_STATE" "$IDEA_SEP" "$IDEA_ROW_SIZE" \
       "$IDEA_SEP" "$IDEA_ROW_TAGS" "$IDEA_SEP" "$title"
   done < <(idea::provider_rows | tr '\t' "$IDEA_SEP") | sort -t "$IDEA_SEP" -k1,1nr
+}
+
+# The issue reference among a subcommand's arguments, stepping over the values
+# that belong to filter flags, so `pick --status open 9` is checked too.
+idea::positional_ref() {
+  local skip_next=0 arg
+  for arg in "$@"; do
+    if [[ "$skip_next" -eq 1 ]]; then
+      skip_next=0
+      continue
+    fi
+    case "$arg" in
+      --status|--tag|--size) skip_next=1 ;;
+      -*) ;;
+      *) printf '%s' "$arg"; return 0 ;;
+    esac
+  done
+  return 0
 }
 
 idea::require_number() {
@@ -285,6 +315,7 @@ idea::filter_rows() {
 idea::render_rows() {
   local number state size tags title
   while IFS="$IDEA_SEP" read -r number state size tags title; do
+    [[ -n "$number" ]] || continue
     printf '%-5s %-11s %-4s %-16s %s\n' \
       "#${number}" "$state" "${size:--}" "${tags:--}" "$title"
   done
@@ -435,6 +466,121 @@ idea::cmd_new() {
   fi
 }
 
+idea::issue_body() {
+  if [[ "$IDEA_PROVIDER" == "github" ]]; then
+    "$IDEA_CLI" issue view "$1" --repo "$IDEA_REPO" --json body --jq '.body'
+  else
+    "$IDEA_CLI" issue view "$1" --repo "$IDEA_REPO" --output json --jq '.description'
+  fi
+}
+
+idea::confirm() {
+  local reply=''
+  printf '%s [y/N] ' "$1" >&2
+  read -r reply || return 1
+  [[ "$reply" == [yY] || "$reply" == [yY][eE][sS] ]]
+}
+
+# Choose one issue from the filtered rows, printing its number.
+idea::select_issue() {
+  local rows="$1" line choice index=0 number state size tags title
+  local -a numbers=()
+  if command -v fzf >/dev/null 2>&1; then
+    line=$(printf '%s\n' "$rows" | idea::render_rows | fzf --no-sort --prompt='idea> ') || line=''
+    if [[ -z "$line" ]]; then
+      idea::log_err "nothing selected"
+      return 1
+    fi
+    line="${line%% *}"
+    printf '%s' "${line#\#}"
+    return 0
+  fi
+  while IFS="$IDEA_SEP" read -r number state size tags title; do
+    [[ -n "$number" ]] || continue
+    index=$((index + 1))
+    numbers+=("$number")
+    printf '%3d) %-5s %-11s %-4s %-16s %s\n' \
+      "$index" "#${number}" "$state" "${size:--}" "${tags:--}" "$title" >&2
+  done <<< "$rows"
+  printf 'pick one [1-%d]: ' "$index" >&2
+  read -r choice || choice=''
+  if ! [[ "$choice" =~ ^[0-9]+$ ]] || [[ "$choice" -lt 1 || "$choice" -gt "$index" ]]; then
+    idea::log_err "'${choice}' is not one of the numbers offered"
+    return 1
+  fi
+  printf '%s' "${numbers[$((choice - 1))]}"
+}
+
+# The issue's body is printed before the question is asked, always — including
+# on the --yes path. Anyone can open an issue on a public repository, so that
+# text is third-party writing about to be handed to an agent as seed content,
+# and reading it first is the one review step between the two.
+idea::cmd_pick() {
+  local number='' yes=0 status='' size='' rows
+  local -a tags=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --yes) yes=1; shift ;;
+      --status) status="${2:-}"; shift 2 ;;
+      --tag) tags+=("${2:-}"); shift 2 ;;
+      --size) size="${2:-}"; shift 2 ;;
+      --) shift; break ;;
+      -*) idea::die "unknown flag for idea pick: $1" ;;
+      *)
+        [[ -z "$number" ]] || idea::die "idea pick takes a single issue number"
+        number="$1"; shift ;;
+    esac
+  done
+  [[ -z "$status" ]] || idea::valid_status "$status" ||
+    idea::die "unknown status '${status}' — try open, in-progress, claimed, abandoned or done"
+  [[ -z "$size" ]] || size=$(idea::normalise_size "$size")
+
+  idea::ensure_login
+
+  if [[ -z "$number" ]]; then
+    rows=$(idea::classified_rows | idea::filter_rows "$status" "$size" "${tags[@]+"${tags[@]}"}")
+    [[ -n "$rows" ]] || idea::die "no ideas match those filters"
+    number=$(idea::select_issue "$rows") || exit 1
+  fi
+
+  local meta_number state assignees labels title
+  IFS="$IDEA_SEP" read -r meta_number state assignees labels title \
+    < <(idea::issue_meta "$number" | tr '\t' "$IDEA_SEP")
+  [[ -n "$meta_number" ]] || idea::die "could not read issue ${number} from ${IDEA_PROVIDER}"
+  idea::split_labels "$labels"
+  idea::lifecycle "$state" "$assignees" "$labels"
+
+  printf '%s%s%s%s%s%s%s%s%s\n' \
+    "$meta_number" "$IDEA_SEP" "$IDEA_ROW_STATE" "$IDEA_SEP" "$IDEA_ROW_SIZE" \
+    "$IDEA_SEP" "$IDEA_ROW_TAGS" "$IDEA_SEP" "$title" | idea::render_rows
+  printf '\n'
+  idea::issue_body "$number"
+  printf '\n'
+
+  # Someone else holding it is a warning, not a wall: this is a single-user
+  # tool and the assignee is only standing in for "being worked on".
+  local prompt='start work on this idea?'
+  if [[ -n "$assignees" ]] && ! idea::list_has "$IDEA_LOGIN" "$assignees"; then
+    idea::log_warn "already assigned to ${assignees}"
+    prompt="already assigned to ${assignees} — start work on it anyway?"
+  fi
+  if [[ "$yes" -ne 1 ]]; then
+    idea::confirm "$prompt" || { idea::log "left #${number} as it was"; return 0; }
+  fi
+
+  if [[ "$IDEA_PROVIDER" == "github" ]]; then
+    "$IDEA_CLI" issue edit "$number" --repo "$IDEA_REPO" --add-assignee "$IDEA_LOGIN"
+  else
+    "$IDEA_CLI" issue update "$number" --repo "$IDEA_REPO" --assignee="+${IDEA_LOGIN}"
+  fi
+
+  # The skill takes it from here into pair-programming itself, so it sets
+  # IDEA_FROM_SKILL and this pointer stays out of its way.
+  if [[ -z "${IDEA_FROM_SKILL:-}" ]]; then
+    idea::log "claimed #${number} — open a Claude Code session in this repo and ask it to pick idea #${number} to build it"
+  fi
+}
+
 idea::cmd_done() {
   "$IDEA_CLI" issue close "$1" --repo "$IDEA_REPO"
 }
@@ -500,14 +646,18 @@ main() {
   local cmd="${1:-}"
   case "$cmd" in
     ''|-h|--help) usage; return 0 ;;
-    new|list|done|abandon|reopen|drop) shift ;;
+    new|list|pick|done|abandon|reopen|drop) shift ;;
     *) idea::log_err "unknown command: ${cmd}"; usage; exit 1 ;;
   esac
 
   # Identifiers are checked before anything reaches the network, so a mistyped
   # reference cannot become a call against some other repository's issue.
+  local ref
   case "$cmd" in
     done|abandon|reopen|drop) idea::require_number "${1:-}" ;;
+    pick)
+      ref=$(idea::positional_ref "$@")
+      [[ -z "$ref" ]] || idea::require_number "$ref" ;;
   esac
 
   idea::detect
@@ -516,6 +666,7 @@ main() {
   case "$cmd" in
     new)     idea::cmd_new     "$@" ;;
     list)    idea::cmd_list    "$@" ;;
+    pick)    idea::cmd_pick    "$@" ;;
     done)    idea::cmd_done    "$@" ;;
     abandon) idea::cmd_abandon "$@" ;;
     reopen)  idea::cmd_reopen  "$@" ;;
