@@ -28,10 +28,14 @@ to start one when your partner signs off on the spec — a first principles file
 is three lines, not a document.
 
 **Promotion.** When a Decision turns out to be general rather than about this
-feature, propose promoting it to `principles.md` when your partner signs off on
-the spec. That file is committed, so promotion is your partner's call, never
-yours. This is how the skill gets sharper: the arguing happens once, and the
-next spec starts from it.
+feature, propose promoting it when your partner signs off on the spec — and
+propose *where*: `principles.md` is the default home, but if the repo has a
+routing doc for its rules (`CLAUDE.md` will name it), triage the candidate
+through it first, since a
+general rule may be a path-scoped convention, an invariant, or a fact that
+belongs in an ADR rather than a principle. Those files are committed, so
+promotion is your partner's call, never yours. This is how the skill gets
+sharper: the arguing happens once, and the next spec starts from it.
 
 ## Stage 1 — Pin the constraints
 
