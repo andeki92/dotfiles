@@ -65,6 +65,10 @@ n=1
 [[ -f "${IDEA_STUB_DIR}/${key}.n" ]] && n=$(cat "${IDEA_STUB_DIR}/${key}.n")
 printf '%s' "$((n + 1))" > "${IDEA_STUB_DIR}/${key}.n"
 
+# Only keys explicitly marked drain stdin: preflight runs before `idea new`
+# reads its body, so a stub that always drained would eat the piped body.
+[[ -f "${IDEA_STUB_DIR}/${key}.record-stdin" ]] && cat > "${IDEA_STUB_DIR}/${key}.stdin"
+
 out="${IDEA_STUB_DIR}/${key}.${n}.out"
 [[ -f "$out" ]] || out="${IDEA_STUB_DIR}/${key}.out"
 [[ -f "$out" ]] && cat "$out"
@@ -195,6 +199,137 @@ no_provider_calls() { [[ ! -s "$IDEA_STUB_LOG" ]]; }
   [ "$status" -ne 0 ]
   [[ "$output" == *"gh"* ]]
   [[ "$output" == *"authenticated"* ]]
+}
+
+# --- idea new --------------------------------------------------------------
+
+@test "new creates the issue on github with the given title" {
+  run "$IDEA_BIN" new "speed up the dispatcher"
+  [ "$status" -eq 0 ]
+  argv_has "issue" gh 2
+  argv_has "create" gh 2
+  argv_has "--title" gh 2
+  argv_has "speed up the dispatcher" gh 2
+  argv_has "--repo" gh 2
+  argv_has "owner/repo" gh 2
+}
+
+@test "new creates the issue on gitlab with the given title" {
+  set_origin "https://gitlab.com/owner/repo.git"
+  run "$IDEA_BIN" new "speed up the dispatcher"
+  [ "$status" -eq 0 ]
+  argv_has "create" glab 2
+  argv_has "--title" glab 2
+  argv_has "speed up the dispatcher" glab 2
+  argv_has "owner/repo" glab 2
+}
+
+@test "size and tags become labels on the create call" {
+  run "$IDEA_BIN" new "a title" --size M --tags "cli, perf"
+  [ "$status" -eq 0 ]
+  local create
+  create="$(calls gh | tail -1)"
+  [[ "$create" == *"--label size:M"* ]]
+  [[ "$create" == *"--label cli"* ]]
+  [[ "$create" == *"--label perf"* ]]
+}
+
+@test "size is rejected unless it is S, M or L" {
+  run "$IDEA_BIN" new "a title" --size XL
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"XL"* ]]
+  [ "$(count_calls gh)" -le 1 ]
+}
+
+@test "every label is created before the issue that applies it" {
+  run "$IDEA_BIN" new "a title" --size L --tags docs
+  [ "$status" -eq 0 ]
+  [[ "$(calls gh | sed -n 2p)" == "label create size:L --repo owner/repo" ]]
+  [[ "$(calls gh | sed -n 3p)" == "label create docs --repo owner/repo" ]]
+  [[ "$(calls gh | tail -1)" == "issue create"* ]]
+}
+
+@test "gitlab labels are created by name" {
+  set_origin "https://gitlab.com/owner/repo.git"
+  run "$IDEA_BIN" new "a title" --size S
+  [ "$status" -eq 0 ]
+  [[ "$(calls glab | sed -n 2p)" == "label create --name size:S --repo owner/repo" ]]
+}
+
+@test "a label that already exists is not a failure" {
+  stub_exit gh-label-create 1
+  stub_err gh-label-create "HTTP 422: Validation Failed. Name already_exists: must be unique"
+  run "$IDEA_BIN" new "a title" --size M
+  [ "$status" -eq 0 ]
+  [[ "$(calls gh | tail -1)" == "issue create"* ]]
+}
+
+@test "a label that already exists is not a failure on gitlab either" {
+  set_origin "https://gitlab.com/owner/repo.git"
+  stub_exit glab-label-create 1
+  stub_err glab-label-create "POST .../labels: 409 {message: Label already exists}"
+  run "$IDEA_BIN" new "a title" --size M
+  [ "$status" -eq 0 ]
+  [[ "$(calls glab | tail -1)" == "issue create"* ]]
+}
+
+@test "a label failing for any other reason stops before creating the issue" {
+  stub_exit gh-label-create 1
+  stub_err gh-label-create "HTTP 403: Resource not accessible by personal access token"
+  run "$IDEA_BIN" new "a title" --size M
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"403"* ]]
+  [[ "$(calls gh | tail -1)" != "issue create"* ]]
+}
+
+@test "a piped body reaches gh on stdin through the body-file flag" {
+  : > "${IDEA_STUB_DIR}/gh-issue-create.record-stdin"
+  run bash -c "printf 'first line\nsecond line' | '$IDEA_BIN' new 'a title'"
+  [ "$status" -eq 0 ]
+  argv_has "--body-file" gh 2
+  argv_has "-" gh 2
+  [[ "$(cat "${IDEA_STUB_DIR}/gh-issue-create.stdin")" == "first line
+second line" ]]
+}
+
+@test "a piped body reaches glab as a literal description with yes" {
+  set_origin "https://gitlab.com/owner/repo.git"
+  run bash -c "printf 'first line\nsecond line' | '$IDEA_BIN' new 'a title'"
+  [ "$status" -eq 0 ]
+  argv_has "--description" glab 2
+  argv_has 'first line\nsecond line' glab 2
+  argv_has "--yes" glab 2
+}
+
+@test "a lone dash body gets a trailing space on gitlab" {
+  set_origin "https://gitlab.com/owner/repo.git"
+  run bash -c "printf '%s' - | '$IDEA_BIN' new 'a title'"
+  [ "$status" -eq 0 ]
+  argv_has "- " glab 2
+  ! argv_has "-" glab 2
+}
+
+@test "a lone dash body is left alone on github" {
+  : > "${IDEA_STUB_DIR}/gh-issue-create.record-stdin"
+  run bash -c "printf '%s' - | '$IDEA_BIN' new 'a title'"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "${IDEA_STUB_DIR}/gh-issue-create.stdin")" == "-" ]]
+}
+
+@test "the body flag supplies the body without reading stdin" {
+  : > "${IDEA_STUB_DIR}/gh-issue-create.record-stdin"
+  run bash -c "printf 'piped and ignored' | '$IDEA_BIN' new 'a title' --body 'from the flag'"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "${IDEA_STUB_DIR}/gh-issue-create.stdin")" == "from the flag" ]]
+}
+
+@test "the body flag supplies the body on gitlab too" {
+  set_origin "https://gitlab.com/owner/repo.git"
+  run "$IDEA_BIN" new "a title" --body "from the flag"
+  [ "$status" -eq 0 ]
+  argv_has "--description" glab 2
+  argv_has "from the flag" glab 2
+  argv_has "--yes" glab 2
 }
 
 # --- idea done -------------------------------------------------------------
