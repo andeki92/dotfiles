@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# idea — capture and pick up backlog ideas as GitHub or GitLab issues.
+# See config/idea/README.md in the dotfiles repo.
+set -euo pipefail
+IFS=$'\n\t'
+
+# Color is opt-in: only when stderr is a TTY and NO_COLOR is unset. Decided
+# once at load so each log_* stays a single printf.
+if [[ -t 2 && -z "${NO_COLOR:-}" ]]; then
+  readonly _IDEA_C_RED=$'\033[31m'
+  readonly _IDEA_C_YELLOW=$'\033[33m'
+  readonly _IDEA_C_CYAN=$'\033[36m'
+  readonly _IDEA_C_RESET=$'\033[0m'
+else
+  readonly _IDEA_C_RED='' _IDEA_C_YELLOW='' _IDEA_C_CYAN='' _IDEA_C_RESET=''
+fi
+
+idea::log()      { printf '%sidea:%s %s\n' "$_IDEA_C_CYAN"   "$_IDEA_C_RESET" "$*" >&2; }
+idea::log_warn() { printf '%sidea:%s %s\n' "$_IDEA_C_YELLOW" "$_IDEA_C_RESET" "$*" >&2; }
+idea::log_err()  { printf '%sidea:%s %s\n' "$_IDEA_C_RED"    "$_IDEA_C_RESET" "$*" >&2; }
+idea::die()      { idea::log_err "$@"; exit 1; }
+
+usage() {
+  cat <<'USAGE'
+idea — capture and pick up backlog ideas as GitHub or GitLab issues.
+
+Usage:
+  idea done <number>          Close an idea as done.
+  idea -h | --help
+
+Ideas live as issues on this repository's origin remote — github.com through
+gh, gitlab.com through glab. The matching CLI must be installed and
+authenticated.
+USAGE
+}
+
+# Set once per invocation by idea::detect.
+IDEA_PROVIDER=''   # github | gitlab
+IDEA_CLI=''        # gh | glab
+IDEA_REPO=''       # owner/repo, pinned explicitly on every repo-scoped call
+
+# Read the provider and owner/repo out of origin's URL. Handles https://,
+# ssh://, scp-style (git@host:owner/repo), embedded userinfo and a trailing
+# .git. The repo is always taken from origin and passed explicitly afterwards,
+# so neither CLI's own default-repository resolution can redirect a call to a
+# fork's upstream.
+idea::detect() {
+  local url rest host sep path
+  if ! url=$(git remote get-url origin 2>/dev/null) || [[ -z "$url" ]]; then
+    idea::die "no 'origin' remote here — idea keeps ideas as issues on origin, so it needs one"
+  fi
+
+  rest="${url#*://}"      # scheme, when there is one
+  rest="${rest##*@}"      # userinfo, when there is one
+  host="${rest%%[:/]*}"
+  sep="${rest:${#host}:1}"
+  path="${rest:$((${#host} + 1))}"
+  # ssh://host:port/owner/repo — drop the port, but never a numeric owner
+  # reached through the scp-style or https forms.
+  if [[ "$sep" == ":" && "$url" == *://* && "$path" =~ ^[0-9]+/ ]]; then
+    path="${path#*/}"
+  fi
+  path="${path%/}"
+  path="${path%.git}"
+  host=$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')
+
+  case "$host" in
+    github.com) IDEA_PROVIDER='github'; IDEA_CLI='gh' ;;
+    gitlab.com) IDEA_PROVIDER='gitlab'; IDEA_CLI='glab' ;;
+    '') idea::die "could not read a host out of origin's URL: ${url}" ;;
+    *)  idea::die "origin is on ${host}; idea supports github.com and gitlab.com only" ;;
+  esac
+
+  [[ -n "$path" && "$path" == */* ]] ||
+    idea::die "could not read owner/repo out of origin's URL: ${url}"
+  IDEA_REPO="$path"
+}
+
+# Fail early and by name: a CLI that is missing or logged out is the first
+# thing a new machine hits, and finding out halfway through a multi-call
+# subcommand is worse than finding out before the first one.
+idea::preflight() {
+  command -v "$IDEA_CLI" >/dev/null 2>&1 ||
+    idea::die "${IDEA_CLI} is not installed — idea needs it to reach ${IDEA_PROVIDER}"
+  "$IDEA_CLI" auth status >/dev/null 2>&1 ||
+    idea::die "${IDEA_CLI} is not authenticated — run '${IDEA_CLI} auth login'"
+}
+
+idea::cmd_done() {
+  local number="${1:?idea done requires an issue number}"
+  "$IDEA_CLI" issue close "$number" --repo "$IDEA_REPO"
+}
+
+main() {
+  local cmd="${1:-}"
+  case "$cmd" in
+    ''|-h|--help) usage; return 0 ;;
+    done) shift ;;
+    *) idea::log_err "unknown command: ${cmd}"; usage; exit 1 ;;
+  esac
+
+  idea::detect
+  idea::preflight
+
+  case "$cmd" in
+    done) idea::cmd_done "$@" ;;
+  esac
+}
+
+main "$@"
