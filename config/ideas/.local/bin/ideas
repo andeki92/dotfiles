@@ -1,44 +1,44 @@
 #!/usr/bin/env bash
-# idea — capture and pick up backlog ideas as GitHub or GitLab issues.
-# See config/idea/README.md in the dotfiles repo.
+# ideas — capture and pick up backlog ideas as GitHub or GitLab issues.
+# See config/ideas/README.md in the dotfiles repo.
 set -euo pipefail
 IFS=$'\n\t'
 
 # Color is opt-in: only when stderr is a TTY and NO_COLOR is unset. Decided
 # once at load so each log_* stays a single printf.
 if [[ -t 2 && -z "${NO_COLOR:-}" ]]; then
-  readonly _IDEA_C_RED=$'\033[31m'
-  readonly _IDEA_C_YELLOW=$'\033[33m'
-  readonly _IDEA_C_CYAN=$'\033[36m'
-  readonly _IDEA_C_RESET=$'\033[0m'
+  readonly _IDEAS_C_RED=$'\033[31m'
+  readonly _IDEAS_C_YELLOW=$'\033[33m'
+  readonly _IDEAS_C_CYAN=$'\033[36m'
+  readonly _IDEAS_C_RESET=$'\033[0m'
 else
-  readonly _IDEA_C_RED='' _IDEA_C_YELLOW='' _IDEA_C_CYAN='' _IDEA_C_RESET=''
+  readonly _IDEAS_C_RED='' _IDEAS_C_YELLOW='' _IDEAS_C_CYAN='' _IDEAS_C_RESET=''
 fi
 
-idea::log()      { printf '%sidea:%s %s\n' "$_IDEA_C_CYAN"   "$_IDEA_C_RESET" "$*" >&2; }
-idea::log_warn() { printf '%sidea:%s %s\n' "$_IDEA_C_YELLOW" "$_IDEA_C_RESET" "$*" >&2; }
-idea::log_err()  { printf '%sidea:%s %s\n' "$_IDEA_C_RED"    "$_IDEA_C_RESET" "$*" >&2; }
-idea::die()      { idea::log_err "$@"; exit 1; }
+ideas::log()      { printf '%sideas:%s %s\n' "$_IDEAS_C_CYAN"   "$_IDEAS_C_RESET" "$*" >&2; }
+ideas::log_warn() { printf '%sideas:%s %s\n' "$_IDEAS_C_YELLOW" "$_IDEAS_C_RESET" "$*" >&2; }
+ideas::log_err()  { printf '%sideas:%s %s\n' "$_IDEAS_C_RED"    "$_IDEAS_C_RESET" "$*" >&2; }
+ideas::die()      { ideas::log_err "$@"; exit 1; }
 
 usage() {
   cat <<'USAGE'
-idea — capture and pick up backlog ideas as GitHub or GitLab issues.
+ideas — capture and pick up backlog ideas as GitHub or GitLab issues.
 
 Usage:
-  idea new <title> [--size S|M|L] [--tags a,b] [--body <text>]
+  ideas new <title> [--size S|M|L] [--tags a,b] [--body <text>]
                               Create an idea. The body comes from --body, from
                               stdin when it is piped, or from the provider's
                               own editor or prompt.
-  idea list [filters] [--json]
+  ideas list [filters] [--json]
                               List ideas, newest first.
-  idea pick [<number>] [--yes] [filters]
+  ideas pick [<number>] [--yes] [filters]
                               Show an idea in full, then claim it and start.
                               Without a number, choose from the filtered list.
-  idea drop    <number>       Release an idea you had claimed.
-  idea done    <number>       Close an idea as done.
-  idea abandon <number>       Close an idea as abandoned.
-  idea reopen  <number>       Reopen a closed idea.
-  idea -h | --help
+  ideas drop    <number>      Release an idea you had claimed.
+  ideas done    <number>      Close an idea as done.
+  ideas abandon <number>      Close an idea as abandoned.
+  ideas reopen  <number>      Reopen a closed idea.
+  ideas -h | --help
 
 Filters:
   --status <state>            open, in-progress, claimed, abandoned or done
@@ -51,20 +51,20 @@ authenticated.
 USAGE
 }
 
-# Set once per invocation by idea::detect.
-IDEA_PROVIDER=''   # github | gitlab
-IDEA_CLI=''        # gh | glab
-IDEA_REPO=''       # owner/repo, pinned explicitly on every repo-scoped call
+# Set once per invocation by ideas::detect.
+IDEAS_PROVIDER=''   # github | gitlab
+IDEAS_CLI=''        # gh | glab
+IDEAS_REPO=''       # owner/repo, pinned explicitly on every repo-scoped call
 
 # Read the provider and owner/repo out of origin's URL. Handles https://,
 # ssh://, scp-style (git@host:owner/repo), embedded userinfo and a trailing
 # .git. The repo is always taken from origin and passed explicitly afterwards,
 # so neither CLI's own default-repository resolution can redirect a call to a
 # fork's upstream.
-idea::detect() {
+ideas::detect() {
   local url rest host sep path
   if ! url=$(git remote get-url origin 2>/dev/null) || [[ -z "$url" ]]; then
-    idea::die "no 'origin' remote here — idea keeps ideas as issues on origin, so it needs one"
+    ideas::die "no 'origin' remote here — ideas keeps them as issues on origin, so it needs one"
   fi
 
   rest="${url#*://}"      # scheme, when there is one
@@ -82,54 +82,54 @@ idea::detect() {
   host=$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')
 
   case "$host" in
-    github.com) IDEA_PROVIDER='github'; IDEA_CLI='gh' ;;
-    gitlab.com) IDEA_PROVIDER='gitlab'; IDEA_CLI='glab' ;;
-    '') idea::die "could not read a host out of origin's URL: ${url}" ;;
-    *)  idea::die "origin is on ${host}; idea supports github.com and gitlab.com only" ;;
+    github.com) IDEAS_PROVIDER='github'; IDEAS_CLI='gh' ;;
+    gitlab.com) IDEAS_PROVIDER='gitlab'; IDEAS_CLI='glab' ;;
+    '') ideas::die "could not read a host out of origin's URL: ${url}" ;;
+    *)  ideas::die "origin is on ${host}; ideas supports github.com and gitlab.com only" ;;
   esac
 
   [[ -n "$path" && "$path" == */* ]] ||
-    idea::die "could not read owner/repo out of origin's URL: ${url}"
-  IDEA_REPO="$path"
+    ideas::die "could not read owner/repo out of origin's URL: ${url}"
+  IDEAS_REPO="$path"
 }
 
 # Fail early and by name: a CLI that is missing or logged out is the first
 # thing a new machine hits, and finding out halfway through a multi-call
 # subcommand is worse than finding out before the first one.
-idea::preflight() {
-  command -v "$IDEA_CLI" >/dev/null 2>&1 ||
-    idea::die "${IDEA_CLI} is not installed — idea needs it to reach ${IDEA_PROVIDER}"
-  "$IDEA_CLI" auth status >/dev/null 2>&1 ||
-    idea::die "${IDEA_CLI} is not authenticated — run '${IDEA_CLI} auth login'"
+ideas::preflight() {
+  command -v "$IDEAS_CLI" >/dev/null 2>&1 ||
+    ideas::die "${IDEAS_CLI} is not installed — ideas needs it to reach ${IDEAS_PROVIDER}"
+  "$IDEAS_CLI" auth status >/dev/null 2>&1 ||
+    ideas::die "${IDEAS_CLI} is not authenticated — run '${IDEAS_CLI} auth login'"
 }
 
 # Well above either provider's 30-item default, which would otherwise truncate
 # any backlog worth having a tool for.
-readonly IDEA_FETCH_LIMIT=200
+readonly IDEAS_FETCH_LIMIT=200
 
 # Records move between the fetch, the filter and the renderers separated by
 # ASCII unit separator rather than by tab: `read` folds runs of tabs together,
 # because a tab is IFS whitespace, which would silently shift every field after
 # an issue with no assignee, no size or no tags.
-readonly IDEA_SEP=$'\037'
+readonly IDEAS_SEP=$'\037'
 
 # The current user's own login, looked up once per run. `@me` cannot stand in
 # for it: neither provider will compare that shorthand against the assignee
 # list an issue actually returns.
-IDEA_LOGIN=''
-idea::ensure_login() {
-  [[ -n "$IDEA_LOGIN" ]] && return 0
-  if [[ "$IDEA_PROVIDER" == "github" ]]; then
-    IDEA_LOGIN=$("$IDEA_CLI" api user --jq '.login')
+IDEAS_LOGIN=''
+ideas::ensure_login() {
+  [[ -n "$IDEAS_LOGIN" ]] && return 0
+  if [[ "$IDEAS_PROVIDER" == "github" ]]; then
+    IDEAS_LOGIN=$("$IDEAS_CLI" api user --jq '.login')
   else
-    IDEA_LOGIN=$("$IDEA_CLI" api user --jq '.username')
+    IDEAS_LOGIN=$("$IDEAS_CLI" api user --jq '.username')
   fi
-  [[ -n "$IDEA_LOGIN" ]] ||
-    idea::die "could not read your ${IDEA_PROVIDER} login from '${IDEA_CLI} api user'"
+  [[ -n "$IDEAS_LOGIN" ]] ||
+    ideas::die "could not read your ${IDEAS_PROVIDER} login from '${IDEAS_CLI} api user'"
 }
 
 # True when a comma-separated list contains an exact item.
-idea::list_has() {
+ideas::list_has() {
   local needle="$1" rest="$2" item
   while [[ -n "$rest" ]]; do
     item="${rest%%,*}"
@@ -140,35 +140,35 @@ idea::list_has() {
 }
 
 # Split a label list into the size marker and the plain tags, leaving them in
-# IDEA_ROW_SIZE and IDEA_ROW_TAGS. Both are read once per issue, so writing
+# IDEAS_ROW_SIZE and IDEAS_ROW_TAGS. Both are read once per issue, so writing
 # them here keeps a subshell out of the row loop. The lifecycle labels get
 # their own columns and so are not repeated among the tags.
-IDEA_ROW_SIZE=''
-IDEA_ROW_TAGS=''
-idea::split_labels() {
+IDEAS_ROW_SIZE=''
+IDEAS_ROW_TAGS=''
+ideas::split_labels() {
   local rest="$1" item
-  IDEA_ROW_SIZE=''
-  IDEA_ROW_TAGS=''
+  IDEAS_ROW_SIZE=''
+  IDEAS_ROW_TAGS=''
   while [[ -n "$rest" ]]; do
     item="${rest%%,*}"
     if [[ "$item" == "$rest" ]]; then rest=''; else rest="${rest#*,}"; fi
     case "$item" in
       '') ;;
-      size:*) IDEA_ROW_SIZE="${item#size:}" ;;
+      size:*) IDEAS_ROW_SIZE="${item#size:}" ;;
       abandoned) ;;
-      *) IDEA_ROW_TAGS="${IDEA_ROW_TAGS:+${IDEA_ROW_TAGS},}${item}" ;;
+      *) IDEAS_ROW_TAGS="${IDEAS_ROW_TAGS:+${IDEAS_ROW_TAGS},}${item}" ;;
     esac
   done
 }
 
 # The jq expression flattening one issue into number, state, assignees, labels
 # and title. Both CLIs carry their own jq, so extraction rides along with the
-# fetch and `idea` needs none of its own; keeping the expression here means the
+# fetch and `ideas` needs none of its own; keeping the expression here means the
 # two providers' field names differ in exactly one place. Labels arrive as
 # objects from one and as plain strings from the other, so both are accepted.
-idea::row_expr() {
+ideas::row_expr() {
   local number_field='.iid' login_field='.username'
-  if [[ "$IDEA_PROVIDER" == "github" ]]; then
+  if [[ "$IDEAS_PROVIDER" == "github" ]]; then
     number_field='.number'
     login_field='.login'
   fi
@@ -182,69 +182,69 @@ idea::row_expr() {
 # and the state span; every lifecycle decision is made here instead, from the
 # same three fields on both providers, so `--status` cannot come to mean two
 # different things depending on which one you are on.
-idea::provider_rows() {
-  if [[ "$IDEA_PROVIDER" == "github" ]]; then
-    "$IDEA_CLI" issue list --repo "$IDEA_REPO" --state all --limit "$IDEA_FETCH_LIMIT" \
-      --json number,state,assignees,labels,title --jq ".[] | $(idea::row_expr)"
+ideas::provider_rows() {
+  if [[ "$IDEAS_PROVIDER" == "github" ]]; then
+    "$IDEAS_CLI" issue list --repo "$IDEAS_REPO" --state all --limit "$IDEAS_FETCH_LIMIT" \
+      --json number,state,assignees,labels,title --jq ".[] | $(ideas::row_expr)"
   else
-    "$IDEA_CLI" issue list --repo "$IDEA_REPO" --all --per-page "$IDEA_FETCH_LIMIT" \
-      --output json --jq ".[] | $(idea::row_expr)"
+    "$IDEAS_CLI" issue list --repo "$IDEAS_REPO" --all --per-page "$IDEAS_FETCH_LIMIT" \
+      --output json --jq ".[] | $(ideas::row_expr)"
   fi
 }
 
 # The same record for a single issue, so `pick` and `reopen` read an issue's
 # assignees and labels through exactly the same shape `list` classifies.
-idea::issue_meta() {
+ideas::issue_meta() {
   local number="$1"
-  if [[ "$IDEA_PROVIDER" == "github" ]]; then
-    "$IDEA_CLI" issue view "$number" --repo "$IDEA_REPO" \
-      --json number,state,assignees,labels,title --jq "$(idea::row_expr)"
+  if [[ "$IDEAS_PROVIDER" == "github" ]]; then
+    "$IDEAS_CLI" issue view "$number" --repo "$IDEAS_REPO" \
+      --json number,state,assignees,labels,title --jq "$(ideas::row_expr)"
   else
-    "$IDEA_CLI" issue view "$number" --repo "$IDEA_REPO" \
-      --output json --jq "$(idea::row_expr)"
+    "$IDEAS_CLI" issue view "$number" --repo "$IDEAS_REPO" \
+      --output json --jq "$(ideas::row_expr)"
   fi
 }
 
 # One tab-separated record per issue: number, lifecycle state, size, tags,
 # title — newest first.
-# Derive an issue's lifecycle state into IDEA_ROW_STATE. Nothing stores it:
+# Derive an issue's lifecycle state into IDEAS_ROW_STATE. Nothing stores it:
 # open versus closed, who is assigned and whether the abandoned label is on it
 # are all the platform's own atomic, immediately-visible facts. The abandoned
 # test comes before done so a closed issue can never answer to both.
-IDEA_ROW_STATE=''
-idea::lifecycle() {
+IDEAS_ROW_STATE=''
+ideas::lifecycle() {
   local state="$1" assignees="$2" labels="$3"
   if [[ "$state" == "open" || "$state" == "opened" ]]; then
     if [[ -z "$assignees" ]]; then
-      IDEA_ROW_STATE='open'
-    elif idea::list_has "$IDEA_LOGIN" "$assignees"; then
-      IDEA_ROW_STATE='in-progress'
+      IDEAS_ROW_STATE='open'
+    elif ideas::list_has "$IDEAS_LOGIN" "$assignees"; then
+      IDEAS_ROW_STATE='in-progress'
     else
-      IDEA_ROW_STATE='claimed'
+      IDEAS_ROW_STATE='claimed'
     fi
-  elif idea::list_has 'abandoned' "$labels"; then
-    IDEA_ROW_STATE='abandoned'
+  elif ideas::list_has 'abandoned' "$labels"; then
+    IDEAS_ROW_STATE='abandoned'
   else
-    IDEA_ROW_STATE='done'
+    IDEAS_ROW_STATE='done'
   fi
 }
 
-idea::classified_rows() {
+ideas::classified_rows() {
   local number state assignees labels title
-  idea::ensure_login
-  while IFS="$IDEA_SEP" read -r number state assignees labels title; do
+  ideas::ensure_login
+  while IFS="$IDEAS_SEP" read -r number state assignees labels title; do
     [[ -n "$number" ]] || continue
-    idea::split_labels "$labels"
-    idea::lifecycle "$state" "$assignees" "$labels"
+    ideas::split_labels "$labels"
+    ideas::lifecycle "$state" "$assignees" "$labels"
     printf '%s%s%s%s%s%s%s%s%s\n' \
-      "$number" "$IDEA_SEP" "$IDEA_ROW_STATE" "$IDEA_SEP" "$IDEA_ROW_SIZE" \
-      "$IDEA_SEP" "$IDEA_ROW_TAGS" "$IDEA_SEP" "$title"
-  done < <(idea::provider_rows | tr '\t' "$IDEA_SEP") | sort -t "$IDEA_SEP" -k1,1nr
+      "$number" "$IDEAS_SEP" "$IDEAS_ROW_STATE" "$IDEAS_SEP" "$IDEAS_ROW_SIZE" \
+      "$IDEAS_SEP" "$IDEAS_ROW_TAGS" "$IDEAS_SEP" "$title"
+  done < <(ideas::provider_rows | tr '\t' "$IDEAS_SEP") | sort -t "$IDEAS_SEP" -k1,1nr
 }
 
 # The issue reference among a subcommand's arguments, stepping over the values
 # that belong to filter flags, so `pick --status open 9` is checked too.
-idea::positional_ref() {
+ideas::positional_ref() {
   local skip_next=0 arg
   for arg in "$@"; do
     if [[ "$skip_next" -eq 1 ]]; then
@@ -260,14 +260,14 @@ idea::positional_ref() {
   return 0
 }
 
-idea::require_number() {
+ideas::require_number() {
   local ref="${1:-}"
-  [[ -n "$ref" ]] || idea::die "this command needs an issue number"
+  [[ -n "$ref" ]] || ideas::die "this command needs an issue number"
   [[ "$ref" =~ ^[0-9]+$ ]] ||
-    idea::die "'${ref}' is not an issue number — idea takes the bare number, such as 42"
+    ideas::die "'${ref}' is not an issue number — ideas takes the bare number, such as 42"
 }
 
-idea::valid_status() {
+ideas::valid_status() {
   case "$1" in
     open|in-progress|claimed|abandoned|done) return 0 ;;
     *) return 1 ;;
@@ -275,16 +275,16 @@ idea::valid_status() {
 }
 
 # Normalise a size argument to S, M or L, or fail.
-idea::normalise_size() {
+ideas::normalise_size() {
   local size
   size=$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')
   case "$size" in
     S|M|L) printf '%s' "$size" ;;
-    *) idea::die "--size takes S, M or L (got: ${1})" ;;
+    *) ideas::die "--size takes S, M or L (got: ${1})" ;;
   esac
 }
 
-idea::json_escape() {
+ideas::json_escape() {
   local s="$1"
   s="${s//\\/\\\\}"
   s="${s//\"/\\\"}"
@@ -294,55 +294,55 @@ idea::json_escape() {
 }
 
 # Filter classified rows on stdin: status, size, then every tag given.
-idea::filter_rows() {
+ideas::filter_rows() {
   local f_status="$1" f_size="$2"
   shift 2
   local number state size tags title tag keep
-  while IFS="$IDEA_SEP" read -r number state size tags title; do
+  while IFS="$IDEAS_SEP" read -r number state size tags title; do
     [[ -n "$f_status" && "$state" != "$f_status" ]] && continue
     [[ -n "$f_size" && "$size" != "$f_size" ]] && continue
     keep=1
     for tag in "$@"; do
-      idea::list_has "$tag" "$tags" || { keep=0; break; }
+      ideas::list_has "$tag" "$tags" || { keep=0; break; }
     done
     [[ "$keep" -eq 1 ]] || continue
     printf '%s%s%s%s%s%s%s%s%s\n' \
-      "$number" "$IDEA_SEP" "$state" "$IDEA_SEP" "$size" \
-      "$IDEA_SEP" "$tags" "$IDEA_SEP" "$title"
+      "$number" "$IDEAS_SEP" "$state" "$IDEAS_SEP" "$size" \
+      "$IDEAS_SEP" "$tags" "$IDEAS_SEP" "$title"
   done
 }
 
-idea::render_rows() {
+ideas::render_rows() {
   local number state size tags title
-  while IFS="$IDEA_SEP" read -r number state size tags title; do
+  while IFS="$IDEAS_SEP" read -r number state size tags title; do
     [[ -n "$number" ]] || continue
     printf '%-5s %-11s %-4s %-16s %s\n' \
       "#${number}" "$state" "${size:--}" "${tags:--}" "$title"
   done
 }
 
-idea::render_rows_json() {
+ideas::render_rows_json() {
   local number state size tags title first=1 size_json tags_json rest item
   printf '['
-  while IFS="$IDEA_SEP" read -r number state size tags title; do
+  while IFS="$IDEAS_SEP" read -r number state size tags title; do
     [[ "$first" -eq 1 ]] && first=0 || printf ','
     size_json='null'
-    [[ -n "$size" ]] && size_json="\"$(idea::json_escape "$size")\""
+    [[ -n "$size" ]] && size_json="\"$(ideas::json_escape "$size")\""
     tags_json=''
     rest="$tags"
     while [[ -n "$rest" ]]; do
       item="${rest%%,*}"
       if [[ "$item" == "$rest" ]]; then rest=''; else rest="${rest#*,}"; fi
-      tags_json="${tags_json:+${tags_json}, }\"$(idea::json_escape "$item")\""
+      tags_json="${tags_json:+${tags_json}, }\"$(ideas::json_escape "$item")\""
     done
     printf '\n  {"number": %s, "state": "%s", "size": %s, "tags": [%s], "title": "%s"}' \
-      "$number" "$state" "$size_json" "$tags_json" "$(idea::json_escape "$title")"
+      "$number" "$state" "$size_json" "$tags_json" "$(ideas::json_escape "$title")"
   done
   [[ "$first" -eq 1 ]] || printf '\n'
   printf ']\n'
 }
 
-idea::cmd_list() {
+ideas::cmd_list() {
   local status='' size='' json=0
   local -a tags=()
   while [[ $# -gt 0 ]]; do
@@ -352,24 +352,24 @@ idea::cmd_list() {
       --size) size="${2:-}"; shift 2 ;;
       --json) json=1; shift ;;
       --) shift; break ;;
-      *) idea::die "unknown argument for idea list: $1" ;;
+      *) ideas::die "unknown argument for ideas list: $1" ;;
     esac
   done
-  [[ -z "$status" ]] || idea::valid_status "$status" ||
-    idea::die "unknown status '${status}' — try open, in-progress, claimed, abandoned or done"
-  [[ -z "$size" ]] || size=$(idea::normalise_size "$size")
+  [[ -z "$status" ]] || ideas::valid_status "$status" ||
+    ideas::die "unknown status '${status}' — try open, in-progress, claimed, abandoned or done"
+  [[ -z "$size" ]] || size=$(ideas::normalise_size "$size")
 
   if [[ "$json" -eq 1 ]]; then
-    idea::classified_rows | idea::filter_rows "$status" "$size" "${tags[@]+"${tags[@]}"}" |
-      idea::render_rows_json
+    ideas::classified_rows | ideas::filter_rows "$status" "$size" "${tags[@]+"${tags[@]}"}" |
+      ideas::render_rows_json
   else
-    idea::classified_rows | idea::filter_rows "$status" "$size" "${tags[@]+"${tags[@]}"}" |
-      idea::render_rows
+    ideas::classified_rows | ideas::filter_rows "$status" "$size" "${tags[@]+"${tags[@]}"}" |
+      ideas::render_rows
   fi
 }
 
 # Split a comma-separated list into one trimmed, non-empty item per line.
-idea::split_commas() {
+ideas::split_commas() {
   local IFS=','
   local item
   set -f
@@ -386,22 +386,22 @@ idea::split_commas() {
 # small default, so an absent-looking label may only be out of view, and the
 # create it would then trigger fails anyway. Creating unconditionally is
 # idempotent and needs no listing to be complete.
-idea::ensure_label() {
+ideas::ensure_label() {
   local name="$1" out
-  if [[ "$IDEA_PROVIDER" == "github" ]]; then
-    out=$("$IDEA_CLI" label create "$name" --repo "$IDEA_REPO" 2>&1) && return 0
+  if [[ "$IDEAS_PROVIDER" == "github" ]]; then
+    out=$("$IDEAS_CLI" label create "$name" --repo "$IDEAS_REPO" 2>&1) && return 0
   else
-    out=$("$IDEA_CLI" label create --name "$name" --repo "$IDEA_REPO" 2>&1) && return 0
+    out=$("$IDEAS_CLI" label create --name "$name" --repo "$IDEAS_REPO" 2>&1) && return 0
   fi
   if printf '%s' "$out" | grep -Eqi 'already[ _]exists'; then
     return 0
   fi
-  idea::log_err "could not create the label '${name}':"
+  ideas::log_err "could not create the label '${name}':"
   printf '%s\n' "$out" >&2
   exit 1
 }
 
-idea::cmd_new() {
+ideas::cmd_new() {
   local title='' size='' tags='' body='' have_body=0 label tag
   local -a labels=()
 
@@ -411,25 +411,25 @@ idea::cmd_new() {
       --tags) tags="${2:-}"; shift 2 ;;
       --body) body="${2:-}"; have_body=1; shift 2 ;;
       --) shift; break ;;
-      -*) idea::die "unknown flag for idea new: $1" ;;
+      -*) ideas::die "unknown flag for ideas new: $1" ;;
       *)
-        [[ -z "$title" ]] || idea::die "idea new takes a single title; quote it if it has spaces"
+        [[ -z "$title" ]] || ideas::die "ideas new takes a single title; quote it if it has spaces"
         title="$1"; shift ;;
     esac
   done
-  [[ -n "$title" ]] || idea::die "idea new requires a title"
+  [[ -n "$title" ]] || ideas::die "ideas new requires a title"
 
   if [[ -n "$size" ]]; then
-    size=$(idea::normalise_size "$size")
+    size=$(ideas::normalise_size "$size")
     labels+=("size:${size}")
   fi
   while IFS= read -r tag; do
     labels+=("$tag")
-  done < <(idea::split_commas "$tags")
+  done < <(ideas::split_commas "$tags")
 
   if [[ ${#labels[@]} -gt 0 ]]; then
     for label in "${labels[@]}"; do
-      idea::ensure_label "$label"
+      ideas::ensure_label "$label"
     done
   fi
 
@@ -440,18 +440,18 @@ idea::cmd_new() {
     have_body=1
   fi
 
-  local -a args=(issue create --repo "$IDEA_REPO" --title "$title")
+  local -a args=(issue create --repo "$IDEAS_REPO" --title "$title")
   if [[ ${#labels[@]} -gt 0 ]]; then
     for label in "${labels[@]}"; do
       args+=(--label "$label")
     done
   fi
 
-  if [[ "$IDEA_PROVIDER" == "github" ]]; then
+  if [[ "$IDEAS_PROVIDER" == "github" ]]; then
     if [[ "$have_body" -eq 1 ]]; then
-      printf '%s' "$body" | "$IDEA_CLI" "${args[@]}" --body-file -
+      printf '%s' "$body" | "$IDEAS_CLI" "${args[@]}" --body-file -
     else
-      "$IDEA_CLI" "${args[@]}"
+      "$IDEAS_CLI" "${args[@]}"
     fi
   else
     if [[ "$have_body" -eq 1 ]]; then
@@ -459,22 +459,22 @@ idea::cmd_new() {
       # stdin", so the body travels as a literal argument — and a body that is
       # itself just `-` gets a space so it cannot be read as that sentinel.
       [[ "$body" == "-" ]] && body="- "
-      "$IDEA_CLI" "${args[@]}" --description "$body" --yes
+      "$IDEAS_CLI" "${args[@]}" --description "$body" --yes
     else
-      "$IDEA_CLI" "${args[@]}"
+      "$IDEAS_CLI" "${args[@]}"
     fi
   fi
 }
 
-idea::issue_body() {
-  if [[ "$IDEA_PROVIDER" == "github" ]]; then
-    "$IDEA_CLI" issue view "$1" --repo "$IDEA_REPO" --json body --jq '.body'
+ideas::issue_body() {
+  if [[ "$IDEAS_PROVIDER" == "github" ]]; then
+    "$IDEAS_CLI" issue view "$1" --repo "$IDEAS_REPO" --json body --jq '.body'
   else
-    "$IDEA_CLI" issue view "$1" --repo "$IDEA_REPO" --output json --jq '.description'
+    "$IDEAS_CLI" issue view "$1" --repo "$IDEAS_REPO" --output json --jq '.description'
   fi
 }
 
-idea::confirm() {
+ideas::confirm() {
   local reply=''
   printf '%s [y/N] ' "$1" >&2
   read -r reply || return 1
@@ -482,20 +482,20 @@ idea::confirm() {
 }
 
 # Choose one issue from the filtered rows, printing its number.
-idea::select_issue() {
+ideas::select_issue() {
   local rows="$1" line choice index=0 number state size tags title
   local -a numbers=()
   if command -v fzf >/dev/null 2>&1; then
-    line=$(printf '%s\n' "$rows" | idea::render_rows | fzf --no-sort --prompt='idea> ') || line=''
+    line=$(printf '%s\n' "$rows" | ideas::render_rows | fzf --no-sort --prompt='ideas> ') || line=''
     if [[ -z "$line" ]]; then
-      idea::log_err "nothing selected"
+      ideas::log_err "nothing selected"
       return 1
     fi
     line="${line%% *}"
     printf '%s' "${line#\#}"
     return 0
   fi
-  while IFS="$IDEA_SEP" read -r number state size tags title; do
+  while IFS="$IDEAS_SEP" read -r number state size tags title; do
     [[ -n "$number" ]] || continue
     index=$((index + 1))
     numbers+=("$number")
@@ -505,7 +505,7 @@ idea::select_issue() {
   printf 'pick one [1-%d]: ' "$index" >&2
   read -r choice || choice=''
   if ! [[ "$choice" =~ ^[0-9]+$ ]] || [[ "$choice" -lt 1 || "$choice" -gt "$index" ]]; then
-    idea::log_err "'${choice}' is not one of the numbers offered"
+    ideas::log_err "'${choice}' is not one of the numbers offered"
     return 1
   fi
   printf '%s' "${numbers[$((choice - 1))]}"
@@ -515,7 +515,7 @@ idea::select_issue() {
 # on the --yes path. Anyone can open an issue on a public repository, so that
 # text is third-party writing about to be handed to an agent as seed content,
 # and reading it first is the one review step between the two.
-idea::cmd_pick() {
+ideas::cmd_pick() {
   local number='' yes=0 status='' size='' rows
   local -a tags=()
   while [[ $# -gt 0 ]]; do
@@ -525,109 +525,109 @@ idea::cmd_pick() {
       --tag) tags+=("${2:-}"); shift 2 ;;
       --size) size="${2:-}"; shift 2 ;;
       --) shift; break ;;
-      -*) idea::die "unknown flag for idea pick: $1" ;;
+      -*) ideas::die "unknown flag for ideas pick: $1" ;;
       *)
-        [[ -z "$number" ]] || idea::die "idea pick takes a single issue number"
+        [[ -z "$number" ]] || ideas::die "ideas pick takes a single issue number"
         number="$1"; shift ;;
     esac
   done
-  [[ -z "$status" ]] || idea::valid_status "$status" ||
-    idea::die "unknown status '${status}' — try open, in-progress, claimed, abandoned or done"
-  [[ -z "$size" ]] || size=$(idea::normalise_size "$size")
+  [[ -z "$status" ]] || ideas::valid_status "$status" ||
+    ideas::die "unknown status '${status}' — try open, in-progress, claimed, abandoned or done"
+  [[ -z "$size" ]] || size=$(ideas::normalise_size "$size")
 
-  idea::ensure_login
+  ideas::ensure_login
 
   if [[ -z "$number" ]]; then
-    rows=$(idea::classified_rows | idea::filter_rows "$status" "$size" "${tags[@]+"${tags[@]}"}")
-    [[ -n "$rows" ]] || idea::die "no ideas match those filters"
-    number=$(idea::select_issue "$rows") || exit 1
+    rows=$(ideas::classified_rows | ideas::filter_rows "$status" "$size" "${tags[@]+"${tags[@]}"}")
+    [[ -n "$rows" ]] || ideas::die "no ideas match those filters"
+    number=$(ideas::select_issue "$rows") || exit 1
   fi
 
   local meta_number state assignees labels title
-  IFS="$IDEA_SEP" read -r meta_number state assignees labels title \
-    < <(idea::issue_meta "$number" | tr '\t' "$IDEA_SEP")
-  [[ -n "$meta_number" ]] || idea::die "could not read issue ${number} from ${IDEA_PROVIDER}"
-  idea::split_labels "$labels"
-  idea::lifecycle "$state" "$assignees" "$labels"
+  IFS="$IDEAS_SEP" read -r meta_number state assignees labels title \
+    < <(ideas::issue_meta "$number" | tr '\t' "$IDEAS_SEP")
+  [[ -n "$meta_number" ]] || ideas::die "could not read issue ${number} from ${IDEAS_PROVIDER}"
+  ideas::split_labels "$labels"
+  ideas::lifecycle "$state" "$assignees" "$labels"
 
   printf '%s%s%s%s%s%s%s%s%s\n' \
-    "$meta_number" "$IDEA_SEP" "$IDEA_ROW_STATE" "$IDEA_SEP" "$IDEA_ROW_SIZE" \
-    "$IDEA_SEP" "$IDEA_ROW_TAGS" "$IDEA_SEP" "$title" | idea::render_rows
+    "$meta_number" "$IDEAS_SEP" "$IDEAS_ROW_STATE" "$IDEAS_SEP" "$IDEAS_ROW_SIZE" \
+    "$IDEAS_SEP" "$IDEAS_ROW_TAGS" "$IDEAS_SEP" "$title" | ideas::render_rows
   printf '\n'
-  idea::issue_body "$number"
+  ideas::issue_body "$number"
   printf '\n'
 
   # Someone else holding it is a warning, not a wall: this is a single-user
   # tool and the assignee is only standing in for "being worked on".
   local prompt='start work on this idea?'
-  if [[ -n "$assignees" ]] && ! idea::list_has "$IDEA_LOGIN" "$assignees"; then
-    idea::log_warn "already assigned to ${assignees}"
+  if [[ -n "$assignees" ]] && ! ideas::list_has "$IDEAS_LOGIN" "$assignees"; then
+    ideas::log_warn "already assigned to ${assignees}"
     prompt="already assigned to ${assignees} — start work on it anyway?"
   fi
   if [[ "$yes" -ne 1 ]]; then
-    idea::confirm "$prompt" || { idea::log "left #${number} as it was"; return 0; }
+    ideas::confirm "$prompt" || { ideas::log "left #${number} as it was"; return 0; }
   fi
 
-  if [[ "$IDEA_PROVIDER" == "github" ]]; then
-    "$IDEA_CLI" issue edit "$number" --repo "$IDEA_REPO" --add-assignee "$IDEA_LOGIN"
+  if [[ "$IDEAS_PROVIDER" == "github" ]]; then
+    "$IDEAS_CLI" issue edit "$number" --repo "$IDEAS_REPO" --add-assignee "$IDEAS_LOGIN"
   else
-    "$IDEA_CLI" issue update "$number" --repo "$IDEA_REPO" --assignee="+${IDEA_LOGIN}"
+    "$IDEAS_CLI" issue update "$number" --repo "$IDEAS_REPO" --assignee="+${IDEAS_LOGIN}"
   fi
 
   # The skill takes it from here into pair-programming itself, so it sets
-  # IDEA_FROM_SKILL and this pointer stays out of its way.
-  if [[ -z "${IDEA_FROM_SKILL:-}" ]]; then
-    idea::log "claimed #${number} — open a Claude Code session in this repo and ask it to pick idea #${number} to build it"
+  # IDEAS_FROM_SKILL and this pointer stays out of its way.
+  if [[ -z "${IDEAS_FROM_SKILL:-}" ]]; then
+    ideas::log "claimed #${number} — open a Claude Code session in this repo and ask it to pick idea #${number} to build it"
   fi
 }
 
-idea::cmd_done() {
-  "$IDEA_CLI" issue close "$1" --repo "$IDEA_REPO"
+ideas::cmd_done() {
+  "$IDEAS_CLI" issue close "$1" --repo "$IDEAS_REPO"
 }
 
-idea::cmd_abandon() {
+ideas::cmd_abandon() {
   local number="$1"
-  idea::ensure_label 'abandoned'
-  if [[ "$IDEA_PROVIDER" == "github" ]]; then
-    "$IDEA_CLI" issue edit "$number" --repo "$IDEA_REPO" --add-label abandoned
+  ideas::ensure_label 'abandoned'
+  if [[ "$IDEAS_PROVIDER" == "github" ]]; then
+    "$IDEAS_CLI" issue edit "$number" --repo "$IDEAS_REPO" --add-label abandoned
   else
-    "$IDEA_CLI" issue update "$number" --repo "$IDEA_REPO" --label abandoned
+    "$IDEAS_CLI" issue update "$number" --repo "$IDEAS_REPO" --label abandoned
   fi
-  "$IDEA_CLI" issue close "$number" --repo "$IDEA_REPO"
+  "$IDEAS_CLI" issue close "$number" --repo "$IDEAS_REPO"
 }
 
 # Give up only this user's own claim. GitLab's bare `--assignee <user>` would
 # replace the whole assignee list and `--unassign` would empty it, so the
-# scoped `-<user>` form is the only one that touches nothing `idea` did not do.
-idea::cmd_drop() {
+# scoped `-<user>` form is the only one that touches nothing `ideas` did not do.
+ideas::cmd_drop() {
   local number="$1"
-  idea::ensure_login
-  if [[ "$IDEA_PROVIDER" == "github" ]]; then
-    "$IDEA_CLI" issue edit "$number" --repo "$IDEA_REPO" --remove-assignee "$IDEA_LOGIN"
+  ideas::ensure_login
+  if [[ "$IDEAS_PROVIDER" == "github" ]]; then
+    "$IDEAS_CLI" issue edit "$number" --repo "$IDEAS_REPO" --remove-assignee "$IDEAS_LOGIN"
   else
-    "$IDEA_CLI" issue update "$number" --repo "$IDEA_REPO" --assignee="-${IDEA_LOGIN}"
+    "$IDEAS_CLI" issue update "$number" --repo "$IDEAS_REPO" --assignee="-${IDEAS_LOGIN}"
   fi
 }
 
-idea::cmd_reopen() {
+ideas::cmd_reopen() {
   local number="$1" state assignees labels title
   local -a edit=()
-  idea::ensure_login
-  IFS="$IDEA_SEP" read -r number state assignees labels title \
-    < <(idea::issue_meta "$number" | tr '\t' "$IDEA_SEP")
-  [[ -n "$number" ]] || idea::die "could not read issue ${1} from ${IDEA_PROVIDER}"
+  ideas::ensure_login
+  IFS="$IDEAS_SEP" read -r number state assignees labels title \
+    < <(ideas::issue_meta "$number" | tr '\t' "$IDEAS_SEP")
+  [[ -n "$number" ]] || ideas::die "could not read issue ${1} from ${IDEAS_PROVIDER}"
 
-  "$IDEA_CLI" issue reopen "$number" --repo "$IDEA_REPO"
+  "$IDEAS_CLI" issue reopen "$number" --repo "$IDEAS_REPO"
 
-  if idea::list_has "$IDEA_LOGIN" "$assignees"; then
-    if [[ "$IDEA_PROVIDER" == "github" ]]; then
-      edit+=(--remove-assignee "$IDEA_LOGIN")
+  if ideas::list_has "$IDEAS_LOGIN" "$assignees"; then
+    if [[ "$IDEAS_PROVIDER" == "github" ]]; then
+      edit+=(--remove-assignee "$IDEAS_LOGIN")
     else
-      edit+=("--assignee=-${IDEA_LOGIN}")
+      edit+=("--assignee=-${IDEAS_LOGIN}")
     fi
   fi
-  if idea::list_has 'abandoned' "$labels"; then
-    if [[ "$IDEA_PROVIDER" == "github" ]]; then
+  if ideas::list_has 'abandoned' "$labels"; then
+    if [[ "$IDEAS_PROVIDER" == "github" ]]; then
       edit+=(--remove-label abandoned)
     else
       edit+=(--unlabel abandoned)
@@ -635,10 +635,10 @@ idea::cmd_reopen() {
   fi
   [[ ${#edit[@]} -gt 0 ]] || return 0
 
-  if [[ "$IDEA_PROVIDER" == "github" ]]; then
-    "$IDEA_CLI" issue edit "$number" --repo "$IDEA_REPO" "${edit[@]}"
+  if [[ "$IDEAS_PROVIDER" == "github" ]]; then
+    "$IDEAS_CLI" issue edit "$number" --repo "$IDEAS_REPO" "${edit[@]}"
   else
-    "$IDEA_CLI" issue update "$number" --repo "$IDEA_REPO" "${edit[@]}"
+    "$IDEAS_CLI" issue update "$number" --repo "$IDEAS_REPO" "${edit[@]}"
   fi
 }
 
@@ -647,30 +647,30 @@ main() {
   case "$cmd" in
     ''|-h|--help) usage; return 0 ;;
     new|list|pick|done|abandon|reopen|drop) shift ;;
-    *) idea::log_err "unknown command: ${cmd}"; usage; exit 1 ;;
+    *) ideas::log_err "unknown command: ${cmd}"; usage; exit 1 ;;
   esac
 
   # Identifiers are checked before anything reaches the network, so a mistyped
   # reference cannot become a call against some other repository's issue.
   local ref
   case "$cmd" in
-    done|abandon|reopen|drop) idea::require_number "${1:-}" ;;
+    done|abandon|reopen|drop) ideas::require_number "${1:-}" ;;
     pick)
-      ref=$(idea::positional_ref "$@")
-      [[ -z "$ref" ]] || idea::require_number "$ref" ;;
+      ref=$(ideas::positional_ref "$@")
+      [[ -z "$ref" ]] || ideas::require_number "$ref" ;;
   esac
 
-  idea::detect
-  idea::preflight
+  ideas::detect
+  ideas::preflight
 
   case "$cmd" in
-    new)     idea::cmd_new     "$@" ;;
-    list)    idea::cmd_list    "$@" ;;
-    pick)    idea::cmd_pick    "$@" ;;
-    done)    idea::cmd_done    "$@" ;;
-    abandon) idea::cmd_abandon "$@" ;;
-    reopen)  idea::cmd_reopen  "$@" ;;
-    drop)    idea::cmd_drop    "$@" ;;
+    new)     ideas::cmd_new     "$@" ;;
+    list)    ideas::cmd_list    "$@" ;;
+    pick)    ideas::cmd_pick    "$@" ;;
+    done)    ideas::cmd_done    "$@" ;;
+    abandon) ideas::cmd_abandon "$@" ;;
+    reopen)  ideas::cmd_reopen  "$@" ;;
+    drop)    ideas::cmd_drop    "$@" ;;
   esac
 }
 

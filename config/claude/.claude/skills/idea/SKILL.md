@@ -5,19 +5,20 @@ description: Use when the user wants to jot down an idea for later, record somet
 
 # Idea
 
-Ideas live as issues on this repository's `origin`. The `idea` CLI does all the
-mechanics; this skill only adds the parts that need a conversation — drafting an
-idea out of what you have been talking about, choosing one by talking rather
-than by keystroke, and handing the chosen one to `pair-programming`.
+Ideas live as issues on this repository's `origin`. The `ideas` CLI — plural,
+because `idea` is IntelliJ IDEA's launcher — does all the mechanics; this skill
+only adds the parts that need a conversation: drafting an idea out of what you
+have been talking about, choosing one by talking rather than by keystroke, and
+handing the chosen one to `pair-programming`.
 
 Announce at the start: "Using idea to `<record|pick up>` an idea."
 
-Run `idea -h` if you need the current flag surface. Everything below assumes it
+Run `ideas -h` if you need the current flag surface. Everything below assumes it
 is on `PATH`; if it is not, say so and stop rather than reaching for `gh` or
 `glab` yourself — the whole point of the CLI is that the provider differences
 live in one place.
 
-**Set `IDEA_FROM_SKILL=1` on every `idea` call you make.** It tells the CLI you
+**Set `IDEAS_FROM_SKILL=1` on every `ideas` call you make.** It tells the CLI you
 are taking the idea onward yourself, so it does not print its "open a Claude
 Code session" pointer at a session that is already open.
 
@@ -36,7 +37,7 @@ When the user wants to record something and has not handed you the text:
 3. **File the approved text**, piping the body in:
 
 ```bash
-IDEA_FROM_SKILL=1 idea new "<approved title>" --size M --tags cli,perf <<'BODY'
+IDEAS_FROM_SKILL=1 ideas new "<approved title>" --size M --tags cli,perf <<'BODY'
 <approved body>
 BODY
 ```
@@ -46,14 +47,14 @@ draft, so there is nothing to approve.
 
 ## Picking one up
 
-**Never run bare `idea pick`.** Its own selection wants a terminal — fzf, or a
+**Never run bare `ideas pick`.** Its own selection wants a terminal — fzf, or a
 numbered prompt — and there is no terminal here. Do the choosing in the
 conversation instead.
 
 1. **Read the backlog as data**, with whatever filters they asked for:
 
    ```bash
-   IDEA_FROM_SKILL=1 idea list --json --status open
+   IDEAS_FROM_SKILL=1 ideas list --json --status open
    ```
 
 2. **Offer the candidates** and let them choose. Skip this step when they
@@ -68,13 +69,13 @@ conversation instead.
    ```bash
    # Answer no: this call is only here to show the body. The real confirmation
    # is the one you are about to ask for in the conversation.
-   printf 'n\n' | IDEA_FROM_SKILL=1 idea pick <number>
+   printf 'n\n' | IDEAS_FROM_SKILL=1 ideas pick <number>
    ```
 
 4. **Only once they have said yes**, claim it:
 
    ```bash
-   IDEA_FROM_SKILL=1 idea pick <number> --yes
+   IDEAS_FROM_SKILL=1 ideas pick <number> --yes
    ```
 
 5. **Hand it straight to `pair-programming`, in the same turn**, with the
@@ -84,10 +85,10 @@ conversation instead.
 ## What this skill does not do
 
 Worktrees, branches, and building are `pair-programming`'s, and the
-`idea` CLI does not touch them either. Do not create a worktree here, and do
+`ideas` CLI does not touch them either. Do not create a worktree here, and do
 not start writing code between claiming an idea and handing it over.
 
-Changing anyone else's assignment is not yours to do. `idea pick` adds only the
+Changing anyone else's assignment is not yours to do. `ideas pick` adds only the
 current user, `drop` and `reopen` remove only the current user, and an idea
 already claimed by somebody else is a warning to relay — with their name — not
 a thing to take over silently.
@@ -98,5 +99,5 @@ a thing to take over silently.
 |---|---|
 | "They obviously want this recorded, I'll just file it" | The draft is the deliverable. File what they approved, not what you guessed. |
 | "The body looks fine, I'll pass `--yes` straight away" | The one review between arbitrary internet text and an agentic build is the user reading it. Show it and wait. |
-| "I'll run `idea pick` and answer the prompt" | There is no terminal. The prompt gets EOF, not your answer. |
+| "I'll run `ideas pick` and answer the prompt" | There is no terminal. The prompt gets EOF, not your answer. |
 | "I'll just call `gh issue create` directly" | Then the provider differences live in two places, and one of them is untested. |

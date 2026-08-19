@@ -2,7 +2,7 @@
 #
 # Fake `gh` and `glab` executables are placed first on PATH. Each one appends
 # its own argv to a log and replays canned output, so these tests assert which
-# provider calls `idea` makes and with which arguments — never that a real API
+# provider calls `ideas` makes and with which arguments — never that a real API
 # agrees with them. `git` is deliberately not faked: every test runs inside a
 # real temporary repository with a real `origin`, so remote-URL parsing is
 # exercised against real `git` output.
@@ -14,73 +14,73 @@
 bats_require_minimum_version 1.5.0
 
 setup() {
-  IDEA_ROOT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
-  IDEA_BIN="${IDEA_ROOT}/.local/bin/idea"
-  IDEA_TMP="$(mktemp -d -t idea-test.XXXXXX)"
-  IDEA_STUB_BIN="${IDEA_TMP}/bin"
-  export IDEA_STUB_DIR="${IDEA_TMP}/stubs"
-  export IDEA_STUB_LOG="${IDEA_TMP}/calls.log"
-  mkdir -p "$IDEA_STUB_BIN" "$IDEA_STUB_DIR"
-  : > "$IDEA_STUB_LOG"
+  IDEAS_ROOT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
+  IDEAS_BIN="${IDEAS_ROOT}/.local/bin/ideas"
+  IDEAS_TMP="$(mktemp -d -t idea-test.XXXXXX)"
+  IDEAS_STUB_BIN="${IDEAS_TMP}/bin"
+  export IDEAS_STUB_DIR="${IDEAS_TMP}/stubs"
+  export IDEAS_STUB_LOG="${IDEAS_TMP}/calls.log"
+  mkdir -p "$IDEAS_STUB_BIN" "$IDEAS_STUB_DIR"
+  : > "$IDEAS_STUB_LOG"
 
   make_stub gh
   make_stub glab
-  export PATH="${IDEA_STUB_BIN}:${PATH}"
+  export PATH="${IDEAS_STUB_BIN}:${PATH}"
 
-  IDEA_WORK="${IDEA_TMP}/repo"
-  mkdir -p "$IDEA_WORK"
-  git init -q "$IDEA_WORK"
-  cd "$IDEA_WORK"
+  IDEAS_WORK="${IDEAS_TMP}/repo"
+  mkdir -p "$IDEAS_WORK"
+  git init -q "$IDEAS_WORK"
+  cd "$IDEAS_WORK"
   set_origin "https://github.com/owner/repo.git"
 }
 
 teardown() {
   cd "$BATS_TEST_DIRNAME"
-  [[ -n "${IDEA_TMP:-}" ]] && rm -rf "$IDEA_TMP"
+  [[ -n "${IDEAS_TMP:-}" ]] && rm -rf "$IDEAS_TMP"
 }
 
 # --- harness ---------------------------------------------------------------
 
 # Write a fake provider CLI that records its argv and replays canned output.
-# Canned files live in $IDEA_STUB_DIR keyed by command plus its first two
+# Canned files live in $IDEAS_STUB_DIR keyed by command plus its first two
 # arguments — `gh issue list` reads `gh-issue-list.out`. A `.exit` file sets
 # the exit status, a `.err` file is written to stderr. Numbered variants
 # (`<key>.1.out`, `<key>.2.out`) answer repeated calls to the same key in
 # order, which is how the two reads behind `pick`'s detail view are told apart.
 make_stub() {
   local name="$1"
-  cat > "${IDEA_STUB_BIN}/${name}" <<'STUB'
+  cat > "${IDEAS_STUB_BIN}/${name}" <<'STUB'
 #!/usr/bin/env bash
 self="$(basename "$0")"
 {
   printf '=== %s\n' "$self"
   for a in "$@"; do printf '\t%s\n' "${a//$'\n'/\\n}"; done
-} >> "$IDEA_STUB_LOG"
+} >> "$IDEAS_STUB_LOG"
 
 key="$self"
 [[ $# -ge 1 ]] && key="${key}-${1}"
 [[ $# -ge 2 && "${2}" != -* ]] && key="${key}-${2}"
 
 n=1
-[[ -f "${IDEA_STUB_DIR}/${key}.n" ]] && n=$(cat "${IDEA_STUB_DIR}/${key}.n")
-printf '%s' "$((n + 1))" > "${IDEA_STUB_DIR}/${key}.n"
+[[ -f "${IDEAS_STUB_DIR}/${key}.n" ]] && n=$(cat "${IDEAS_STUB_DIR}/${key}.n")
+printf '%s' "$((n + 1))" > "${IDEAS_STUB_DIR}/${key}.n"
 
-# Only keys explicitly marked drain stdin: preflight runs before `idea new`
+# Only keys explicitly marked drain stdin: preflight runs before `ideas new`
 # reads its body, so a stub that always drained would eat the piped body.
-[[ -f "${IDEA_STUB_DIR}/${key}.record-stdin" ]] && cat > "${IDEA_STUB_DIR}/${key}.stdin"
+[[ -f "${IDEAS_STUB_DIR}/${key}.record-stdin" ]] && cat > "${IDEAS_STUB_DIR}/${key}.stdin"
 
-out="${IDEA_STUB_DIR}/${key}.${n}.out"
-[[ -f "$out" ]] || out="${IDEA_STUB_DIR}/${key}.out"
+out="${IDEAS_STUB_DIR}/${key}.${n}.out"
+[[ -f "$out" ]] || out="${IDEAS_STUB_DIR}/${key}.out"
 [[ -f "$out" ]] && cat "$out"
 
-err="${IDEA_STUB_DIR}/${key}.err"
+err="${IDEAS_STUB_DIR}/${key}.err"
 [[ -f "$err" ]] && cat "$err" >&2
 
-status="${IDEA_STUB_DIR}/${key}.exit"
+status="${IDEAS_STUB_DIR}/${key}.exit"
 [[ -f "$status" ]] && exit "$(cat "$status")"
 exit 0
 STUB
-  chmod +x "${IDEA_STUB_BIN}/${name}"
+  chmod +x "${IDEAS_STUB_BIN}/${name}"
 }
 
 set_origin() {
@@ -89,11 +89,11 @@ set_origin() {
 }
 
 # Canned stdout for a stub key, e.g. `stub_out gh-issue-list <<'EOF'`.
-stub_out() { cat > "${IDEA_STUB_DIR}/${1}.out"; }
+stub_out() { cat > "${IDEAS_STUB_DIR}/${1}.out"; }
 # Canned stdout for the <n>th call to a stub key.
-stub_out_nth() { cat > "${IDEA_STUB_DIR}/${1}.${2}.out"; }
-stub_exit() { printf '%s' "$2" > "${IDEA_STUB_DIR}/${1}.exit"; }
-stub_err() { printf '%s\n' "$2" > "${IDEA_STUB_DIR}/${1}.err"; }
+stub_out_nth() { cat > "${IDEAS_STUB_DIR}/${1}.${2}.out"; }
+stub_exit() { printf '%s' "$2" > "${IDEAS_STUB_DIR}/${1}.exit"; }
+stub_err() { printf '%s\n' "$2" > "${IDEAS_STUB_DIR}/${1}.err"; }
 
 # Every recorded invocation of <command>, one space-joined line each.
 calls() {
@@ -104,7 +104,7 @@ calls() {
     }
     matched { a = substr($0, 2); line = (line == "" ? a : line " " a) }
     END { if (matched) print line }
-  ' "$IDEA_STUB_LOG"
+  ' "$IDEAS_STUB_LOG"
 }
 
 count_calls() { calls "$1" | grep -c . || true; }
@@ -117,7 +117,7 @@ call_argv() {
       matched = (substr($0, 5) == want && seen == want_n); next
     }
     matched { print substr($0, 2) }
-  ' "$IDEA_STUB_LOG"
+  ' "$IDEAS_STUB_LOG"
 }
 
 # True when the <n>th invocation of <command> passed <value> as a whole argument.
@@ -126,7 +126,7 @@ argv_has() {
   call_argv "$cmd" "$n" | grep -Fxq -- "$value"
 }
 
-no_provider_calls() { [[ ! -s "$IDEA_STUB_LOG" ]]; }
+no_provider_calls() { [[ ! -s "$IDEAS_STUB_LOG" ]]; }
 
 fail() {
   echo "$@" >&2
@@ -148,7 +148,7 @@ assert_repo_pinned() {
 }
 
 # A canned post-jq row as the provider CLI would emit it: number, state,
-# assignees, labels, title. `idea` asks gh/glab to do the field extraction with
+# assignees, labels, title. `ideas` asks gh/glab to do the field extraction with
 # their own built-in --jq, so a stub replays what comes back out of it.
 row() { printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5"; }
 
@@ -168,14 +168,14 @@ sample_rows() {
 # --- provider detection and preflight --------------------------------------
 
 @test "help prints usage and makes no provider call" {
-  run "$IDEA_BIN" --help
+  run "$IDEAS_BIN" --help
   [ "$status" -eq 0 ]
-  [[ "$output" == *"idea done"* ]]
+  [[ "$output" == *"ideas done"* ]]
   no_provider_calls
 }
 
 @test "an https github origin routes the preflight to gh" {
-  run "$IDEA_BIN" done 7
+  run "$IDEAS_BIN" done 7
   [ "$status" -eq 0 ]
   [[ "$(calls gh | head -1)" == "auth status" ]]
   [ "$(count_calls glab)" -eq 0 ]
@@ -183,7 +183,7 @@ sample_rows() {
 
 @test "an scp-style github origin routes the preflight to gh" {
   set_origin "git@github.com:owner/repo.git"
-  run "$IDEA_BIN" done 7
+  run "$IDEAS_BIN" done 7
   [ "$status" -eq 0 ]
   [[ "$(calls gh | head -1)" == "auth status" ]]
   argv_has "owner/repo" gh 2
@@ -191,7 +191,7 @@ sample_rows() {
 
 @test "a gitlab origin routes the preflight to glab and keeps subgroup paths" {
   set_origin "https://gitlab.com/group/sub/repo.git"
-  run "$IDEA_BIN" done 7
+  run "$IDEAS_BIN" done 7
   [ "$status" -eq 0 ]
   [[ "$(calls glab | head -1)" == "auth status" ]]
   [ "$(count_calls gh)" -eq 0 ]
@@ -200,14 +200,14 @@ sample_rows() {
 
 @test "an ssh url with an explicit port still yields owner/repo" {
   set_origin "ssh://git@github.com:22/owner/repo.git"
-  run "$IDEA_BIN" done 7
+  run "$IDEAS_BIN" done 7
   [ "$status" -eq 0 ]
   argv_has "owner/repo" gh 2
 }
 
 @test "an origin on an unsupported host errors without calling any provider" {
   set_origin "https://bitbucket.org/owner/repo.git"
-  run "$IDEA_BIN" done 7
+  run "$IDEAS_BIN" done 7
   [ "$status" -ne 0 ]
   [[ "$output" == *"bitbucket.org"* ]]
   [[ "$output" == *"github.com"* ]]
@@ -217,14 +217,14 @@ sample_rows() {
 
 @test "a repository with no origin errors without calling any provider" {
   git remote remove origin
-  run "$IDEA_BIN" done 7
+  run "$IDEAS_BIN" done 7
   [ "$status" -ne 0 ]
   [[ "$output" == *"origin"* ]]
   no_provider_calls
 }
 
 @test "a missing provider CLI errors naming it" {
-  run env PATH="/usr/bin:/bin" "$IDEA_BIN" done 7
+  run env PATH="/usr/bin:/bin" "$IDEAS_BIN" done 7
   [ "$status" -ne 0 ]
   [[ "$output" == *"gh"* ]]
   [[ "$output" == *"not installed"* ]]
@@ -232,7 +232,7 @@ sample_rows() {
 
 @test "an unauthenticated provider CLI errors naming it" {
   stub_exit gh-auth-status 1
-  run "$IDEA_BIN" done 7
+  run "$IDEAS_BIN" done 7
   [ "$status" -ne 0 ]
   [[ "$output" == *"gh"* ]]
   [[ "$output" == *"authenticated"* ]]
@@ -246,13 +246,13 @@ sample_rows() {
   stub_issue 7 open "" "size:M" "free idea" "a body"
   row 7 closed "octocat" "abandoned" "given up on" | stub_out gh-issue-view
 
-  run "$IDEA_BIN" new "a title" --size M --tags cli,docs
-  run "$IDEA_BIN" list
-  run "$IDEA_BIN" pick 7 --yes
-  run "$IDEA_BIN" drop 7
-  run "$IDEA_BIN" done 7
-  run "$IDEA_BIN" abandon 7
-  run "$IDEA_BIN" reopen 7
+  run "$IDEAS_BIN" new "a title" --size M --tags cli,docs
+  run "$IDEAS_BIN" list
+  run "$IDEAS_BIN" pick 7 --yes
+  run "$IDEAS_BIN" drop 7
+  run "$IDEAS_BIN" done 7
+  run "$IDEAS_BIN" abandon 7
+  run "$IDEAS_BIN" reopen 7
 
   [ "$(count_calls gh)" -gt 15 ]
   assert_repo_pinned gh
@@ -265,22 +265,22 @@ sample_rows() {
   stub_issue 7 opened "" "size:M" "free idea" "a body" glab
   row 7 closed "octocat" "abandoned" "given up on" | stub_out glab-issue-view
 
-  run "$IDEA_BIN" new "a title" --size M --tags cli,docs
-  run "$IDEA_BIN" list
-  run "$IDEA_BIN" pick 7 --yes
-  run "$IDEA_BIN" drop 7
-  run "$IDEA_BIN" done 7
-  run "$IDEA_BIN" abandon 7
-  run "$IDEA_BIN" reopen 7
+  run "$IDEAS_BIN" new "a title" --size M --tags cli,docs
+  run "$IDEAS_BIN" list
+  run "$IDEAS_BIN" pick 7 --yes
+  run "$IDEAS_BIN" drop 7
+  run "$IDEAS_BIN" done 7
+  run "$IDEAS_BIN" abandon 7
+  run "$IDEAS_BIN" reopen 7
 
   [ "$(count_calls glab)" -gt 15 ]
   assert_repo_pinned glab
 }
 
-# --- idea new --------------------------------------------------------------
+# --- ideas new -------------------------------------------------------------
 
 @test "new creates the issue on github with the given title" {
-  run "$IDEA_BIN" new "speed up the dispatcher"
+  run "$IDEAS_BIN" new "speed up the dispatcher"
   [ "$status" -eq 0 ]
   argv_has "issue" gh 2
   argv_has "create" gh 2
@@ -292,7 +292,7 @@ sample_rows() {
 
 @test "new creates the issue on gitlab with the given title" {
   set_origin "https://gitlab.com/owner/repo.git"
-  run "$IDEA_BIN" new "speed up the dispatcher"
+  run "$IDEAS_BIN" new "speed up the dispatcher"
   [ "$status" -eq 0 ]
   argv_has "create" glab 2
   argv_has "--title" glab 2
@@ -301,7 +301,7 @@ sample_rows() {
 }
 
 @test "size and tags become labels on the create call" {
-  run "$IDEA_BIN" new "a title" --size M --tags "cli, perf"
+  run "$IDEAS_BIN" new "a title" --size M --tags "cli, perf"
   [ "$status" -eq 0 ]
   local create
   create="$(calls gh | tail -1)"
@@ -311,14 +311,14 @@ sample_rows() {
 }
 
 @test "size is rejected unless it is S, M or L" {
-  run "$IDEA_BIN" new "a title" --size XL
+  run "$IDEAS_BIN" new "a title" --size XL
   [ "$status" -ne 0 ]
   [[ "$output" == *"XL"* ]]
   [ "$(count_calls gh)" -le 1 ]
 }
 
 @test "every label is created before the issue that applies it" {
-  run "$IDEA_BIN" new "a title" --size L --tags docs
+  run "$IDEAS_BIN" new "a title" --size L --tags docs
   [ "$status" -eq 0 ]
   [[ "$(calls gh | sed -n 2p)" == "label create size:L --repo owner/repo" ]]
   [[ "$(calls gh | sed -n 3p)" == "label create docs --repo owner/repo" ]]
@@ -327,7 +327,7 @@ sample_rows() {
 
 @test "gitlab labels are created by name" {
   set_origin "https://gitlab.com/owner/repo.git"
-  run "$IDEA_BIN" new "a title" --size S
+  run "$IDEAS_BIN" new "a title" --size S
   [ "$status" -eq 0 ]
   [[ "$(calls glab | sed -n 2p)" == "label create --name size:S --repo owner/repo" ]]
 }
@@ -335,7 +335,7 @@ sample_rows() {
 @test "a label that already exists is not a failure" {
   stub_exit gh-label-create 1
   stub_err gh-label-create "HTTP 422: Validation Failed. Name already_exists: must be unique"
-  run "$IDEA_BIN" new "a title" --size M
+  run "$IDEAS_BIN" new "a title" --size M
   [ "$status" -eq 0 ]
   [[ "$(calls gh | tail -1)" == "issue create"* ]]
 }
@@ -344,7 +344,7 @@ sample_rows() {
   set_origin "https://gitlab.com/owner/repo.git"
   stub_exit glab-label-create 1
   stub_err glab-label-create "POST .../labels: 409 {message: Label already exists}"
-  run "$IDEA_BIN" new "a title" --size M
+  run "$IDEAS_BIN" new "a title" --size M
   [ "$status" -eq 0 ]
   [[ "$(calls glab | tail -1)" == "issue create"* ]]
 }
@@ -352,25 +352,25 @@ sample_rows() {
 @test "a label failing for any other reason stops before creating the issue" {
   stub_exit gh-label-create 1
   stub_err gh-label-create "HTTP 403: Resource not accessible by personal access token"
-  run "$IDEA_BIN" new "a title" --size M
+  run "$IDEAS_BIN" new "a title" --size M
   [ "$status" -ne 0 ]
   [[ "$output" == *"403"* ]]
   [[ "$(calls gh | tail -1)" != "issue create"* ]]
 }
 
 @test "a piped body reaches gh on stdin through the body-file flag" {
-  : > "${IDEA_STUB_DIR}/gh-issue-create.record-stdin"
-  run bash -c "printf 'first line\nsecond line' | '$IDEA_BIN' new 'a title'"
+  : > "${IDEAS_STUB_DIR}/gh-issue-create.record-stdin"
+  run bash -c "printf 'first line\nsecond line' | '$IDEAS_BIN' new 'a title'"
   [ "$status" -eq 0 ]
   argv_has "--body-file" gh 2
   argv_has "-" gh 2
-  [[ "$(cat "${IDEA_STUB_DIR}/gh-issue-create.stdin")" == "first line
+  [[ "$(cat "${IDEAS_STUB_DIR}/gh-issue-create.stdin")" == "first line
 second line" ]]
 }
 
 @test "a piped body reaches glab as a literal description with yes" {
   set_origin "https://gitlab.com/owner/repo.git"
-  run bash -c "printf 'first line\nsecond line' | '$IDEA_BIN' new 'a title'"
+  run bash -c "printf 'first line\nsecond line' | '$IDEAS_BIN' new 'a title'"
   [ "$status" -eq 0 ]
   argv_has "--description" glab 2
   argv_has 'first line\nsecond line' glab 2
@@ -379,41 +379,41 @@ second line" ]]
 
 @test "a lone dash body gets a trailing space on gitlab" {
   set_origin "https://gitlab.com/owner/repo.git"
-  run bash -c "printf '%s' - | '$IDEA_BIN' new 'a title'"
+  run bash -c "printf '%s' - | '$IDEAS_BIN' new 'a title'"
   [ "$status" -eq 0 ]
   argv_has "- " glab 2
   ! argv_has "-" glab 2
 }
 
 @test "a lone dash body is left alone on github" {
-  : > "${IDEA_STUB_DIR}/gh-issue-create.record-stdin"
-  run bash -c "printf '%s' - | '$IDEA_BIN' new 'a title'"
+  : > "${IDEAS_STUB_DIR}/gh-issue-create.record-stdin"
+  run bash -c "printf '%s' - | '$IDEAS_BIN' new 'a title'"
   [ "$status" -eq 0 ]
-  [[ "$(cat "${IDEA_STUB_DIR}/gh-issue-create.stdin")" == "-" ]]
+  [[ "$(cat "${IDEAS_STUB_DIR}/gh-issue-create.stdin")" == "-" ]]
 }
 
 @test "the body flag supplies the body without reading stdin" {
-  : > "${IDEA_STUB_DIR}/gh-issue-create.record-stdin"
-  run bash -c "printf 'piped and ignored' | '$IDEA_BIN' new 'a title' --body 'from the flag'"
+  : > "${IDEAS_STUB_DIR}/gh-issue-create.record-stdin"
+  run bash -c "printf 'piped and ignored' | '$IDEAS_BIN' new 'a title' --body 'from the flag'"
   [ "$status" -eq 0 ]
-  [[ "$(cat "${IDEA_STUB_DIR}/gh-issue-create.stdin")" == "from the flag" ]]
+  [[ "$(cat "${IDEAS_STUB_DIR}/gh-issue-create.stdin")" == "from the flag" ]]
 }
 
 @test "the body flag supplies the body on gitlab too" {
   set_origin "https://gitlab.com/owner/repo.git"
-  run "$IDEA_BIN" new "a title" --body "from the flag"
+  run "$IDEAS_BIN" new "a title" --body "from the flag"
   [ "$status" -eq 0 ]
   argv_has "--description" glab 2
   argv_has "from the flag" glab 2
   argv_has "--yes" glab 2
 }
 
-# --- idea list -------------------------------------------------------------
+# --- ideas list ------------------------------------------------------------
 
 @test "list asks github for at least 200 issues in every state" {
   stub_out gh-api-user <<< "octocat"
   sample_rows | stub_out gh-issue-list
-  run "$IDEA_BIN" list
+  run "$IDEAS_BIN" list
   [ "$status" -eq 0 ]
   argv_has "--limit" gh 3
   argv_has "200" gh 3
@@ -425,7 +425,7 @@ second line" ]]
   set_origin "https://gitlab.com/owner/repo.git"
   stub_out glab-api-user <<< "octocat"
   sample_rows opened | stub_out glab-issue-list
-  run "$IDEA_BIN" list
+  run "$IDEAS_BIN" list
   [ "$status" -eq 0 ]
   argv_has "--per-page" glab 3
   argv_has "200" glab 3
@@ -437,7 +437,7 @@ second line" ]]
 @test "list derives all five lifecycle states from the fetched fields" {
   stub_out gh-api-user <<< "octocat"
   sample_rows | stub_out gh-issue-list
-  run "$IDEA_BIN" list
+  run "$IDEAS_BIN" list
   [ "$status" -eq 0 ]
   [ "$(col "${lines[0]}" 1)" = "#5" ]
   [ "$(col "${lines[0]}" 2)" = "open" ]
@@ -451,7 +451,7 @@ second line" ]]
   set_origin "https://gitlab.com/owner/repo.git"
   stub_out glab-api-user <<< "octocat"
   sample_rows opened | stub_out glab-issue-list
-  run "$IDEA_BIN" list
+  run "$IDEAS_BIN" list
   [ "$status" -eq 0 ]
   [ "$(col "${lines[0]}" 2)" = "open" ]
   [ "$(col "${lines[1]}" 2)" = "in-progress" ]
@@ -461,7 +461,7 @@ second line" ]]
 @test "a closed issue carrying the abandoned label never reads as done" {
   stub_out gh-api-user <<< "octocat"
   { row 9 closed "" "abandoned,size:M" "both closed and abandoned"; } | stub_out gh-issue-list
-  run "$IDEA_BIN" list
+  run "$IDEAS_BIN" list
   [ "$status" -eq 0 ]
   [ "$(col "${lines[0]}" 2)" = "abandoned" ]
 }
@@ -469,7 +469,7 @@ second line" ]]
 @test "each line carries number, state, size, tags and title" {
   stub_out gh-api-user <<< "octocat"
   { row 4 open "octocat" "size:M,cli,perf" "mine in progress"; } | stub_out gh-issue-list
-  run "$IDEA_BIN" list
+  run "$IDEAS_BIN" list
   [ "$status" -eq 0 ]
   [ "$(col "${lines[0]}" 1)" = "#4" ]
   [ "$(col "${lines[0]}" 2)" = "in-progress" ]
@@ -481,7 +481,7 @@ second line" ]]
 @test "an issue with no size or tags still shows every column" {
   stub_out gh-api-user <<< "octocat"
   { row 4 open "" "" "bare idea"; } | stub_out gh-issue-list
-  run "$IDEA_BIN" list
+  run "$IDEAS_BIN" list
   [ "$status" -eq 0 ]
   [ "$(col "${lines[0]}" 3)" = "-" ]
   [ "$(col "${lines[0]}" 4)" = "-" ]
@@ -490,7 +490,7 @@ second line" ]]
 @test "list orders newest first" {
   stub_out gh-api-user <<< "octocat"
   sample_rows | stub_out gh-issue-list
-  run "$IDEA_BIN" list
+  run "$IDEAS_BIN" list
   [ "$status" -eq 0 ]
   [ "$(col "${lines[0]}" 1)" = "#5" ]
   [ "$(col "${lines[1]}" 1)" = "#4" ]
@@ -502,7 +502,7 @@ second line" ]]
 @test "the status filter selects on the derived state, not a provider filter" {
   stub_out gh-api-user <<< "octocat"
   sample_rows | stub_out gh-issue-list
-  run "$IDEA_BIN" list --status open
+  run "$IDEAS_BIN" list --status open
   [ "$status" -eq 0 ]
   [ "${#lines[@]}" -eq 1 ]
   [ "$(col "${lines[0]}" 1)" = "#5" ]
@@ -514,7 +514,7 @@ second line" ]]
 @test "the tag filter selects on a plain label" {
   stub_out gh-api-user <<< "octocat"
   sample_rows | stub_out gh-issue-list
-  run "$IDEA_BIN" list --tag infra
+  run "$IDEAS_BIN" list --tag infra
   [ "$status" -eq 0 ]
   [ "${#lines[@]}" -eq 1 ]
   [ "$(col "${lines[0]}" 1)" = "#5" ]
@@ -524,7 +524,7 @@ second line" ]]
 @test "the size filter selects on the size label" {
   stub_out gh-api-user <<< "octocat"
   sample_rows | stub_out gh-issue-list
-  run "$IDEA_BIN" list --size S
+  run "$IDEAS_BIN" list --size S
   [ "$status" -eq 0 ]
   [ "${#lines[@]}" -eq 2 ]
   [ "$(col "${lines[0]}" 1)" = "#5" ]
@@ -534,7 +534,7 @@ second line" ]]
 @test "filters given together must all match" {
   stub_out gh-api-user <<< "octocat"
   sample_rows | stub_out gh-issue-list
-  run "$IDEA_BIN" list --size S --status open
+  run "$IDEAS_BIN" list --size S --status open
   [ "$status" -eq 0 ]
   [ "${#lines[@]}" -eq 1 ]
   [ "$(col "${lines[0]}" 1)" = "#5" ]
@@ -544,7 +544,7 @@ second line" ]]
   stub_out gh-api-user <<< "octocat"
   { row 7 open "" "size:M,cli,perf" "both tags"; row 8 open "" "size:M,cli" "one tag"; } |
     stub_out gh-issue-list
-  run "$IDEA_BIN" list --tag cli --tag perf
+  run "$IDEAS_BIN" list --tag cli --tag perf
   [ "$status" -eq 0 ]
   [ "${#lines[@]}" -eq 1 ]
   [ "$(col "${lines[0]}" 1)" = "#7" ]
@@ -552,7 +552,7 @@ second line" ]]
 
 @test "an unknown status is rejected" {
   stub_out gh-api-user <<< "octocat"
-  run "$IDEA_BIN" list --status nonsense
+  run "$IDEAS_BIN" list --status nonsense
   [ "$status" -ne 0 ]
   [[ "$output" == *"nonsense"* ]]
 }
@@ -560,7 +560,7 @@ second line" ]]
 @test "the json flag emits the same fields as the printed line" {
   stub_out gh-api-user <<< "octocat"
   { row 4 open "octocat" "size:M,cli,perf" 'mine "in" progress'; } | stub_out gh-issue-list
-  run "$IDEA_BIN" list --json
+  run "$IDEAS_BIN" list --json
   [ "$status" -eq 0 ]
   [[ "$output" == *'"number": 4'* ]]
   [[ "$output" == *'"state": "in-progress"'* ]]
@@ -572,7 +572,7 @@ second line" ]]
 @test "the json flag emits null size and an empty tag list when there are none" {
   stub_out gh-api-user <<< "octocat"
   { row 4 open "" "" "bare idea"; } | stub_out gh-issue-list
-  run "$IDEA_BIN" list --json
+  run "$IDEAS_BIN" list --json
   [ "$status" -eq 0 ]
   [[ "$output" == *'"size": null'* ]]
   [[ "$output" == *'"tags": []'* ]]
@@ -581,7 +581,7 @@ second line" ]]
 @test "the json flag emits an empty array when nothing matches" {
   stub_out gh-api-user <<< "octocat"
   sample_rows | stub_out gh-issue-list
-  run "$IDEA_BIN" list --json --tag nothing-has-this
+  run "$IDEAS_BIN" list --json --tag nothing-has-this
   [ "$status" -eq 0 ]
   [ "$output" = "[]" ]
 }
@@ -589,7 +589,7 @@ second line" ]]
 @test "the login lookup asks the provider for the current user" {
   stub_out gh-api-user <<< "octocat"
   sample_rows | stub_out gh-issue-list
-  run "$IDEA_BIN" list
+  run "$IDEAS_BIN" list
   [ "$status" -eq 0 ]
   [[ "$(calls gh | sed -n 2p)" == "api user --jq .login" ]]
 }
@@ -598,27 +598,27 @@ second line" ]]
   set_origin "https://gitlab.com/owner/repo.git"
   stub_out glab-api-user <<< "octocat"
   sample_rows opened | stub_out glab-issue-list
-  run "$IDEA_BIN" list
+  run "$IDEAS_BIN" list
   [ "$status" -eq 0 ]
   [[ "$(calls glab | sed -n 2p)" == "api user --jq .username" ]]
 }
 
-# --- idea done -------------------------------------------------------------
+# --- ideas done ------------------------------------------------------------
 
 @test "done closes the issue on github with an explicit repo" {
-  run "$IDEA_BIN" done 7
+  run "$IDEAS_BIN" done 7
   [ "$status" -eq 0 ]
   [[ "$(calls gh | tail -1)" == "issue close 7 --repo owner/repo" ]]
 }
 
 @test "done closes the issue on gitlab with an explicit repo" {
   set_origin "https://gitlab.com/owner/repo.git"
-  run "$IDEA_BIN" done 7
+  run "$IDEAS_BIN" done 7
   [ "$status" -eq 0 ]
   [[ "$(calls glab | tail -1)" == "issue close 7 --repo owner/repo" ]]
 }
 
-# --- idea pick -------------------------------------------------------------
+# --- ideas pick ------------------------------------------------------------
 
 # An issue as `pick` reads it: its metadata, then its body, from the two reads
 # behind the detail view.
@@ -633,7 +633,7 @@ stub_issue() {
   stub_out gh-api-user <<< "octocat"
   stub_issue 7 open "" "size:M,cli" "speed up the dispatcher" "the whole body
 across two lines"
-  run bash -c "printf 'n\n' | '$IDEA_BIN' pick 7"
+  run bash -c "printf 'n\n' | '$IDEAS_BIN' pick 7"
   [ "$status" -eq 0 ]
   [[ "$output" == *"the whole body"* ]]
   [[ "$output" == *"across two lines"* ]]
@@ -644,7 +644,7 @@ across two lines"
 @test "pick reads the assignees before it offers the prompt" {
   stub_out gh-api-user <<< "octocat"
   stub_issue 7 open "someone-else" "size:M" "already taken" "a body"
-  run bash -c "printf 'n\n' | '$IDEA_BIN' pick 7"
+  run bash -c "printf 'n\n' | '$IDEAS_BIN' pick 7"
   [ "$status" -eq 0 ]
   [[ "$(calls gh | sed -n 3p)" == "issue view 7 --repo owner/repo"* ]]
   [[ "$(calls gh)" != *"--add-assignee"* ]]
@@ -653,7 +653,7 @@ across two lines"
 @test "the prompt names an assignee who is someone else" {
   stub_out gh-api-user <<< "octocat"
   stub_issue 7 open "someone-else" "size:M" "already taken" "a body"
-  run bash -c "printf 'n\n' | '$IDEA_BIN' pick 7"
+  run bash -c "printf 'n\n' | '$IDEAS_BIN' pick 7"
   [ "$status" -eq 0 ]
   [[ "$output" == *"someone-else"* ]]
 }
@@ -661,7 +661,7 @@ across two lines"
 @test "declining the prompt assigns nothing" {
   stub_out gh-api-user <<< "octocat"
   stub_issue 7 open "" "size:M" "free idea" "a body"
-  run bash -c "printf 'n\n' | '$IDEA_BIN' pick 7"
+  run bash -c "printf 'n\n' | '$IDEAS_BIN' pick 7"
   [ "$status" -eq 0 ]
   [[ "$(calls gh)" != *"issue edit"* ]]
 }
@@ -669,7 +669,7 @@ across two lines"
 @test "confirming the prompt adds the current user without displacing anyone" {
   stub_out gh-api-user <<< "octocat"
   stub_issue 7 open "someone-else" "size:M" "already taken" "a body"
-  run bash -c "printf 'y\n' | '$IDEA_BIN' pick 7"
+  run bash -c "printf 'y\n' | '$IDEAS_BIN' pick 7"
   [ "$status" -eq 0 ]
   [[ "$(calls gh | tail -1)" == "issue edit 7 --repo owner/repo --add-assignee octocat" ]]
 }
@@ -678,7 +678,7 @@ across two lines"
   set_origin "https://gitlab.com/owner/repo.git"
   stub_out glab-api-user <<< "octocat"
   stub_issue 7 opened "someone-else" "size:M" "already taken" "a body" glab
-  run bash -c "printf 'y\n' | '$IDEA_BIN' pick 7"
+  run bash -c "printf 'y\n' | '$IDEAS_BIN' pick 7"
   [ "$status" -eq 0 ]
   [[ "$(calls glab | tail -1)" == "issue update 7 --repo owner/repo --assignee=+octocat" ]]
 }
@@ -686,7 +686,7 @@ across two lines"
 @test "yes with an issue number skips the prompt and starts anyway" {
   stub_out gh-api-user <<< "octocat"
   stub_issue 7 open "" "size:M" "free idea" "a body"
-  run "$IDEA_BIN" pick 7 --yes
+  run "$IDEAS_BIN" pick 7 --yes
   [ "$status" -eq 0 ]
   [[ "$output" != *"[y/N]"* ]]
   [[ "$(calls gh | tail -1)" == "issue edit 7 --repo owner/repo --add-assignee octocat" ]]
@@ -695,7 +695,7 @@ across two lines"
 @test "the body is shown before the issue is claimed even with yes" {
   stub_out gh-api-user <<< "octocat"
   stub_issue 7 open "" "size:M" "free idea" "third-party body text"
-  run "$IDEA_BIN" pick 7 --yes
+  run "$IDEAS_BIN" pick 7 --yes
   [ "$status" -eq 0 ]
   [[ "$output" == *"third-party body text"* ]]
   [[ "$(calls gh | tail -1)" == *"--add-assignee"* ]]
@@ -704,7 +704,7 @@ across two lines"
 @test "a confirmed start points at a Claude Code session" {
   stub_out gh-api-user <<< "octocat"
   stub_issue 7 open "" "size:M" "free idea" "a body"
-  run "$IDEA_BIN" pick 7 --yes
+  run "$IDEAS_BIN" pick 7 --yes
   [ "$status" -eq 0 ]
   [[ "$output" == *"Claude Code"* ]]
   [[ "$output" == *"7"* ]]
@@ -713,7 +713,7 @@ across two lines"
 @test "the skill wrapper suppresses the pointer it does not need" {
   stub_out gh-api-user <<< "octocat"
   stub_issue 7 open "" "size:M" "free idea" "a body"
-  run env IDEA_FROM_SKILL=1 "$IDEA_BIN" pick 7 --yes
+  run env IDEAS_FROM_SKILL=1 "$IDEAS_BIN" pick 7 --yes
   [ "$status" -eq 0 ]
   [[ "$output" != *"Claude Code"* ]]
   [[ "$(calls gh | tail -1)" == *"--add-assignee"* ]]
@@ -723,7 +723,7 @@ across two lines"
   stub_out gh-api-user <<< "octocat"
   sample_rows | stub_out gh-issue-list
   stub_issue 5 open "" "size:S,infra" "nobody has this one" "body of five"
-  run bash -c "printf '1\nn\n' | PATH='${IDEA_STUB_BIN}:/usr/bin:/bin' '$IDEA_BIN' pick --status open"
+  run bash -c "printf '1\nn\n' | PATH='${IDEAS_STUB_BIN}:/usr/bin:/bin' '$IDEAS_BIN' pick --status open"
   [ "$status" -eq 0 ]
   [[ "$output" == *"nobody has this one"* ]]
   [[ "$output" == *"body of five"* ]]
@@ -731,14 +731,14 @@ across two lines"
 }
 
 @test "pick refuses a non-numeric reference before any provider call" {
-  run "$IDEA_BIN" pick "https://github.com/other/repo/issues/9"
+  run "$IDEAS_BIN" pick "https://github.com/other/repo/issues/9"
   [ "$status" -ne 0 ]
   [[ "$output" == *"issue number"* ]]
   no_provider_calls
 }
 
 @test "pick refuses a non-numeric reference given after a filter" {
-  run "$IDEA_BIN" pick --status open nine
+  run "$IDEAS_BIN" pick --status open nine
   [ "$status" -ne 0 ]
   [[ "$output" == *"issue number"* ]]
   no_provider_calls
@@ -749,8 +749,8 @@ across two lines"
 @test "a non-numeric issue reference is refused before any provider call" {
   local cmd
   for cmd in done abandon reopen drop; do
-    : > "$IDEA_STUB_LOG"
-    run "$IDEA_BIN" "$cmd" "https://github.com/other/repo/issues/9"
+    : > "$IDEAS_STUB_LOG"
+    run "$IDEAS_BIN" "$cmd" "https://github.com/other/repo/issues/9"
     [ "$status" -ne 0 ]
     [[ "$output" == *"issue number"* ]]
     no_provider_calls
@@ -758,16 +758,16 @@ across two lines"
 }
 
 @test "a missing issue reference is refused before any provider call" {
-  run "$IDEA_BIN" done
+  run "$IDEAS_BIN" done
   [ "$status" -ne 0 ]
   no_provider_calls
 }
 
-# --- idea drop -------------------------------------------------------------
+# --- ideas drop ------------------------------------------------------------
 
 @test "drop removes only the current user on github" {
   stub_out gh-api-user <<< "octocat"
-  run "$IDEA_BIN" drop 7
+  run "$IDEAS_BIN" drop 7
   [ "$status" -eq 0 ]
   [[ "$(calls gh | tail -1)" == "issue edit 7 --repo owner/repo --remove-assignee octocat" ]]
 }
@@ -775,16 +775,16 @@ across two lines"
 @test "drop removes only the current user on gitlab, never every assignee" {
   set_origin "https://gitlab.com/owner/repo.git"
   stub_out glab-api-user <<< "octocat"
-  run "$IDEA_BIN" drop 7
+  run "$IDEAS_BIN" drop 7
   [ "$status" -eq 0 ]
   [[ "$(calls glab | tail -1)" == "issue update 7 --repo owner/repo --assignee=-octocat" ]]
   ! argv_has "--unassign" glab 3
 }
 
-# --- idea abandon ----------------------------------------------------------
+# --- ideas abandon ---------------------------------------------------------
 
 @test "abandon creates the label, applies it, then closes" {
-  run "$IDEA_BIN" abandon 7
+  run "$IDEAS_BIN" abandon 7
   [ "$status" -eq 0 ]
   [[ "$(calls gh | sed -n 2p)" == "label create abandoned --repo owner/repo" ]]
   [[ "$(calls gh | sed -n 3p)" == "issue edit 7 --repo owner/repo --add-label abandoned" ]]
@@ -793,19 +793,19 @@ across two lines"
 
 @test "abandon creates the label, applies it, then closes on gitlab" {
   set_origin "https://gitlab.com/owner/repo.git"
-  run "$IDEA_BIN" abandon 7
+  run "$IDEAS_BIN" abandon 7
   [ "$status" -eq 0 ]
   [[ "$(calls glab | sed -n 2p)" == "label create --name abandoned --repo owner/repo" ]]
   [[ "$(calls glab | sed -n 3p)" == "issue update 7 --repo owner/repo --label abandoned" ]]
   [[ "$(calls glab | sed -n 4p)" == "issue close 7 --repo owner/repo" ]]
 }
 
-# --- idea reopen -----------------------------------------------------------
+# --- ideas reopen ----------------------------------------------------------
 
 @test "reopen reopens, then drops the abandoned label and the current user" {
   stub_out gh-api-user <<< "octocat"
   row 7 closed "octocat" "abandoned,size:M" "given up on" | stub_out gh-issue-view
-  run "$IDEA_BIN" reopen 7
+  run "$IDEAS_BIN" reopen 7
   [ "$status" -eq 0 ]
   [[ "$(calls gh | sed -n 3p)" == "issue view 7 --repo owner/repo"* ]]
   [[ "$(calls gh | sed -n 4p)" == "issue reopen 7 --repo owner/repo" ]]
@@ -815,7 +815,7 @@ across two lines"
 @test "reopen leaves an assignment it did not make alone" {
   stub_out gh-api-user <<< "octocat"
   row 7 closed "someone-else" "abandoned" "given up on" | stub_out gh-issue-view
-  run "$IDEA_BIN" reopen 7
+  run "$IDEAS_BIN" reopen 7
   [ "$status" -eq 0 ]
   [[ "$(calls gh | tail -1)" == "issue edit 7 --repo owner/repo --remove-label abandoned" ]]
   ! argv_has "someone-else" gh 5
@@ -824,7 +824,7 @@ across two lines"
 @test "reopen makes no edit call when there is nothing to remove" {
   stub_out gh-api-user <<< "octocat"
   row 7 closed "" "size:M" "finished long ago" | stub_out gh-issue-view
-  run "$IDEA_BIN" reopen 7
+  run "$IDEAS_BIN" reopen 7
   [ "$status" -eq 0 ]
   [[ "$(calls gh | tail -1)" == "issue reopen 7 --repo owner/repo" ]]
 }
@@ -833,7 +833,7 @@ across two lines"
   set_origin "https://gitlab.com/owner/repo.git"
   stub_out glab-api-user <<< "octocat"
   row 7 closed "octocat" "abandoned" "given up on" | stub_out glab-issue-view
-  run "$IDEA_BIN" reopen 7
+  run "$IDEAS_BIN" reopen 7
   [ "$status" -eq 0 ]
   [[ "$(calls glab | sed -n 4p)" == "issue reopen 7 --repo owner/repo" ]]
   [[ "$(calls glab | sed -n 5p)" == "issue update 7 --repo owner/repo --assignee=-octocat --unlabel abandoned" ]]
