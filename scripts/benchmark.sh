@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Benchmark script for measuring zsh startup time
 # Usage: ./scripts/benchmark.sh [--save]
@@ -77,7 +77,7 @@ if [[ -f "$BENCHMARK_FILE" ]]; then
   else
     last_median=$(grep -A 10 "^## Local Benchmarks" "$BENCHMARK_FILE" | grep -m1 -oE 'Median \| [0-9]+\.[0-9]+s' | grep -oE '[0-9]+\.[0-9]+s' | tr -d 's')
   fi
-  
+
   if [[ ! -z "$last_median" ]]; then
     diff=$(echo "scale=3; $last_median - $median" | bc)
     if (( $(echo "$diff > 0" | bc -l) )); then
@@ -110,19 +110,19 @@ fi
 if [[ "$SAVE_RESULTS" == "true" ]]; then
   echo
   echo "💾 Saving results to $BENCHMARK_FILE"
-  
+
   # Get the current date
   current_date=$(date +%Y-%m-%d)
-  
+
   # Get description
   if [[ "$CI" == "true" ]]; then
     # Get PR number from GitHub environment
     PR_NUMBER=${PR_NUMBER:-"N/A"}
     description=${PR_DESCRIPTION:-"CI Run"}
     echo "Using PR #${PR_NUMBER} with description: ${description}"
-    
+
     entry="| ${current_date} | #${PR_NUMBER} | ${description} | ${median}s | ${average}s |"
-    
+
     # Check if an entry for this PR already exists
     if grep -q "#${PR_NUMBER}" "$BENCHMARK_FILE"; then
       echo "Updating existing entry for PR #${PR_NUMBER}"
@@ -138,7 +138,7 @@ if [[ "$SAVE_RESULTS" == "true" ]]; then
       # Find the CI section line number
       ci_line=$(grep -n "^## CI Benchmarks" "$BENCHMARK_FILE" | cut -d: -f1)
       header_line=$((ci_line + 3))  # Headers are 3 lines after section title
-      
+
       # Insert after header line
       head -n $header_line "$BENCHMARK_FILE" > "$BENCHMARK_FILE.tmp"
       echo "$entry" >> "$BENCHMARK_FILE.tmp"
@@ -148,19 +148,19 @@ if [[ "$SAVE_RESULTS" == "true" ]]; then
   else
     read -p "Enter a description for this benchmark: " description
     entry="| ${current_date} | ${description} | ${median}s | ${average}s |"
-    
+
     # Find the Local section line number
     local_line=$(grep -n "^## Local Benchmarks" "$BENCHMARK_FILE" | cut -d: -f1)
     header_line=$((local_line + 3))  # Headers are 3 lines after section title
-    
+
     # Insert after header line
     head -n $header_line "$BENCHMARK_FILE" > "$BENCHMARK_FILE.tmp"
     echo "$entry" >> "$BENCHMARK_FILE.tmp"
     tail -n +$((header_line + 1)) "$BENCHMARK_FILE" >> "$BENCHMARK_FILE.tmp"
     mv "$BENCHMARK_FILE.tmp" "$BENCHMARK_FILE"
   fi
-  
+
   echo "Results saved! ✓"
 fi
 
-exit 0 
+exit 0
