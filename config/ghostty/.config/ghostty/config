@@ -42,8 +42,6 @@ copy-on-select = true
 shell-integration = detect
 
 # Keybindings for convenient navigation
-keybind = cmd+t=new_tab
-keybind = cmd+w=close_surface
 keybind = cmd+r=reload_config
 keybind = cmd+i=inspector:toggle
 
@@ -51,3 +49,7 @@ keybind = cmd+i=inspector:toggle
 keybind = ctrl+tab=next_tab
 keybind = ctrl+shift+tab=previous_tab
 keybind = shift+enter=text:\n
+
+# Quick Terminal Configurations
+keybind = global:ctrl+]=toggle_quick_terminal
+quick-terminal-space-behavior = move
