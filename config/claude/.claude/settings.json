@@ -51,15 +51,9 @@
     ]
   },
   "enabledPlugins": {
-    "rust-analyzer-lsp@claude-plugins-official": true,
-    "skill-creator@claude-plugins-official": true
+    "skill-creator@claude-plugins-official": true,
+    "llm-wiki-skills@llm-wiki": true
   },
-  "effortLevel": "xhigh",
-  "tui": "fullscreen",
-  "skipWorkflowUsageWarning": true,
-  "theme": "auto",
-  "switchModelsOnFlag": false,
-  "agentPushNotifEnabled": true,
   "extraKnownMarketplaces": {
     "llm-wiki": {
       "source": {
@@ -67,5 +61,11 @@
         "url": "https://gitlab.com/andkir/llm-wiki.git"
       }
     }
-  }
+  },
+  "effortLevel": "xhigh",
+  "tui": "fullscreen",
+  "skipWorkflowUsageWarning": true,
+  "theme": "auto",
+  "switchModelsOnFlag": false,
+  "agentPushNotifEnabled": true
 }
