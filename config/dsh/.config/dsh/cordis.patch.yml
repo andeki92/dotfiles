@@ -1,0 +1,30 @@
+# Home-level patch layer — applied after every profile's own cordis.patch.yml,
+# so this overrides regardless of active profile (per profile contract:
+# packages/boot/app-boot/README.md#profiles).
+#
+# NOTE: the `web` bundle disables the base `skill-filesystem` row and gives
+# each agent preset its own instead (packages/bundle/web-app/cordis.patch.yml),
+# so under `--profile web` this patch is a no-op — customSkillDirs would need
+# to be set on the active preset's own skill-filesystem row instead. It does
+# take effect under `--profile headless` and any profile that keeps the base
+# row enabled.
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+  config:
+    customSkillDirs:
+      - !!js process.env.HOME + '/.claude/skills'
+
+#
+# Local DDGS search bridge (applies to every profile): route the model-facing
+# web_search tool through a local DuckDuckGo provider instead of the DeepSeek
+# search API. The provider is registered by the row below; the plugin and its
+# venv live at ~/.config/dsh/profiles/web/plugins/dsh-web-search-ddgs (the
+# absolute file:// name resolves from any profile directory). Remove these
+# two entries to revert to `deepseek-official`.
+- id: web
+  config:
+    searchProvider: ddgs-local
+
+- insert:
+    - id: web-search-ddgs
+      name: 'file:///Users/akle/.config/dsh/profiles/web/plugins/dsh-web-search-ddgs/index.js'

@@ -1,0 +1,17 @@
+llm-pi-ai:
+  providers:
+    omlx:
+      displayName: oMLX (local)
+      apiKeyEnv: OMLX_API_KEY
+      api: openai-completions
+      baseURL: http://127.0.0.1:8000/v1
+      models:
+        - id: Jundot/Qwen3.8-27B-oQ4e-mtp
+    kimi-coding:
+      apiKeyEnv: KIMI_CODING_API_KEY
+ui-onboarding:
+  welcomeNoticeVersion: 2026-08-13.1
+agent-default-model:
+  provider: deepseek-official
+  model: deepseek-v4-pro
+  reasoningEffort: high

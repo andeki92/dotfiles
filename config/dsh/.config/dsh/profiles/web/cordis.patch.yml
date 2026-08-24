@@ -1,0 +1,8 @@
+# Your patch layer for this dsh profile, applied after every bundle layer:
+# a top-level YAML array of loader patch entries (id-targeted config
+# overrides, disables, and insert lists; `!!js` expressions allowed).
+#
+# NOTE: the local DDGS search bridge (searchProvider: ddgs-local + the
+# web-search-ddgs provider row) lives in the HOME-level patch
+# (~/.config/dsh/cordis.patch.yml) so it applies to every profile, not just web.
+[]

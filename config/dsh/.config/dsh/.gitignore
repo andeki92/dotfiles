@@ -1,0 +1,10 @@
+# Managed credential store — real secrets, never tracked
+.credentials.yaml
+
+# Machine-local env layer
+.env
+
+# Session logs and other generated runtime state
+sessions/
+storages/
+.anonymous-user-id
