@@ -50,3 +50,8 @@ crust = "#181926"
 [kubernetes]
 disabled = false
 symbol = "󱃾 "
+
+[custom.updates]
+command = "cat ~/.local/state/drift/pending 2>/dev/null"
+when = "test -s ~/.local/state/drift/pending"
+format = "[⬆ $output ](bold yellow)"
