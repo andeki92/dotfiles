@@ -122,7 +122,9 @@ ideas::ensure_login() {
   if [[ "$IDEAS_PROVIDER" == "github" ]]; then
     IDEAS_LOGIN=$("$IDEAS_CLI" api user --jq '.login')
   else
-    IDEAS_LOGIN=$("$IDEAS_CLI" api user --jq '.username')
+    # glab dropped --jq from `glab api` itself (still on issue view/list), so
+    # this one goes through system jq instead.
+    IDEAS_LOGIN=$("$IDEAS_CLI" api user --output json | jq -r '.username')
   fi
   [[ -n "$IDEAS_LOGIN" ]] ||
     ideas::die "could not read your ${IDEAS_PROVIDER} login from '${IDEAS_CLI} api user'"
