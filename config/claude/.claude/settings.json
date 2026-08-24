@@ -52,13 +52,20 @@
   },
   "enabledPlugins": {
     "skill-creator@claude-plugins-official": true,
-    "llm-wiki-skills@llm-wiki": true
+    "llm-wiki-skills@llm-wiki": true,
+    "akle-skills@skills": true
   },
   "extraKnownMarketplaces": {
     "llm-wiki": {
       "source": {
         "source": "git",
         "url": "https://gitlab.com/andkir/llm-wiki.git"
+      }
+    },
+    "skills": {
+      "source": {
+        "source": "git",
+        "url": "https://gitlab.com/andkir/skills.git"
       }
     }
   },
