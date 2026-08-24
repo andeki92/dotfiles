@@ -59,5 +59,13 @@
   "skipWorkflowUsageWarning": true,
   "theme": "auto",
   "switchModelsOnFlag": false,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "extraKnownMarketplaces": {
+    "llm-wiki": {
+      "source": {
+        "source": "git",
+        "url": "https://gitlab.com/andkir/llm-wiki.git"
+      }
+    }
+  }
 }
