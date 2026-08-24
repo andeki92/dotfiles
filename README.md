@@ -108,6 +108,8 @@ stow brew git starship zsh mise
 # Link platform-specific git config (one-time per machine)
 ./scripts/post-stow.sh
 
-# Update after changes
-stow -R .
+# Update after changes (never bare `stow -R .` — it symlinks every tool
+# directly into ~/ instead of ~/.config/<tool>, since --dir=./config makes
+# package "." resolve to the whole config/ tree)
+stow -R $(ls config)
 ```

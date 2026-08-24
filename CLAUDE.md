@@ -7,7 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **YOU MUST manage this dotfiles repository using GNU Stow with XDG Base Directory specifications.**
 
 ### YOU MUST:
-- **ALWAYS** use `stow -R .` after making configuration changes
+- **ALWAYS** use `stow -R $(ls config)` after making configuration changes
+  (never bare `stow -R .` — with `.stowrc`'s `--dir=./config`, package name
+  `.` resolves to the whole `config/` tree and symlinks every tool directly
+  into `~/` instead of `~/.config/<tool>`)
 - **ALWAYS** test zsh performance with `./scripts/benchmark.sh` before committing zsh changes
 - **ALWAYS** place new configurations under `config/<tool>/` following XDG spec
 - **ALWAYS** use the exact Homebrew commands specified below for package management
@@ -23,18 +26,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## COMMANDS YOU WILL USE
 
 ```bash
-# Apply all configurations
-stow .
+# Apply all configurations (never bare `stow .` — see note above)
+stow $(ls config)
 ./scripts/post-stow.sh   # link platform-specific git config (one-time per machine)
 
 # Apply specific tool configurations
 stow zsh git brew
 
 # Re-apply after making changes (restow)
-stow -R .
+stow -R $(ls config)
 
 # Remove symlinks (before major changes)
-stow -D .
+stow -D $(ls config)
 
 # Homebrew package management
 brew bundle --global                    # Install all from Brewfile
@@ -114,7 +117,7 @@ git submodule update --init --recursive
 
 ```bash
 # For any config changes
-stow -R .                    # Verify stow works without conflicts
+stow -R $(ls config)         # Verify stow works without conflicts
 
 # For zsh changes (MANDATORY)
 ./scripts/benchmark.sh       # Must not regress >25%

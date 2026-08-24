@@ -11,7 +11,7 @@ PLATFORM_LINK="$GIT_CONFIG_DIR/config-platform"
 LOCAL_DIR="$GIT_CONFIG_DIR/local"
 
 if [[ ! -d "$GIT_CONFIG_DIR" ]]; then
-  echo "$GIT_CONFIG_DIR does not exist — did you run \`stow -R .\` first?" >&2
+  echo "$GIT_CONFIG_DIR does not exist — did you run \`stow -R \$(ls config)\` first?" >&2
   exit 1
 fi
 

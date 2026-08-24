@@ -113,7 +113,7 @@ prompt: |
 
   If you are building inside a git worktree, skip any command that installs or
   symlinks into a location outside this repository — this repo's mandatory
-  `stow -R .` chief among them — and note in your report that the step still
+  `stow -R $(ls config)` chief among them — and note in your report that the step still
   needs to run after the change is merged back into the originating checkout.
 
   When every unit is built and committed, run the project's full suite, linter

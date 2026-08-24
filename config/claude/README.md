@@ -4,7 +4,9 @@ Stowed to `~/.claude/`. Source-of-truth for how Claude Code behaves on this
 machine: global settings, hooks, slash commands, and project guidance.
 
 > Edit the files here, never the symlinks under `~/.claude/`.
-> Re-apply with `stow -R claude` (or `stow -R .`) from the repo root.
+> Re-apply with `stow -R claude` from the repo root (or `stow -R $(ls config)`
+> to restow everything — never bare `stow -R .`, which symlinks every tool
+> directly into `~/` instead of `~/.config/<tool>`).
 
 ```
 config/claude/.claude/
