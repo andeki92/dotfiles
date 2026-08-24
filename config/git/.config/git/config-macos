@@ -1,3 +1,10 @@
 # macOS-specific Git configuration
 [credential]
 helper = osxkeychain
+
+# GitLab uses Git Credential Manager for OAuth browser login instead of
+# osxkeychain-cached PATs. The blank helper clears the inherited osxkeychain
+# entry so only GCM handles gitlab.com.
+[credential "https://gitlab.com"]
+helper =
+helper = manager
