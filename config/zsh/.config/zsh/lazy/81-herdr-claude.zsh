@@ -1,3 +1,10 @@
+# Opt out of headroom's anonymous session-summary upload to Headroom Labs; it
+# is on by default. Local savings tracking (`headroom savings`, the dashboard)
+# is a separate switch and keeps working. Exported at file scope rather than
+# inside claude() so every headroom invocation gets it, and read at process
+# start, so the shared proxy only picks it up the next time it starts.
+export HEADROOM_BEACON=off
+
 # claude() — launch Claude Code through the headroom compression proxy when
 # `headroom` is on PATH, and, inside herdr, put a bare `claude` (no args) in a
 # new, focused herdr tab instead of the pane it was typed in.
