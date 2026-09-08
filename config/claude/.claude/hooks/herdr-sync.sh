@@ -69,13 +69,15 @@ tab_label() {
     | jq -r '.result.tab.label // empty' 2>/dev/null
 }
 
-# Move the Claude pane into a new focused tab of $1, keeping its label — the
-# move usually comes after the first prompt has already named the tab.
+# Move the Claude pane into a new tab of $1, keeping its label — the move
+# usually comes after the first prompt has already named the tab. Never
+# focus: the move happens mid-turn while the user may be typing in another
+# pane, and the session is found again under its workspace when wanted.
 move_pane_to() {
   label="$(tab_label)"
   [ -n "$label" ] || label=claude
   run_bounded herdr pane move "$HERDR_PANE_ID" --new-tab --workspace "$1" \
-    --label "$label" --focus >/dev/null 2>&1
+    --label "$label" --no-focus >/dev/null 2>&1
 }
 
 # Label: first prompt → "claude-<slug>", only while the tab still carries a
@@ -160,7 +162,15 @@ adopt() {
   if [ -z "$target" ]; then
     parent="$(printf '%s' "$listing" | jq -r '.result.source.source_workspace_id // empty')"
     [ -n "$parent" ] || parent="$live_ws"
-    target="$(run_bounded herdr worktree open --workspace "$parent" --path "$cwd" --no-focus 2>/dev/null \
+    # Label as "<repo>/<worktree>": the agent panel lists worktree workspaces
+    # flat, so a bare worktree name doesn't say which repository it came
+    # from. An explicit label also stops herdr's automatic one drifting with
+    # the pane's cwd.
+    repo="$(printf '%s' "$listing" | jq -r '.result.source.repo_name // empty')"
+    wt_label="$(basename "$cwd")"
+    [ -z "$repo" ] || wt_label="$repo/$wt_label"
+    target="$(run_bounded herdr worktree open --workspace "$parent" --path "$cwd" \
+      --label "$wt_label" --no-focus 2>/dev/null \
       | jq -r '.result.workspace.workspace_id // empty' 2>/dev/null)"
   fi
   [ -n "$target" ] || exit 0

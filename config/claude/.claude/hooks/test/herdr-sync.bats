@@ -74,13 +74,13 @@ case "$1 $2" in
     if [ "${FAKE_WT_LINKED:-}" = "true" ]; then
       jq -nc --arg src "$FAKE_SOURCE_WS" --arg wt "$FAKE_WT" \
         --argjson open "${FAKE_WT_OPEN_WS:-null}" \
-        '{result: {source: {source_workspace_id: $src, source_checkout_path: "/repo"},
+        '{result: {source: {source_workspace_id: $src, source_checkout_path: "/repo", repo_name: "repo"},
                    worktrees: [
                      {path: "/repo", is_linked_worktree: false, open_workspace_id: $src},
                      {path: $wt, is_linked_worktree: true, open_workspace_id: $open}]}}'
     else
       jq -nc --arg src "$FAKE_SOURCE_WS" \
-        '{result: {source: {source_workspace_id: $src, source_checkout_path: "/repo"},
+        '{result: {source: {source_workspace_id: $src, source_checkout_path: "/repo", repo_name: "repo"},
                    worktrees: [{path: "/repo", is_linked_worktree: false, open_workspace_id: $src}]}}'
     fi
     ;;
@@ -216,7 +216,7 @@ EOF
   export FAKE_TAB_LABEL=claude-ship-218
   run_hook "$(enter_payload)"
   [ "$status" -eq 0 ]
-  grep -qx "pane move w1:p1 --new-tab --workspace w9 --label claude-ship-218 --focus" "$CALLS"
+  grep -qx "pane move w1:p1 --new-tab --workspace w9 --label claude-ship-218 --no-focus" "$CALLS"
 }
 
 exit_payload() {
@@ -231,7 +231,7 @@ exit_payload() {
   export FAKE_LIVE_WS=w9 FAKE_WT_OPEN_WS='"w9"'
   run_hook "$(exit_payload keep)"
   [ "$status" -eq 0 ]
-  grep -qx "pane move w1:p1 --new-tab --workspace w1 --label claude --focus" "$CALLS"
+  grep -qx "pane move w1:p1 --new-tab --workspace w1 --label claude --no-focus" "$CALLS"
   ! grep -q "workspace close" "$CALLS"
   ! grep -q "worktree open" "$CALLS"
 }
@@ -243,7 +243,7 @@ exit_payload() {
   rm -rf "$WT"
   run_hook "$(exit_payload remove)"
   [ "$status" -eq 0 ]
-  grep -qx "pane move w1:p1 --new-tab --workspace w1 --label claude --focus" "$CALLS"
+  grep -qx "pane move w1:p1 --new-tab --workspace w1 --label claude --no-focus" "$CALLS"
   grep -qx "workspace close w9" "$CALLS"
   # The pane must be out before the workspace goes.
   [ "$(grep -n 'pane move' "$CALLS" | cut -d: -f1)" -lt \
@@ -258,7 +258,7 @@ exit_payload() {
   run_hook "$payload"
   [ "$status" -eq 0 ]
   ! grep -q "worktree open" "$CALLS"
-  grep -qx "pane move w1:p1 --new-tab --workspace w9 --label claude --focus" "$CALLS"
+  grep -qx "pane move w1:p1 --new-tab --workspace w9 --label claude --no-focus" "$CALLS"
 }
 
 @test "already in the target workspace is a no-op" {
@@ -325,13 +325,13 @@ exit_payload() {
   run_hook "$(enter_payload)"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
-  grep -qx "worktree open --workspace w1 --path $WT --no-focus" "$CALLS"
+  grep -qx "worktree open --workspace w1 --path $WT --label repo/feat --no-focus" "$CALLS"
   ! grep -q "workspace close" "$CALLS"
 }
 
 @test "enter opens the worktree workspace and moves the pane into it" {
   run_hook "$(enter_payload)"
   [ "$status" -eq 0 ]
-  grep -qx "worktree open --workspace w1 --path $WT --no-focus" "$CALLS"
-  grep -qx "pane move w1:p1 --new-tab --workspace w9 --label claude --focus" "$CALLS"
+  grep -qx "worktree open --workspace w1 --path $WT --label repo/feat --no-focus" "$CALLS"
+  grep -qx "pane move w1:p1 --new-tab --workspace w9 --label claude --no-focus" "$CALLS"
 }
