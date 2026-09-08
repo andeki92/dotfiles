@@ -38,17 +38,17 @@ update_all() {
 # Check if an update is needed based on timestamp file
 _needs_update() {
   local timestamp_file="$UPDATE_TIMESTAMPS_DIR/$1-update"
-  
+
   # If timestamp doesn't exist, definitely needs update
   if [[ ! -f "$timestamp_file" ]]; then
     return 0  # true in shell logic
   fi
-  
+
   # Check if it's been more than UPDATE_REMINDER_DAYS since last update
   local last_update=$(stat -f "%m" "$timestamp_file")
   local now=$(date +%s)
   local days_since=$(( (now - last_update) / 86400 ))
-  
+
   [[ $days_since -ge $UPDATE_REMINDER_DAYS ]]
 }
 
@@ -57,15 +57,15 @@ _needs_update() {
 # Check for updates needed and notify if so
 check_updates() {
   local updates_needed=()
-  
+
   if _needs_update "brew"; then
     updates_needed+=("Homebrew")
   fi
-  
+
   if _needs_update "mise"; then
     updates_needed+=("mise")
   fi
-  
+
   if (( ${#updates_needed[@]} > 0 )); then
     echo "📦 Updates available for: ${updates_needed[*]}"
     echo "Run 'update_all' to update everything, or:"
@@ -84,4 +84,4 @@ alias updateall="update_all"
 # ==== Auto-check on startup ====
 
 # Run the check deferred so it doesn't slow down startup
-zsh-defer check_updates 
+zsh-defer check_updates

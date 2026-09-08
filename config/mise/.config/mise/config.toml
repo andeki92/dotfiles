@@ -26,6 +26,7 @@ lazygit = "0.64.0"
 lefthook = "2.1.10"
 lua = "5.1.5" # MUST be 5.1.x for lazyvim
 neovim = "0.12.4"
+"npm:@deepseek-ai/dsh" = "0.1.1-rc.2"
 "npm:markdownlint-cli2" = "0.23.2"
 opentofu = "1.12.5"
 # headroom: local LLM compression proxy that `claude()` (zsh lazy tier) wraps
@@ -45,6 +46,8 @@ task = "3.52.0"
 uv = "0.12.1"
 yq = "4.53.3"
 node = "latest"
+"aqua:ast-grep/ast-grep" = "0.45.3"
+"aqua:rust-lang/rust-analyzer" = "2026-08-31"
 
 [settings]
 experimental = true
