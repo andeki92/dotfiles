@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+#
+# agent-skills-syncctl — load/unload/run/status the launchd watcher that
+# keeps ~/.agent/skills in sync with enabled Claude Code plugins.
+#
+# It's an OS-level file watcher (launchd WatchPaths), not a Claude Code
+# hook — nothing here depends on an agent session running.
+#
+# Usage:
+#   ./agent-skills-syncctl install     # write + bootstrap the launchd agent
+#   ./agent-skills-syncctl uninstall   # bootout + remove the launchd agent
+#   ./agent-skills-syncctl status      # show whether it's loaded
+#   ./agent-skills-syncctl run         # trigger a sync right now
+#   ./agent-skills-syncctl logs        # tail its log file
+
+set -euo pipefail
+
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SYNC_SCRIPT="${SYNC_SCRIPT:-$SELF_DIR/sync-agent-skills.sh}"
+
+LABEL="local.agent-skills-sync"
+PLIST_PATH="$HOME/Library/LaunchAgents/${LABEL}.plist"
+LOG_PATH="$HOME/Library/Logs/${LABEL}.log"
+DOMAIN="gui/$(id -u)"
+
+CLAUDE_CACHE="$HOME/.claude/plugins/cache"
+CLAUDE_SETTINGS_USER="$HOME/.claude/settings.json"
+CLAUDE_SETTINGS_LOCAL="$HOME/.claude/settings.local.json"
+
+# launchd does NOT source your shell rc files (no mise activate, no shell
+# functions/aliases). jq resolves via mise shims here; claude may need a
+# pinned path too if it's not a plain PATH binary — see CLAUDE_BIN below and
+# in sync-agent-skills.sh. Find the real claude path with:
+#   (unset -f claude 2>/dev/null; command -v claude)
+LAUNCHD_PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+# Set this if the first `bash` on LAUNCHD_PATH isn't >= 4 (macOS's system
+# /bin/bash is 3.2 and the script needs associative arrays). Leave as "bash"
+# to resolve via LAUNCHD_PATH, or pin an absolute path, e.g.
+# /opt/homebrew/bin/bash.
+BASH_BIN="${BASH_BIN:-bash}"
+
+# Set this if `claude` isn't a plain binary on LAUNCHD_PATH (e.g. it's a
+# shell function in your interactive shell). Passed through to the plist as
+# CLAUDE_BIN, which sync-agent-skills.sh reads. Defaults to the standalone
+# installer's location.
+CLAUDE_BIN="${CLAUDE_BIN:-$HOME/.local/bin/claude}"
+
+usage() {
+  echo "Usage: $(basename "$0") {install|uninstall|status|run|logs}" >&2
+  exit 1
+}
+
+require_sync_script() {
+  [[ -f "$SYNC_SCRIPT" ]] || {
+    echo "agent-skills-syncctl: can't find sync script at $SYNC_SCRIPT" >&2
+    exit 1
+  }
+  chmod +x "$SYNC_SCRIPT"
+}
+
+write_plist() {
+  mkdir -p "$(dirname "$PLIST_PATH")" "$(dirname "$LOG_PATH")"
+  cat > "$PLIST_PATH" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${LABEL}</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/env</string>
+        <string>${BASH_BIN}</string>
+        <string>${SYNC_SCRIPT}</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>${LAUNCHD_PATH}</string>
+        <key>CLAUDE_BIN</key>
+        <string>${CLAUDE_BIN}</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StartInterval</key>
+    <integer>86400</integer>
+
+    <key>WatchPaths</key>
+    <array>
+        <string>${CLAUDE_CACHE}</string>
+        <string>${CLAUDE_SETTINGS_USER}</string>
+        <string>${CLAUDE_SETTINGS_LOCAL}</string>
+    </array>
+
+    <key>StandardOutPath</key>
+    <string>${LOG_PATH}</string>
+
+    <key>StandardErrorPath</key>
+    <string>${LOG_PATH}</string>
+</dict>
+</plist>
+PLIST
+}
+
+cmd_install() {
+  require_sync_script
+  write_plist
+  # bootout first so re-running `install` after an edit cleanly reloads it.
+  launchctl bootout "$DOMAIN/$LABEL" >/dev/null 2>&1 || true
+  launchctl bootstrap "$DOMAIN" "$PLIST_PATH"
+  launchctl enable "$DOMAIN/$LABEL"
+  echo "installed + loaded: $LABEL"
+  echo "watching:"
+  echo "  $CLAUDE_CACHE"
+  echo "  $CLAUDE_SETTINGS_USER"
+  echo "  $CLAUDE_SETTINGS_LOCAL"
+  echo "log: $LOG_PATH"
+}
+
+cmd_uninstall() {
+  launchctl bootout "$DOMAIN/$LABEL" >/dev/null 2>&1 || true
+  rm -f "$PLIST_PATH"
+  echo "unloaded + removed: $LABEL"
+}
+
+cmd_status() {
+  if launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1; then
+    launchctl print "$DOMAIN/$LABEL" | grep -E "state =|path =|next run"
+  else
+    echo "$LABEL is not loaded"
+  fi
+}
+
+cmd_run() {
+  require_sync_script
+  if launchctl kickstart -k "$DOMAIN/$LABEL" 2>/dev/null; then
+    echo "kicked $LABEL via launchd — check: $(basename "$0") logs"
+  else
+    echo "not loaded — running sync script directly instead"
+    bash "$SYNC_SCRIPT"
+  fi
+}
+
+cmd_logs() {
+  touch "$LOG_PATH"
+  tail -f "$LOG_PATH"
+}
+
+case "${1:-}" in
+  install)   cmd_install ;;
+  uninstall) cmd_uninstall ;;
+  status)    cmd_status ;;
+  run)       cmd_run ;;
+  logs)      cmd_logs ;;
+  *)         usage ;;
+esac
