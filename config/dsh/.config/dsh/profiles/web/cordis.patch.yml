@@ -5,4 +5,12 @@
 # NOTE: the local DDGS search bridge (searchProvider: ddgs-local + the
 # web-search-ddgs provider row) lives in the HOME-level patch
 # (~/.config/dsh/cordis.patch.yml) so it applies to every profile, not just web.
-[]
+
+# Host-plane HMR: the web-app bundle ships `hmr` disabled (reload lifecycle
+# untested), this row re-enables it. With it active, editing a loaded
+# plugin's source under this profile dir (e.g. plugins/*/index.js)
+# hot-reloads the module without restarting dsh. `name` must match the
+# bundle row or the patch is skipped.
+- id: hmr
+  name: '@deepseek-ai/cordis-plugin-hmr'
+  disabled: false
