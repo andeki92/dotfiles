@@ -1,9 +1,9 @@
-# Design work
+# ship runs build in a worktree
 
-Before writing code for a new feature, component, or behaviour change — and
-before entering plan mode — use the **`pair-programming`** skill. It is the
-entry point for design work: we settle the constraints together, it writes the
-spec, and it carries that spec through review and implementation.
+Every `ship` run builds in an isolated git worktree. This line is the standing
+instruction `EnterWorktree` needs, so `grill` enters one without asking and
+says so in one line. To keep a particular run in the current checkout, say so
+when starting it.
 
 # Sandboxed environments (cbox)
 
