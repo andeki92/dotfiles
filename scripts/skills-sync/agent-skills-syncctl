@@ -130,7 +130,7 @@ cmd_uninstall() {
 
 cmd_status() {
   if launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1; then
-    launchctl print "$DOMAIN/$LABEL" | grep -E "state =|path =|next run"
+    launchctl print "$DOMAIN/$LABEL" | grep -E "state =|path =|next run" || true
   else
     echo "$LABEL is not loaded"
   fi
