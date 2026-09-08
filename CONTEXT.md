@@ -13,6 +13,7 @@ load-bearing.
 | `cordis` | The plugin/patch loader `dsh` profiles are built from — a profile's `cordis.yml` lists bundles, its `cordis.patch.yml` overrides individual plugin rows. |
 | `dsh` | DeepSeek harness — the AI coding agent configured under `config/dsh/`; profiles (e.g. `web`) compose bundles via `cordis` files. |
 | `eager` / `lazy` | The two zsh load tiers under `config/zsh/.config/zsh/`: `eager/` runs synchronously at startup (numbered `NN-name.zsh`), `lazy/` is deferred with `zsh-defer` until after the prompt draws. |
+| `headroom` | The local LLM compression proxy from headroomlabs-ai (`pipx:headroom-ai` in mise). When it is on PATH the zsh `claude()` wrapper launches Claude Code through `headroom wrap claude`, so every session shares one proxy and its savings show up in `headroom dashboard`. Not the "memory headroom" of the oMLX notes. |
 | `herdr` | "Agent Multiplexer" (Brewfile's term) — a tmux-like terminal multiplexer, prefix `ctrl+a`, for running multiple coding-agent sessions in panes. |
 | `llm-wiki` | `config/llm-wiki/` holds one file — a path pointer to `~/llm-wiki`, the user's personal Obsidian knowledge vault, for tools that need to locate it. |
 | `opencode` | The open-source terminal AI coding agent from opencode.ai, configured under `config/opencode/`. |
