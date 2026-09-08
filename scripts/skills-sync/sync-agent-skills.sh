@@ -3,7 +3,7 @@
 # sync-agent-skills.sh
 #
 # Mirrors the skills/ of every *enabled* Claude Code plugin into
-# ~/.agent/skills as symlinks, so other agent harnesses can use them.
+# ~/.agents/skills as symlinks, so other agent harnesses can use them.
 #
 # - Ownership-tracked: keeps a manifest of what it created, so it only ever
 #   adds/removes entries it owns and never touches anything else living in
