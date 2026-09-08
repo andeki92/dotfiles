@@ -4,9 +4,25 @@
     "allow": [
       "Bash(claude --version)"
     ],
-    "deny": []
+    "deny": [
+      "EnterPlanMode",
+      "ExitPlanMode",
+      "DesignSync",
+      "NotebookEdit",
+      "SendMessage",
+      "PushNotification",
+      "RemoteTrigger",
+      "ReportFindings",
+      "ScheduleWakeup",
+      "AskUserQuestion",
+      "CronCreate",
+      "CronDelete",
+      "CronList"
+    ]
   },
-  "model": "sonnet",
+  "model": "opus[1m]",
+  "disableClaudeAiConnectors": true,
+  "disableBundledSkills": true,
   "hooks": {
     "PreToolUse": [
       {
@@ -60,6 +76,9 @@
       }
     ]
   },
+  "disableRemoteControl": true,
+  "disableWorkflows": true,
+  "disableArtifact": true,
   "enabledPlugins": {
     "skill-creator@claude-plugins-official": true,
     "llm-wiki-skills@llm-wiki": true,
@@ -79,8 +98,16 @@
       }
     }
   },
-  "effortLevel": "xhigh",
+  "feedbackDrafts": "off",
+  "effortLevel": "high",
+  "modelSettings": {
+    "claude-sonnet-5": {
+      "effortLevel": "high"
+    }
+  },
+  "awaySummaryEnabled": false,
   "tui": "fullscreen",
+  "autoMemoryEnabled": false,
   "skipWorkflowUsageWarning": true,
   "theme": "auto",
   "switchModelsOnFlag": false,
