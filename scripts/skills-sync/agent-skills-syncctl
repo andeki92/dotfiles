@@ -142,7 +142,7 @@ cmd_run() {
     echo "kicked $LABEL via launchd — check: $(basename "$0") logs"
   else
     echo "not loaded — running sync script directly instead"
-    bash "$SYNC_SCRIPT"
+    "$BASH_BIN" "$SYNC_SCRIPT"
   fi
 }
 
