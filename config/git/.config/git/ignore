@@ -84,3 +84,9 @@ config-platform
 
 # Never comitt local claude settings
 **/.claude/settings.local.json
+
+# headroom wrap state (see the zsh claude() wrapper) — per-machine tooling
+# state dropped into every project's .claude/, never part of the project
+**/.claude/.headroom_wrap_marker.json
+**/.claude/.headroom_wrap_owners.json
+**/.claude/.headroom_wrap_settings.lock
