@@ -37,6 +37,25 @@
             "command": "\"$HOME/.claude/hooks/herdr-tab-sync.sh\""
           }
         ]
+      },
+      {
+        "matcher": "EnterWorktree|ExitWorktree",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/herdr-worktree-sync.sh\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/herdr-worktree-sync.sh\""
+          }
+        ]
       }
     ],
     "Stop": [

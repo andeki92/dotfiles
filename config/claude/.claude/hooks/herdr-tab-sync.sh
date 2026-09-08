@@ -12,12 +12,18 @@
 # dead zone begins. Either way the result is the label the sidebar and
 # prefix+1..9 switching actually show.
 #
+# The tab to rename is read back from `herdr pane get` on every run rather
+# than from HERDR_TAB_ID: that env var is a launch-time snapshot, and once the
+# pane has been moved to another tab or workspace (herdr-worktree-sync.sh
+# does exactly that) it names a tab that no longer exists. HERDR_PANE_ID is
+# the one id herdr keeps valid as an alias after a move.
+#
 # No-ops silently (exit 0) outside herdr, or when herdr/jq aren't installed —
 # this hook must never block or warn on a machine/session that isn't herdr.
 set -uo pipefail
 
 [ "${HERDR_ENV:-}" = "1" ] || exit 0
-[ -n "${HERDR_PANE_ID:-}" ] && [ -n "${HERDR_TAB_ID:-}" ] || exit 0
+[ -n "${HERDR_PANE_ID:-}" ] || exit 0
 command -v herdr >/dev/null 2>&1 || exit 0
 command -v jq >/dev/null 2>&1 || exit 0
 
@@ -38,11 +44,14 @@ run_bounded() {
 payload="$(cat)"
 event="$(printf '%s' "$payload" | jq -r '.hook_event_name // empty' 2>/dev/null)"
 
+pane="$(run_bounded herdr pane get "$HERDR_PANE_ID" 2>/dev/null)"
+tab_id="$(printf '%s' "$pane" | jq -r '.result.pane.tab_id // empty' 2>/dev/null)"
+[ -n "$tab_id" ] || exit 0
+
 if [ "$event" = "PostToolUse" ]; then
   title="$(printf '%s' "$payload" | jq -r '.tool_input.description // empty' 2>/dev/null)"
 else
-  title="$(run_bounded herdr pane get "$HERDR_PANE_ID" 2>/dev/null \
-    | jq -r '.result.pane.terminal_title_stripped // empty' 2>/dev/null)"
+  title="$(printf '%s' "$pane" | jq -r '.result.pane.terminal_title_stripped // empty' 2>/dev/null)"
 fi
 [ -n "$title" ] || exit 0
 
@@ -52,5 +61,5 @@ slug="${slug:0:24}"
 slug="${slug%-}"
 [ -n "$slug" ] || exit 0
 
-run_bounded herdr tab rename "$HERDR_TAB_ID" "claude-$slug" >/dev/null 2>&1
+run_bounded herdr tab rename "$tab_id" "claude-$slug" >/dev/null 2>&1
 exit 0

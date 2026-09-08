@@ -18,14 +18,17 @@ setup() {
   export CALLS
 
   # A fake `herdr` standing in for the real CLI. `pane get` answers with
-  # $HERDR_FAKE_TITLE baked into terminal_title_stripped; `tab rename` just
-  # logs its argv to $CALLS so tests can assert on the computed label.
+  # $HERDR_FAKE_TITLE baked into terminal_title_stripped and reports the
+  # pane's *live* tab as w1:t7 — deliberately not the w1:t1 that HERDR_TAB_ID
+  # claims, since that env var is a launch-time snapshot that goes stale once
+  # a pane is moved. `tab rename` just logs its argv to $CALLS so tests can
+  # assert on the target tab and the computed label.
   cat >"$FAKE_BIN/herdr" <<'EOF'
 #!/usr/bin/env bash
 case "$1 $2" in
   "pane get")
     jq -nc --arg t "$HERDR_FAKE_TITLE" \
-      '{result: {pane: {terminal_title_stripped: $t}}}'
+      '{result: {pane: {tab_id: "w1:t7", terminal_title_stripped: $t}}}'
     ;;
   "tab rename")
     echo "$*" >>"$CALLS"
@@ -61,14 +64,14 @@ run_hook() {
   export HERDR_FAKE_TITLE="Herdr Claude skill with tab automation"
   run_hook
   [ "$status" -eq 0 ]
-  grep -qx "tab rename w1:t1 claude-herdr-claude-skill-with" "$CALLS"
+  grep -qx "tab rename w1:t7 claude-herdr-claude-skill-with" "$CALLS"
 }
 
 @test "lowercases and collapses punctuation/whitespace runs into single hyphens" {
   export HERDR_FAKE_TITLE="Fix: Auth --- Middleware!!"
   run_hook
   [ "$status" -eq 0 ]
-  grep -qx "tab rename w1:t1 claude-fix-auth-middleware" "$CALLS"
+  grep -qx "tab rename w1:t7 claude-fix-auth-middleware" "$CALLS"
 }
 
 @test "skips the rename when the title is empty" {
@@ -135,14 +138,14 @@ EOF
   ln -sf "$FAKE_BIN/herdr" "$no_timeout_bin/herdr"
   run_hook_with_path "$no_timeout_bin"
   [ "$status" -eq 0 ]
-  grep -qx "tab rename w1:t1 claude-some-title" "$CALLS"
+  grep -qx "tab rename w1:t7 claude-some-title" "$CALLS"
 }
 
 @test "still renames from title on an explicit Stop-shaped payload" {
   export HERDR_FAKE_TITLE="Some title"
   run_hook_with_payload "$FAKE_BIN:$PATH" '{"hook_event_name":"Stop"}'
   [ "$status" -eq 0 ]
-  grep -qx "tab rename w1:t1 claude-some-title" "$CALLS"
+  grep -qx "tab rename w1:t7 claude-some-title" "$CALLS"
 }
 
 @test "renames from a PostToolUse Agent dispatch's description, not the title" {
@@ -150,7 +153,7 @@ EOF
   payload='{"hook_event_name":"PostToolUse","tool_name":"Agent","tool_input":{"description":"Research better tab-sync trigger than Stop hook"}}'
   run_hook_with_payload "$FAKE_BIN:$PATH" "$payload"
   [ "$status" -eq 0 ]
-  grep -qx "tab rename w1:t1 claude-research-better-tab-sync" "$CALLS"
+  grep -qx "tab rename w1:t7 claude-research-better-tab-sync" "$CALLS"
 }
 
 @test "skips the rename when a PostToolUse payload has no description" {
@@ -159,6 +162,31 @@ EOF
   run_hook_with_payload "$FAKE_BIN:$PATH" "$payload"
   [ "$status" -eq 0 ]
   [ ! -s "$CALLS" ]
+}
+
+@test "renames the tab reported by pane get, not HERDR_TAB_ID" {
+  export HERDR_TAB_ID=w1:t1
+  export HERDR_FAKE_TITLE="Some title"
+  run_hook
+  [ "$status" -eq 0 ]
+  grep -qx "tab rename w1:t7 claude-some-title" "$CALLS"
+  ! grep -q "tab rename w1:t1" "$CALLS"
+}
+
+@test "renames without HERDR_TAB_ID in the environment" {
+  unset HERDR_TAB_ID
+  export HERDR_FAKE_TITLE="Some title"
+  run_hook
+  [ "$status" -eq 0 ]
+  grep -qx "tab rename w1:t7 claude-some-title" "$CALLS"
+}
+
+@test "PostToolUse description path also targets the tab reported by pane get" {
+  export HERDR_TAB_ID=w1:t1
+  payload='{"hook_event_name":"PostToolUse","tool_name":"Agent","tool_input":{"description":"Research something"}}'
+  run_hook_with_payload "$FAKE_BIN:$PATH" "$payload"
+  [ "$status" -eq 0 ]
+  grep -qx "tab rename w1:t7 claude-research-something" "$CALLS"
 }
 
 @test "no-ops when jq is not on PATH" {
