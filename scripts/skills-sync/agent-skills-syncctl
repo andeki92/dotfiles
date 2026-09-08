@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # agent-skills-syncctl — load/unload/run/status the launchd watcher that
-# keeps ~/.agent/skills in sync with enabled Claude Code plugins.
+# keeps ~/.agents/skills in sync with enabled Claude Code plugins.
 #
 # It's an OS-level file watcher (launchd WatchPaths), not a Claude Code
 # hook — nothing here depends on an agent session running.
