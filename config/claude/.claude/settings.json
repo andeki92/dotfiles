@@ -30,20 +30,11 @@
         ]
       },
       {
-        "matcher": "Agent|Task",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.claude/hooks/herdr-tab-sync.sh\""
-          }
-        ]
-      },
-      {
         "matcher": "EnterWorktree|ExitWorktree",
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/.claude/hooks/herdr-worktree-sync.sh\""
+            "command": "\"$HOME/.claude/hooks/herdr-sync.sh\""
           }
         ]
       }
@@ -53,17 +44,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/.claude/hooks/herdr-worktree-sync.sh\""
+            "command": "\"$HOME/.claude/hooks/herdr-sync.sh\""
           }
         ]
       }
     ],
-    "Stop": [
+    "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/.claude/hooks/herdr-tab-sync.sh\""
+            "command": "\"$HOME/.claude/hooks/herdr-sync.sh\""
           }
         ]
       }

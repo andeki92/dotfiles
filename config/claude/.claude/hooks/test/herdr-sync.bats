@@ -1,9 +1,10 @@
 #!/usr/bin/env bats
 #
-# Tests for ../herdr-worktree-sync.sh — the hook that mirrors a Claude Code
-# session's move into (or out of) a linked git worktree onto herdr's
-# topology: open the worktree as a child workspace and move the Claude pane
-# into it, or move it back to the parent when the session leaves.
+# Tests for ../herdr-sync.sh — the one Claude Code hook that keeps herdr in
+# step with a session: labels the tab once from the first prompt, and
+# mirrors the session's move into (or out of) a linked git worktree onto
+# herdr's topology — open the worktree as a child workspace and move the
+# Claude pane into it, or move it back to the parent when the session leaves.
 #
 # Run:  bats config/claude/.claude/hooks/test
 # Needs: bats (mise: aqua:bats-core/bats-core), jq.
@@ -11,7 +12,7 @@
 bats_require_minimum_version 1.5.0
 
 setup() {
-  HOOK="${BATS_TEST_DIRNAME}/../herdr-worktree-sync.sh"
+  HOOK="${BATS_TEST_DIRNAME}/../herdr-sync.sh"
   FAKE_BIN="${BATS_TEST_TMPDIR}/bin"
   CALLS="${BATS_TEST_TMPDIR}/herdr-calls"
   QUERIES="${BATS_TEST_TMPDIR}/herdr-queries"
@@ -35,6 +36,7 @@ setup() {
   # asked herdr to do.
   #
   #   FAKE_LIVE_WS    workspace the pane currently sits in (pane get)
+  #   FAKE_TAB_LABEL  label of the pane's live tab w1:t1 (tab get)
   #   FAKE_SOURCE_WS  parent repo workspace (worktree list .source)
   #   FAKE_WT_OPEN_WS open_workspace_id for the linked entry, or "null"
   #   FAKE_WT_LINKED  "true" to list $WT as a linked worktree, else omitted
@@ -47,6 +49,14 @@ case "$1 $2" in
     echo "$*" >>"$QUERIES"
     jq -nc --arg ws "$FAKE_LIVE_WS" \
       '{result: {pane: {pane_id: "w1:p1", workspace_id: $ws, tab_id: "w1:t1"}}}'
+    ;;
+  "tab get")
+    echo "$*" >>"$QUERIES"
+    jq -nc --arg l "$FAKE_TAB_LABEL" \
+      '{result: {tab: {tab_id: "w1:t1", label: $l}}}'
+    ;;
+  "tab rename")
+    echo "$*" >>"$CALLS"
     ;;
   "worktree list")
     echo "$*" >>"$QUERIES"
@@ -94,6 +104,7 @@ EOF
   export HERDR_PANE_ID=w1:p1
   export FAKE_WT="$WT"
   export FAKE_LIVE_WS=w1
+  export FAKE_TAB_LABEL=claude
   export FAKE_SOURCE_WS=w1
   export FAKE_WT_LINKED=true
   export FAKE_WT_OPEN_WS=null
@@ -113,6 +124,99 @@ enter_payload() {
     '{hook_event_name: "PostToolUse", tool_name: "EnterWorktree", cwd: $cwd,
       tool_input: {name: "feat"},
       tool_response: {worktreePath: $cwd, worktreeBranch: "worktree-feat"}}'
+}
+
+prompt_payload() {
+  jq -nc --arg p "$1" --arg cwd "$REPO" \
+    '{hook_event_name: "UserPromptSubmit", cwd: $cwd, prompt: $p}'
+}
+
+@test "first prompt labels a placeholder tab from the prompt" {
+  run_hook "$(prompt_payload 'ship #218')"
+  [ "$status" -eq 0 ]
+  grep -qx "tab rename w1:t1 claude-ship-218" "$CALLS"
+}
+
+@test "slug drops a slash-command prefix and keeps the argument" {
+  run_hook "$(prompt_payload '/akle-skills:ship #218')"
+  [ "$status" -eq 0 ]
+  grep -qx "tab rename w1:t1 claude-ship-218" "$CALLS"
+}
+
+@test "slug stops at the first prose after the references" {
+  run_hook "$(prompt_payload 'ship #123 and then let us discuss bla bla bla')"
+  [ "$status" -eq 0 ]
+  grep -qx "tab rename w1:t1 claude-ship-123" "$CALLS"
+}
+
+@test "slug keeps a whole run of references, connectors included" {
+  run_hook "$(prompt_payload 'ship #123, #213, and #456')"
+  [ "$status" -eq 0 ]
+  grep -qx "tab rename w1:t1 claude-ship-123-213-and-456" "$CALLS"
+}
+
+@test "slug keeps the first four words of prose, capped at 24 chars" {
+  run_hook "$(prompt_payload $'We have our claude custom command to work in herdr - I want you to research\nsecond line ignored')"
+  [ "$status" -eq 0 ]
+  grep -qx "tab rename w1:t1 claude-we-have-our-claude" "$CALLS"
+}
+
+@test "a tab that already has a real label is never renamed" {
+  export FAKE_TAB_LABEL=claude-ship-218
+  run_hook "$(prompt_payload 'now do something else')"
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALLS" ]
+
+  export FAKE_TAB_LABEL=cli
+  run_hook "$(prompt_payload 'ship #218')"
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALLS" ]
+}
+
+@test "a bare herdr default label counts as a placeholder" {
+  export FAKE_TAB_LABEL=3
+  run_hook "$(prompt_payload 'ship #218')"
+  [ "$status" -eq 0 ]
+  grep -qx "tab rename w1:t1 claude-ship-218" "$CALLS"
+}
+
+@test "stop and agent dispatch no longer rename anything" {
+  run_hook '{"hook_event_name":"Stop","cwd":"/x"}'
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALLS" ]
+  run_hook '{"hook_event_name":"PostToolUse","tool_name":"Agent","tool_input":{"description":"Research something"}}'
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALLS" ]
+}
+
+@test "bounds a wedged herdr instead of hanging" {
+  # A fake herdr whose `pane get` sleeps far longer than the hook's 5s
+  # bound. If run_bounded's `timeout 5` didn't fire, this would take 20s+.
+  slow_bin="${BATS_TEST_TMPDIR}/slow-bin"
+  mkdir -p "$slow_bin"
+  cat >"$slow_bin/herdr" <<'EOF'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "pane get") sleep 20 ;;
+  *) echo "$*" >>"$CALLS" ;;
+esac
+EOF
+  chmod +x "$slow_bin/herdr"
+
+  start=$(date +%s)
+  run_hook_with_payload "$slow_bin:$PATH" "$(prompt_payload 'ship #218')"
+  elapsed=$(( $(date +%s) - start ))
+
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALLS" ]
+  [ "$elapsed" -lt 10 ]
+}
+
+@test "the move carries the tab label across" {
+  export FAKE_TAB_LABEL=claude-ship-218
+  run_hook "$(enter_payload)"
+  [ "$status" -eq 0 ]
+  grep -qx "pane move w1:p1 --new-tab --workspace w9 --label claude-ship-218 --focus" "$CALLS"
 }
 
 exit_payload() {
