@@ -38,16 +38,38 @@ claude() {
   fi
 
   local created pane_id
-  created="$(herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$PWD" --label claude --focus 2>/dev/null)"
-  pane_id="$(printf '%s' "$created" | jq -r '.result.root_pane.pane_id // empty')"
+  # herdr answers on stdout and refuses on stderr, one JSON document either
+  # way; keep both so a refusal can be quoted back.
+  created="$(herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$PWD" --label claude --focus 2>&1)"
+  pane_id="$(printf '%s' "$created" | jq -r '.result.root_pane.pane_id // empty' 2>/dev/null | head -n1)"
 
   if [[ -z "$pane_id" ]]; then
-    echo "herdr tab create failed; running claude here instead" >&2
+    _claude_herdr_refused "$created"
     _claude_run ${=launch}
     return
   fi
 
   herdr pane run "$pane_id" "HERDR_AGENT=claude ${launch}" >/dev/null 2>&1
+}
+
+# herdr would not open the tab: say why in herdr's own words and hold the
+# message until a key is pressed. Claude's fullscreen TUI wipes the pane a
+# moment after launch, which is how a one-line "tab create failed" went
+# unread for a day while a stale server refused every call.
+_claude_herdr_refused() {
+  local why
+  why="$(printf '%s' "$1" \
+    | jq -r 'select(.error != null) | "\(.error.code): \(.error.message | split("\n")[0])"' 2>/dev/null \
+    | head -n1)"
+  [[ -n "$why" ]] || why="${1%%$'\n'*}"
+  [[ -n "$why" ]] || why="no response"
+  print -u2 -- "herdr tab create failed — ${why}"
+  print -u2 -- "Running claude in this pane instead; tab labels and worktree workspaces will not sync to herdr until it works again."
+  if [[ -t 0 && -t 2 ]]; then
+    print -u2 -n -- "Press any key to continue… "
+    read -sk 1
+    print -u2 ""
+  fi
 }
 
 # Run the launch command in this pane, tagged for herdr when inside it.
