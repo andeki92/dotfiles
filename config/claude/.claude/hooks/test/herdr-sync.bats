@@ -20,6 +20,8 @@ setup() {
   : >"$CALLS"
   : >"$QUERIES"
   export CALLS QUERIES
+  # The hook's once-per-session marker lives under TMPDIR; keep it per test.
+  export TMPDIR="$BATS_TEST_TMPDIR"
 
   # On-disk shape of a main checkout and a linked worktree: git marks a
   # linked worktree with a `.git` *file* (pointing back at the main repo)
@@ -42,8 +44,16 @@ setup() {
   #   FAKE_WT_LINKED  "true" to list $WT as a linked worktree, else omitted
   #   FAKE_OPENED_WS  workspace id `worktree open` reports
   #   FAKE_MOVE_EXIT  exit status for `pane move` (default 0)
+  #   FAKE_REFUSE     error code every call answers with on stderr, exit 1 —
+  #                   the shape of a real refusal such as protocol_mismatch
   cat >"$FAKE_BIN/herdr" <<'EOF'
 #!/usr/bin/env bash
+if [ -n "${FAKE_REFUSE:-}" ]; then
+  echo "$*" >>"$QUERIES"
+  jq -nc --arg c "$FAKE_REFUSE" \
+    '{id: "cli", error: {code: $c, message: "client protocol 22 is newer than server protocol 20; restart the Herdr server before using this command.\nStopping exits pane processes."}}' >&2
+  exit 1
+fi
 case "$1 $2" in
   "pane get")
     echo "$*" >>"$QUERIES"
@@ -208,8 +218,60 @@ EOF
   elapsed=$(( $(date +%s) - start ))
 
   [ "$status" -eq 0 ]
+  [ -z "$output" ]
   [ ! -s "$CALLS" ]
   [ "$elapsed" -lt 10 ]
+}
+
+refused_context() {
+  printf '%s' "$output" | jq -r '.hookSpecificOutput.additionalContext'
+}
+
+@test "a herdr refusal is handed to Claude once per session" {
+  export FAKE_REFUSE=protocol_mismatch
+  payload="$(prompt_payload 'ship #218' | jq -c '. + {session_id: "s1"}')"
+
+  run_hook "$payload"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.hookSpecificOutput.hookEventName')" = UserPromptSubmit ]
+  refused_context | grep -q 'protocol_mismatch: client protocol 22 is newer than server protocol 20'
+  refused_context | grep -q 'restarting the herdr server'
+  # The first line of herdr's message, not the whole of it.
+  ! refused_context | grep -q 'Stopping exits pane processes'
+  [ ! -s "$CALLS" ]
+
+  # Same session again: already said.
+  run_hook "$payload"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+
+  # Another session hears it afresh.
+  run_hook "$(prompt_payload 'ship #218' | jq -c '. + {session_id: "s2"}')"
+  [ "$status" -eq 0 ]
+  refused_context | grep -q protocol_mismatch
+}
+
+@test "the refusal names the event it arrived on" {
+  export FAKE_REFUSE=protocol_mismatch
+  payload="$(jq -nc --arg cwd "$WT" '{hook_event_name: "SessionStart", source: "startup", cwd: $cwd, session_id: "s3"}')"
+  run_hook "$payload"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.hookSpecificOutput.hookEventName')" = SessionStart ]
+
+  run_hook "$(enter_payload | jq -c '. + {session_id: "s4"}')"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.hookSpecificOutput.hookEventName')" = PostToolUse ]
+  [ ! -s "$CALLS" ]
+}
+
+@test "a main-checkout session start stays silent even when herdr refuses" {
+  # The no-round-trip rule holds: nothing is asked, so nothing is refused.
+  export FAKE_REFUSE=protocol_mismatch
+  payload="$(jq -nc --arg cwd "$REPO" '{hook_event_name: "SessionStart", source: "startup", cwd: $cwd, session_id: "s5"}')"
+  run_hook "$payload"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ ! -s "$QUERIES" ]
 }
 
 @test "the move carries the tab label across" {
