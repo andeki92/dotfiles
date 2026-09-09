@@ -251,6 +251,22 @@ refused_context() {
   refused_context | grep -q protocol_mismatch
 }
 
+@test "the once-per-session marker is named from a sanitised session id" {
+  export FAKE_REFUSE=protocol_mismatch
+  payload="$(prompt_payload 'ship #218' | jq -c '. + {session_id: "../../evil/ id"}')"
+
+  run_hook "$payload"
+  [ "$status" -eq 0 ]
+  refused_context | grep -q protocol_mismatch
+  # Only the marker under TMPDIR, under a name with no path separators.
+  [ -e "$TMPDIR/herdr-sync-notice.....evilid" ]
+  [ ! -e "$TMPDIR/../evil" ]
+
+  run_hook "$payload"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
 @test "the refusal names the event it arrived on" {
   export FAKE_REFUSE=protocol_mismatch
   payload="$(jq -nc --arg cwd "$WT" '{hook_event_name: "SessionStart", source: "startup", cwd: $cwd, session_id: "s3"}')"

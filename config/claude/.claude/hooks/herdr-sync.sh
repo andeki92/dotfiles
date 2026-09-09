@@ -61,7 +61,9 @@ field() { printf '%s' "$payload" | jq -r "$1 // empty" 2>/dev/null; }
 event="$(field '.hook_event_name')"
 tool="$(field '.tool_name')"
 cwd="$(field '.cwd')"
-session="$(field '.session_id')"
+# The id names a file below, so it is reduced to filename-safe characters
+# first rather than trusted as one.
+session="$(field '.session_id' | tr -cd 'A-Za-z0-9._-')"
 
 # Hand Claude one line of context and stop. The hookSpecificOutput shape is
 # the one form every wired event (SessionStart, UserPromptSubmit, PostToolUse)
