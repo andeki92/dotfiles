@@ -12,8 +12,10 @@ export HEADROOM_BEACON=off
 # headroom: `headroom wrap claude` starts (or joins) one local proxy shared by
 # every session on the machine, points this session's ANTHROPIC_BASE_URL at
 # it, and records the tokens it saves (`headroom dashboard`, `headroom
-# savings`). `--1m` keeps the [1m] context window Claude Code otherwise drops
-# behind a custom base URL; `--code-memory none` skips the Serena MCP server.
+# savings`). No `--1m` and no `--model`: both pin the model for every
+# session (`--1m` via ANTHROPIC_MODEL, set to headroom's built-in Opus) and
+# override the one `/model` saves to settings.json, which already keeps its
+# 1M window behind the proxy. `--code-memory none` skips the Serena MCP server.
 # Set CLAUDE_NO_HEADROOM=1 to launch the bare binary. Subcommands (`mcp`,
 # `plugin`, ...) and `--version`/`--help` never go through the proxy.
 #
@@ -26,7 +28,7 @@ claude() {
   if [[ "${CLAUDE_NO_HEADROOM:-}" != "1" ]] \
     && command -v headroom >/dev/null 2>&1 \
     && _claude_is_session "$@"; then
-    launch="headroom wrap claude --1m --code-memory none --"
+    launch="headroom wrap claude --code-memory none --"
   fi
 
   if [[ "${HERDR_ENV:-}" != "1" ]] || [[ -z "${HERDR_WORKSPACE_ID:-}" ]] \
