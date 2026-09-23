@@ -85,7 +85,7 @@ _claude_headroom_hook_repoint() {
   local settings="$PWD/.claude/settings.local.json"
   local shim="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims/headroom"
   local marker="headroom-wrap-selfheal"
-  local want="$shim wrap selfheal --marker $marker"
+  local want="${(q)shim} wrap selfheal --marker $marker"
   [[ -f "$settings" && -x "$shim" ]] || return 0
   command -v jq >/dev/null 2>&1 || return 0
 
@@ -94,8 +94,11 @@ _claude_headroom_hook_repoint() {
     "[${hooks} | select(.command != \$c)] | length > 0" "$settings" >/dev/null 2>&1 \
     || return 0
 
+  # Copy first so the temp file, and the file it replaces, keep the original
+  # mode; the redirect below truncates it without resetting that.
   local tmp="${settings}.tmp.$$"
-  if jq --arg m "$marker" --arg c "$want" "(${hooks}).command = \$c" "$settings" >"$tmp"; then
+  if cp -p "$settings" "$tmp" \
+    && jq --arg m "$marker" --arg c "$want" "(${hooks}).command = \$c" "$settings" >"$tmp"; then
     mv "$tmp" "$settings"
   else
     rm -f "$tmp"
