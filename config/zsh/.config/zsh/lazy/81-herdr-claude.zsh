@@ -29,6 +29,7 @@ claude() {
     && command -v headroom >/dev/null 2>&1 \
     && _claude_is_session "$@"; then
     launch="headroom wrap claude --code-memory none --"
+    _claude_headroom_hook_repoint
   fi
 
   if [[ "${HERDR_ENV:-}" != "1" ]] || [[ -z "${HERDR_WORKSPACE_ID:-}" ]] \
@@ -71,6 +72,33 @@ _claude_herdr_refused() {
     print -u2 -n -- "Press any key to continue… "
     read -sk 1
     print -u2 ""
+  fi
+}
+
+# `headroom wrap claude` adds a SessionStart self-heal hook to
+# ./.claude/settings.local.json that calls headroom by absolute path. Under
+# mise activation that path is the versioned install dir, and wrap never
+# rewrites a hook it already added, so every headroom bump left each project
+# calling a binary `mise prune` later deletes. Point the hook at the mise shim
+# instead, which follows whatever version the mise config pins. Needs jq.
+_claude_headroom_hook_repoint() {
+  local settings="$PWD/.claude/settings.local.json"
+  local shim="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims/headroom"
+  local marker="headroom-wrap-selfheal"
+  local want="$shim wrap selfheal --marker $marker"
+  [[ -f "$settings" && -x "$shim" ]] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+
+  local hooks='.hooks.SessionStart[]?.hooks[]? | select((.command // "") | contains($m))'
+  jq -e --arg m "$marker" --arg c "$want" \
+    "[${hooks} | select(.command != \$c)] | length > 0" "$settings" >/dev/null 2>&1 \
+    || return 0
+
+  local tmp="${settings}.tmp.$$"
+  if jq --arg m "$marker" --arg c "$want" "(${hooks}).command = \$c" "$settings" >"$tmp"; then
+    mv "$tmp" "$settings"
+  else
+    rm -f "$tmp"
   fi
 }
 
