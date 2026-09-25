@@ -33,7 +33,7 @@ opentofu = "1.12.5"
 # Claude Code sessions with. Extras: proxy + code (AST) + mcp (retrieve tool)
 # + ml (Kompress prose model); `all` would add torch-heavy voice/eval extras.
 # Python 3.13 is what upstream recommends for the dashboard's dollar figures.
-"pipx:headroom-ai" = { version = "0.37.0", extras = ["proxy", "code", "mcp", "ml"], uvx_args = "--python 3.13" }
+"pipx:headroom-ai" = { version = "0.38.0", extras = ["proxy", "code", "mcp", "ml"], uvx_args = "--python 3.13" }
 "pipx:yamllint" = "1.38.0"
 python = "3.14.6"
 ripgrep = "15.2.0"
