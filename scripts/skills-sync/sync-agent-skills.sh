@@ -2,8 +2,11 @@
 #
 # sync-agent-skills.sh
 #
-# Mirrors the skills/ of every *enabled* Claude Code plugin into
-# ~/.agents/skills as symlinks, so other agent harnesses can use them.
+# Mirrors the skills/ of every *enabled*, *user-scoped* Claude Code plugin
+# into ~/.agents/skills as symlinks, so other agent harnesses can use them.
+# Project-scoped installs are skipped: ~/.agents is global, and letting a
+# project pin (e.g. an older version) collide with the user install made the
+# linked version depend on `claude plugin list` ordering.
 #
 # - Ownership-tracked: keeps a manifest of what it created, so it only ever
 #   adds/removes entries it owns and never touches anything else living in
@@ -77,7 +80,7 @@ while IFS= read -r install_path; do
     fi
     desired[$name]="$src"
   done < <(find "$install_path/skills" -iname 'SKILL.md' -print0)
-done < <(jq -r '.[] | select(.enabled == true) | .installPath' <<<"$plugin_json")
+done < <(jq -r '.[] | select(.enabled == true and .scope == "user") | .installPath' <<<"$plugin_json")
 
 # ---- Load previous manifest (what this script owns) ----
 declare -A previous
