@@ -94,7 +94,8 @@
       "source": {
         "source": "git",
         "url": "https://gitlab.com/bache-klever/skills.git"
-      }
+      },
+      "autoUpdate": true
     }
   },
   "feedbackDrafts": "off",
