@@ -86,6 +86,7 @@
   "disableArtifact": true,
   "enabledPlugins": {
     "skill-creator@claude-plugins-official": true,
+    "rust-analyzer-lsp@claude-plugins-official": true,
     "llm-wiki-skills@llm-wiki": true,
     "akle-skills@skills": true
   },
