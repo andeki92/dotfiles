@@ -1,42 +1,13 @@
-# Opt out of headroom's anonymous session-summary upload to Headroom Labs; it
-# is on by default. Local savings tracking (`headroom savings`, the dashboard)
-# is a separate switch and keeps working. Exported at file scope rather than
-# inside claude() so every headroom invocation gets it, and read at process
-# start, so the shared proxy only picks it up the next time it starts.
-export HEADROOM_BEACON=off
-
-# claude() — launch Claude Code through the headroom compression proxy when
-# `headroom` is on PATH, and, inside herdr, put a bare `claude` (no args) in a
-# new, focused herdr tab instead of the pane it was typed in.
-#
-# headroom: `headroom wrap claude` starts (or joins) one local proxy shared by
-# every session on the machine, points this session's ANTHROPIC_BASE_URL at
-# it, and records the tokens it saves (`headroom dashboard`, `headroom
-# savings`). No `--1m` and no `--model`: both pin the model for every
-# session (`--1m` via ANTHROPIC_MODEL, set to headroom's built-in Opus) and
-# override the one `/model` saves to settings.json, which already keeps its
-# 1M window behind the proxy. `--code-memory none` skips the Serena MCP server.
-# Set CLAUDE_NO_HEADROOM=1 to launch the bare binary. Subcommands (`mcp`,
-# `plugin`, ...) and `--version`/`--help` never go through the proxy.
-#
-# herdr: HERDR_AGENT=claude tells herdr which agent sits behind the wrapper
-# process so pane status detection keeps working. Any flags (`-p`,
-# `--resume`, ...), and any shell outside herdr or without herdr/jq on PATH,
-# run in the current pane.
+# claude() — inside herdr, launch a bare `claude` (no args) in a new,
+# focused herdr tab instead of the pane it was typed in. Any flags or
+# subcommands (`-p`, `--resume`, `mcp`, ...), and any shell outside herdr or
+# without herdr/jq on PATH, pass straight through to the real binary.
 claude() {
-  local launch="command claude"
-  if [[ "${CLAUDE_NO_HEADROOM:-}" != "1" ]] \
-    && command -v headroom >/dev/null 2>&1 \
-    && _claude_is_session "$@"; then
-    launch="headroom wrap claude --code-memory none --"
-    _claude_headroom_hook_repoint
-  fi
-
   if [[ "${HERDR_ENV:-}" != "1" ]] || [[ -z "${HERDR_WORKSPACE_ID:-}" ]] \
     || (( $# > 0 )) \
     || ! command -v herdr >/dev/null 2>&1 \
     || ! command -v jq >/dev/null 2>&1; then
-    _claude_run ${=launch} "$@"
+    command claude "$@"
     return
   fi
 
@@ -48,11 +19,11 @@ claude() {
 
   if [[ -z "$pane_id" ]]; then
     _claude_herdr_refused "$created"
-    _claude_run ${=launch}
+    command claude
     return
   fi
 
-  herdr pane run "$pane_id" "HERDR_AGENT=claude ${launch}" >/dev/null 2>&1
+  herdr pane run "$pane_id" "command claude" >/dev/null 2>&1
 }
 
 # herdr would not open the tab: say why in herdr's own words and hold the
@@ -73,54 +44,4 @@ _claude_herdr_refused() {
     read -sk 1
     print -u2 ""
   fi
-}
-
-# `headroom wrap claude` adds a SessionStart self-heal hook to
-# ./.claude/settings.local.json that calls headroom by absolute path. Under
-# mise activation that path is the versioned install dir, and wrap never
-# rewrites a hook it already added, so every headroom bump left each project
-# calling a binary `mise prune` later deletes. Point the hook at the mise shim
-# instead, which follows whatever version the mise config pins. Needs jq.
-_claude_headroom_hook_repoint() {
-  local settings="$PWD/.claude/settings.local.json"
-  local shim="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims/headroom"
-  local marker="headroom-wrap-selfheal"
-  local want="${(q)shim} wrap selfheal --marker $marker"
-  [[ -f "$settings" && -x "$shim" ]] || return 0
-  command -v jq >/dev/null 2>&1 || return 0
-
-  local hooks='.hooks.SessionStart[]?.hooks[]? | select((.command // "") | contains($m))'
-  jq -e --arg m "$marker" --arg c "$want" \
-    "[${hooks} | select(.command != \$c)] | length > 0" "$settings" >/dev/null 2>&1 \
-    || return 0
-
-  # Copy first so the temp file, and the file it replaces, keep the original
-  # mode; the redirect below truncates it without resetting that.
-  local tmp="${settings}.tmp.$$"
-  if cp -p "$settings" "$tmp" \
-    && jq --arg m "$marker" --arg c "$want" "(${hooks}).command = \$c" "$settings" >"$tmp"; then
-    mv "$tmp" "$settings"
-  else
-    rm -f "$tmp"
-  fi
-}
-
-# Run the launch command in this pane, tagged for herdr when inside it.
-_claude_run() {
-  if [[ "${HERDR_ENV:-}" == "1" ]]; then
-    HERDR_AGENT=claude "$@"
-  else
-    "$@"
-  fi
-}
-
-# True when the arguments start an interactive or print-mode session: no
-# arguments, or a first argument that is a flag other than --version/--help.
-_claude_is_session() {
-  (( $# == 0 )) && return 0
-  case "$1" in
-    -v|--version|-h|--help) return 1 ;;
-    -*) return 0 ;;
-    *) return 1 ;;
-  esac
 }
