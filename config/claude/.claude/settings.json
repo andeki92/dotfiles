@@ -1,5 +1,11 @@
 {
   "includeCoAuthoredBy": false,
+  "cleanupPeriodDays": 365,
+  "statusLine": {
+    "type": "command",
+    "command": "~/.cargo/bin/claude-statusline",
+    "refreshInterval": 1
+  },
   "permissions": {
     "allow": [
       "Bash(claude --version)"
@@ -94,7 +100,8 @@
       "source": {
         "source": "git",
         "url": "https://gitlab.com/bache-klever/skills.git"
-      }
+      },
+      "autoUpdate": true
     }
   },
   "feedbackDrafts": "off",
