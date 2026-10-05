@@ -7,7 +7,8 @@ platforms = ["linux", "macos"]
 
 # herdr has no background poll, so refresh at the moments that matter: the
 # user looks at a pane, an agent finishes a turn (it may just have pushed or
-# opened the PR), or the herdr-sync hook moves a Claude pane into a worktree.
+# opened the PR), or the herdr-worktree hook moves a Claude pane into a
+# worktree.
 [[events]]
 on = "pane.focused"
 command = ["bash", "pr-status.sh"]

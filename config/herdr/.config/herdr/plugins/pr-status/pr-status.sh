@@ -9,7 +9,7 @@
 # No PR, no repo, or no forge CLI clears the token. Only panes running an
 # agent are looked at, so focusing a plain shell costs nothing.
 #
-# The branch is read from the pane's workspace checkout first: herdr-sync.sh
+# The branch is read from the pane's workspace checkout first: herdr-worktree.sh
 # moves a Claude pane into its worktree's workspace, while the pane's own
 # cwd stays wherever the shell started. A workspace that is not a git
 # checkout falls back to the pane's cwd.

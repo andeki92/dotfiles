@@ -67,7 +67,7 @@ _claude_herdr_refused() {
   [[ -n "$why" ]] || why="${1%%$'\n'*}"
   [[ -n "$why" ]] || why="no response"
   print -u2 -- "herdr tab create failed — ${why}"
-  print -u2 -- "Running claude in this pane instead; tab labels and worktree workspaces will not sync to herdr until it works again."
+  print -u2 -- "Running claude in this pane instead; worktree workspaces will not follow the session in herdr until it works again."
   if [[ -t 0 && -t 2 ]]; then
     print -u2 -n -- "Press any key to continue… "
     read -sk 1

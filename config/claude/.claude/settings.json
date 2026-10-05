@@ -55,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/.claude/hooks/herdr-sync.sh\""
+            "command": "\"$HOME/.claude/hooks/herdr-worktree.sh\""
           }
         ]
       }
@@ -65,7 +65,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/.claude/hooks/herdr-sync.sh\""
+            "command": "\"$HOME/.claude/hooks/herdr-worktree.sh\""
           }
         ]
       },
@@ -76,16 +76,6 @@
             "type": "command",
             "command": "bash '/Users/akle/.claude/hooks/herdr-agent-state.sh' session",
             "timeout": 10
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.claude/hooks/herdr-sync.sh\""
           }
         ]
       }
