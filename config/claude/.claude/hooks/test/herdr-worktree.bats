@@ -1,10 +1,9 @@
 #!/usr/bin/env bats
 #
-# Tests for ../herdr-sync.sh — the one Claude Code hook that keeps herdr in
-# step with a session: labels the tab once from the first prompt, and
-# mirrors the session's move into (or out of) a linked git worktree onto
-# herdr's topology — open the worktree as a child workspace and move the
-# Claude pane into it, or move it back to the parent when the session leaves.
+# Tests for ../herdr-worktree.sh — the Claude Code hook that mirrors a
+# session's move into (or out of) a linked git worktree onto herdr: open the
+# worktree as a child workspace and move the Claude pane into it, or move it
+# back to the parent when the session leaves.
 #
 # Run:  bats config/claude/.claude/hooks/test
 # Needs: bats (mise: aqua:bats-core/bats-core), jq.
@@ -12,7 +11,7 @@
 bats_require_minimum_version 1.5.0
 
 setup() {
-  HOOK="${BATS_TEST_DIRNAME}/../herdr-sync.sh"
+  HOOK="${BATS_TEST_DIRNAME}/../herdr-worktree.sh"
   FAKE_BIN="${BATS_TEST_TMPDIR}/bin"
   CALLS="${BATS_TEST_TMPDIR}/herdr-calls"
   QUERIES="${BATS_TEST_TMPDIR}/herdr-queries"
@@ -64,9 +63,6 @@ case "$1 $2" in
     echo "$*" >>"$QUERIES"
     jq -nc --arg l "$FAKE_TAB_LABEL" \
       '{result: {tab: {tab_id: "w1:t1", label: $l}}}'
-    ;;
-  "tab rename")
-    echo "$*" >>"$CALLS"
     ;;
   "worktree list")
     echo "$*" >>"$QUERIES"
@@ -136,66 +132,14 @@ enter_payload() {
       tool_response: {worktreePath: $cwd, worktreeBranch: "worktree-feat"}}'
 }
 
-prompt_payload() {
-  jq -nc --arg p "$1" --arg cwd "$REPO" \
-    '{hook_event_name: "UserPromptSubmit", cwd: $cwd, prompt: $p}'
-}
-
-@test "first prompt labels a placeholder tab from the prompt" {
-  run_hook "$(prompt_payload 'ship #218')"
+@test "prompts and other tools ask herdr nothing" {
+  run_hook "$(jq -nc --arg cwd "$WT" '{hook_event_name: "UserPromptSubmit", cwd: $cwd, prompt: "ship #218"}')"
   [ "$status" -eq 0 ]
-  grep -qx "tab rename w1:t1 claude-ship-218" "$CALLS"
-}
-
-@test "slug drops a slash-command prefix and keeps the argument" {
-  run_hook "$(prompt_payload '/akle-skills:ship #218')"
-  [ "$status" -eq 0 ]
-  grep -qx "tab rename w1:t1 claude-ship-218" "$CALLS"
-}
-
-@test "slug stops at the first prose after the references" {
-  run_hook "$(prompt_payload 'ship #123 and then let us discuss bla bla bla')"
-  [ "$status" -eq 0 ]
-  grep -qx "tab rename w1:t1 claude-ship-123" "$CALLS"
-}
-
-@test "slug keeps a whole run of references, connectors included" {
-  run_hook "$(prompt_payload 'ship #123, #213, and #456')"
-  [ "$status" -eq 0 ]
-  grep -qx "tab rename w1:t1 claude-ship-123-213-and-456" "$CALLS"
-}
-
-@test "slug keeps the first four words of prose, capped at 24 chars" {
-  run_hook "$(prompt_payload $'We have our claude custom command to work in herdr - I want you to research\nsecond line ignored')"
-  [ "$status" -eq 0 ]
-  grep -qx "tab rename w1:t1 claude-we-have-our-claude" "$CALLS"
-}
-
-@test "a tab that already has a real label is never renamed" {
-  export FAKE_TAB_LABEL=claude-ship-218
-  run_hook "$(prompt_payload 'now do something else')"
-  [ "$status" -eq 0 ]
-  [ ! -s "$CALLS" ]
-
-  export FAKE_TAB_LABEL=cli
-  run_hook "$(prompt_payload 'ship #218')"
-  [ "$status" -eq 0 ]
-  [ ! -s "$CALLS" ]
-}
-
-@test "a bare herdr default label counts as a placeholder" {
-  export FAKE_TAB_LABEL=3
-  run_hook "$(prompt_payload 'ship #218')"
-  [ "$status" -eq 0 ]
-  grep -qx "tab rename w1:t1 claude-ship-218" "$CALLS"
-}
-
-@test "stop and agent dispatch no longer rename anything" {
-  run_hook '{"hook_event_name":"Stop","cwd":"/x"}'
-  [ "$status" -eq 0 ]
+  [ ! -s "$QUERIES" ]
   [ ! -s "$CALLS" ]
   run_hook '{"hook_event_name":"PostToolUse","tool_name":"Agent","tool_input":{"description":"Research something"}}'
   [ "$status" -eq 0 ]
+  [ ! -s "$QUERIES" ]
   [ ! -s "$CALLS" ]
 }
 
@@ -214,7 +158,7 @@ EOF
   chmod +x "$slow_bin/herdr"
 
   start=$(date +%s)
-  run_hook_with_payload "$slow_bin:$PATH" "$(prompt_payload 'ship #218')"
+  run_hook_with_payload "$slow_bin:$PATH" "$(enter_payload)"
   elapsed=$(( $(date +%s) - start ))
 
   [ "$status" -eq 0 ]
@@ -229,11 +173,11 @@ refused_context() {
 
 @test "a herdr refusal is handed to Claude once per session" {
   export FAKE_REFUSE=protocol_mismatch
-  payload="$(prompt_payload 'ship #218' | jq -c '. + {session_id: "s1"}')"
+  payload="$(enter_payload | jq -c '. + {session_id: "s1"}')"
 
   run_hook "$payload"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -r '.hookSpecificOutput.hookEventName')" = UserPromptSubmit ]
+  [ "$(printf '%s' "$output" | jq -r '.hookSpecificOutput.hookEventName')" = PostToolUse ]
   refused_context | grep -q 'protocol_mismatch: client protocol 22 is newer than server protocol 20'
   refused_context | grep -q 'restarting the herdr server'
   # The first line of herdr's message, not the whole of it.
@@ -246,20 +190,20 @@ refused_context() {
   [ -z "$output" ]
 
   # Another session hears it afresh.
-  run_hook "$(prompt_payload 'ship #218' | jq -c '. + {session_id: "s2"}')"
+  run_hook "$(enter_payload | jq -c '. + {session_id: "s2"}')"
   [ "$status" -eq 0 ]
   refused_context | grep -q protocol_mismatch
 }
 
 @test "the once-per-session marker is named from a sanitised session id" {
   export FAKE_REFUSE=protocol_mismatch
-  payload="$(prompt_payload 'ship #218' | jq -c '. + {session_id: "../../evil/ id"}')"
+  payload="$(enter_payload | jq -c '. + {session_id: "../../evil/ id"}')"
 
   run_hook "$payload"
   [ "$status" -eq 0 ]
   refused_context | grep -q protocol_mismatch
   # Only the marker under TMPDIR, under a name with no path separators.
-  [ -e "$TMPDIR/herdr-sync-notice.....evilid" ]
+  [ -e "$TMPDIR/herdr-worktree-notice.....evilid" ]
   [ ! -e "$TMPDIR/../evil" ]
 
   run_hook "$payload"
@@ -273,10 +217,6 @@ refused_context() {
   run_hook "$payload"
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r '.hookSpecificOutput.hookEventName')" = SessionStart ]
-
-  run_hook "$(enter_payload | jq -c '. + {session_id: "s4"}')"
-  [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -r '.hookSpecificOutput.hookEventName')" = PostToolUse ]
   [ ! -s "$CALLS" ]
 }
 
@@ -290,7 +230,7 @@ refused_context() {
   [ ! -s "$QUERIES" ]
 }
 
-@test "the move carries the tab label across" {
+@test "the move carries a tab label set by hand across" {
   export FAKE_TAB_LABEL=claude-ship-218
   run_hook "$(enter_payload)"
   [ "$status" -eq 0 ]
