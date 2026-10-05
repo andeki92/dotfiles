@@ -9,7 +9,6 @@ load-bearing.
 
 | Term | Means |
 |---|---|
-| `cbox` | The Podman/apple-container sandbox an agent may run inside (`config/cbox/`); egress is locked to an allow-list via a host-side Squid proxy. |
 | `cordis` | The plugin/patch loader `dsh` profiles are built from — a profile's `cordis.yml` lists bundles, its `cordis.patch.yml` overrides individual plugin rows. |
 | `dsh` | DeepSeek harness — the AI coding agent configured under `config/dsh/`; profiles (e.g. `web`) compose bundles via `cordis` files. |
 | `eager` / `lazy` | The two zsh load tiers under `config/zsh/.config/zsh/`: `eager/` runs synchronously at startup (numbered `NN-name.zsh`), `lazy/` is deferred with `zsh-defer` until after the prompt draws. |
