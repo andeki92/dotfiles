@@ -11,7 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   (never bare `stow -R .` — with `.stowrc`'s `--dir=./config`, package name
   `.` resolves to the whole `config/` tree and symlinks every tool directly
   into `~/` instead of `~/.config/<tool>`)
-- **ALWAYS** test zsh performance with `./scripts/benchmark.sh` before committing zsh changes
+- **ALWAYS** run `./scripts/benchmark.sh` locally before and after zsh changes that could slow startup
+  (new eager files, plugins, synchronous `eval "$(tool init)"`); there is no CI benchmark
 - **ALWAYS** place new configurations under `config/<tool>/` following XDG spec
 - **ALWAYS** use the exact Homebrew commands specified below for package management
 - **ALWAYS** check existing module README.md files before making changes
@@ -45,7 +46,7 @@ brew bundle dump --global --force      # Update Brewfile from installed
 brew bundle check --global             # Verify installation status
 brew bundle cleanup --global --force   # Remove packages not in Brewfile
 
-# Performance testing (MANDATORY for zsh changes)
+# Performance testing (local only, run now and again)
 ./scripts/benchmark.sh                 # Test startup time
 ./scripts/benchmark.sh --save          # Save results to docs/benchmarks.md
 
@@ -81,7 +82,7 @@ git submodule update --init --recursive
 4. **DOCUMENT:** Add brief README.md if complex
 
 ### Modifying Zsh Configuration
-1. **FIRST:** Run `./scripts/benchmark.sh` for baseline
+1. **FIRST:** Run `./scripts/benchmark.sh` for baseline if the change could affect startup
 2. **EDIT:** Files in `config/zsh/.config/zsh/`
 3. **APPLY:** `stow -R zsh`
 4. **TEST:** `./scripts/benchmark.sh` - ensure <25% regression
@@ -105,7 +106,7 @@ git submodule update --init --recursive
 - `.stowrc` - Stow behavior: uses `./config` as source, `~/` as target
 - `config/zsh/.zshrc` - Main zsh entrypoint, loads all config in order
 - `config/brew/.config/homebrew/Brewfile` - Declarative package management
-- `scripts/benchmark.sh` - Performance testing (mandatory for zsh changes)
+- `scripts/benchmark.sh` - Local zsh startup benchmark
 
 **WHEN working on zsh:** ALWAYS check performance impact
 **WHEN adding packages:** ALWAYS use Brewfile, never direct brew install
@@ -119,7 +120,7 @@ git submodule update --init --recursive
 # For any config changes
 stow -R $(ls config)         # Verify stow works without conflicts
 
-# For zsh changes (MANDATORY)
+# For zsh changes that could affect startup
 ./scripts/benchmark.sh       # Must not regress >25%
 
 # For brew changes
@@ -173,13 +174,3 @@ cask "ghostty"
 - Ignore benchmark results showing performance regression
 - Use `brew install` without updating the Brewfile
 - Modify existing configs without testing stow re-application
-
-## CI/CD INTEGRATION
-
-**UNDERSTAND:** GitHub Actions automatically benchmark zsh changes:
-- Triggers on PRs affecting `config/zsh/**`
-- Compares PR branch vs main branch performance  
-- **FAILS CI** if >25% performance regression
-- Comments results on PR with benchmark history
-
-**WHEN zsh PR fails CI:** Check benchmark output and optimize before merge
