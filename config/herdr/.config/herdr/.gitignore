@@ -1,9 +1,15 @@
 # Sessions are not stored in git
 session.json
+session-snapshots/
+session-backups/
+
+# Plugin registry, rebuilt by `herdr plugin link` (scripts/herdr-setup.sh)
+plugins.json
 
 # Release-notes
 release-notes.json
 
 # Ignore logs and sockets
 *.sock
+*.sock.agent
 *.log

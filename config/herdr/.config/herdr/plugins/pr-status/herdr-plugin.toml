@@ -1,0 +1,29 @@
+id = "dotfiles.pr-status"
+name = "PR Status"
+version = "0.1.0"
+min_herdr_version = "0.9.1"
+description = "Show the GitHub PR / GitLab MR of an agent's branch, with its CI rollup, as $pr on the agent's sidebar row"
+platforms = ["linux", "macos"]
+
+# herdr has no background poll, so refresh at the moments that matter: the
+# user looks at a pane, an agent finishes a turn (it may just have pushed or
+# opened the PR), or the herdr-sync hook moves a Claude pane into a worktree.
+[[events]]
+on = "pane.focused"
+command = ["bash", "pr-status.sh"]
+
+[[events]]
+on = "pane.agent_status_changed"
+command = ["bash", "pr-status.sh"]
+
+[[events]]
+on = "pane.moved"
+command = ["bash", "pr-status.sh"]
+
+# Manual refresh of the focused pane, past the throttle — CI that finishes
+# while nobody touches the pane only shows up through this.
+[[actions]]
+id = "refresh"
+title = "Refresh PR status"
+contexts = ["workspace"]
+command = ["bash", "pr-status.sh"]

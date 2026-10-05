@@ -1,0 +1,17 @@
+id = "dotfiles.worktree-setup"
+name = "Worktree Setup"
+version = "0.1.0"
+min_herdr_version = "0.9.0"
+description = "Copy the gitignored files a repo lists in .worktreeinclude into each new worktree, as Claude Code does for its own"
+platforms = ["linux", "macos"]
+
+# worktree.created fires for checkouts herdr makes itself (sidebar "New
+# worktree", `herdr worktree create`); worktree.opened covers ones made
+# elsewhere and opened in herdr afterwards, Claude Code's included.
+[[events]]
+on = "worktree.created"
+command = ["bash", "setup.sh"]
+
+[[events]]
+on = "worktree.opened"
+command = ["bash", "setup.sh"]

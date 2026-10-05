@@ -21,6 +21,11 @@
 #                        worktree was removed on the way out, the child
 #                        workspace is closed too.
 #
+# Session identity — what lets herdr resume the session after a server
+# restart — is herdr's own integration hook, herdr-agent-state.sh beside
+# this one (`herdr integration install claude`). This hook never reports
+# agent state or session, so it cannot take that authority from it.
+#
 # The pane is located by HERDR_PANE_ID, which herdr keeps valid as an alias
 # after a move. HERDR_TAB_ID and HERDR_WORKSPACE_ID are launch-time snapshots
 # that go stale the moment the pane moves, so the live tab and workspace are
