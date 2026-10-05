@@ -193,7 +193,7 @@ the following must be installed (all declared in
 
 | Tool | Backend | Used by |
 |------|---------|---------|
-| `yamllint` | `pipx:` (via `uv`, see `[settings.pipx] uvx`) | `linters/yaml.sh` |
+| `yamllint` | `pypi:` (via `uv`, see `[settings.pypi] uvx`) | `linters/yaml.sh` |
 | `jq` | mise core | `linters/json.sh` + dispatcher payload parsing |
 | `shellcheck` | mise core | `linters/sh.sh` |
 
