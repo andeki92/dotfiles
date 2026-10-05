@@ -65,7 +65,8 @@ This repository includes various aliases to improve productivity across differen
 
 ## Performance Monitoring
 
-This repository includes tooling to monitor zsh startup performance over time.
+This repository includes a script to measure zsh startup time locally. Run it every now and again, or before and
+after a zsh change you suspect is slow.
 
 ### Running Benchmarks
 
@@ -78,17 +79,6 @@ To measure zsh startup time:
 # Save benchmark results to docs/benchmarks.md
 ./scripts/benchmark.sh --save
 ```
-
-### Automated Benchmarks
-
-Pull requests that modify zsh configurations will automatically trigger benchmark tests through GitHub Actions. The
-action will:
-
-1. Run benchmarks on both the PR branch and main branch
-2. Compare the results
-3. Comment on the PR with performance impact
-
-This helps ensure that changes don't negatively impact shell startup time.
 
 ## Usage
 
