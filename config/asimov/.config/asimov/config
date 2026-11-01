@@ -1,0 +1,19 @@
+# Asimov: keeps rebuildable data out of Time Machine backups.
+# Project dirs (target/, node_modules/, .venv/, …) are matched by Asimov's
+# built-in sentinels. Below are the global caches and toolchains it leaves
+# alone by default. Local APFS snapshots still include all of it; exclusions
+# only keep it off the backup disk.
+
+[fixed_dirs]
+enabled = true                                   # ~/.cache (uv, huggingface), ~/.npm/_cacache, ~/go/pkg/mod, …
+extra = ~/.rustup
+extra = ~/.cargo/registry
+extra = ~/.cargo/git
+extra = ~/.cargo/build                           # shared cargo build-dirs (heim)
+extra = ~/.local/share/mise
+extra = ~/Library/Developer/Xcode/DerivedData
+extra = ~/Library/Developer/Xcode/iOS DeviceSupport
+extra = ~/Library/Developer/CoreSimulator/Devices
+extra = ~/Library/Application Support/com.apple.container   # rig CI containers and images
+extra = ~/.local/state/rig
+extra = ~/Library/Application Support/Claude/vm_bundles
