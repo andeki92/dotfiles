@@ -1,10 +1,13 @@
 # macOS-specific Git configuration
+# Git Credential Manager handles every host. The blank helper clears the
+# osxkeychain entry Homebrew's system gitconfig sets, so GCM is asked alone.
 [credential]
-helper = osxkeychain
+guiPrompt = false
+helper =
+helper = /usr/local/share/gcm-core/git-credential-manager
 
-# GitLab uses Git Credential Manager for OAuth browser login instead of
-# osxkeychain-cached PATs. The blank helper clears the inherited osxkeychain
-# entry so only GCM handles gitlab.com.
+# gitlab.com authenticates through glab instead. The blank helper clears the
+# GCM entry above, which git would otherwise ask first.
 [credential "https://gitlab.com"]
 helper =
-helper = manager
+helper = !glab auth git-credential
