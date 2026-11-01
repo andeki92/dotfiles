@@ -86,3 +86,5 @@ config-platform
 **/.claude/settings.local.json
 
 **/.claude/.cc-writes/
+
+.scratch/
