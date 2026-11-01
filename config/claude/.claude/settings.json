@@ -1,11 +1,11 @@
 {
-  "includeCoAuthoredBy": false,
   "cleanupPeriodDays": 365,
-  "statusLine": {
-    "type": "command",
-    "command": "~/.cargo/bin/claude-statusline",
-    "refreshInterval": 1
+  "env": {
+    "GIT_CONFIG_VALUE_1": "/Users/akle/.config/glab-agent/git-credential",
+    "GLAB_CONFIG_DIR": "/Users/akle/.config/glab-agent",
+    "SSL_CERT_FILE": "/etc/ssl/cert.pem"
   },
+  "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
       "Bash(claude --version)"
@@ -84,6 +84,11 @@
   "disableRemoteControl": true,
   "disableWorkflows": true,
   "disableArtifact": true,
+  "statusLine": {
+    "type": "command",
+    "command": "~/.cargo/bin/claude-statusline",
+    "refreshInterval": 1
+  },
   "enabledPlugins": {
     "skill-creator@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true,
@@ -96,6 +101,35 @@
         "url": "https://gitlab.com/bache-klever/skills.git"
       },
       "autoUpdate": true
+    }
+  },
+  "sandbox": {
+    "network": {
+      "allowedDomains": [
+        "gitlab.com",
+        "github.com"
+      ],
+      "allowLocalBinding": true
+    },
+    "filesystem": {
+      "allowWrite": [
+        "/private/var/folders/*/*/T/*",
+        "/private/var/folders/*/*/T/*/*",
+        "/private/var/folders/*/*/T/*/*/*"
+      ],
+      "denyRead": [
+        "~/.cargo/credentials.toml",
+        "~/.cargo/credentials"
+      ],
+      "allowRead": [
+        "~/.rustup",
+        "~/.cargo",
+        "~/.local/bin",
+        "~/.local/share/uv",
+        "~/.local/share/mise",
+        "~/.venvs",
+        "~/.config/glab-agent"
+      ]
     }
   },
   "feedbackDrafts": "off",
