@@ -26,6 +26,8 @@ brew "glab"              # Gitlab CLI
 
 # Agentic Work
 brew "herdr"             # Agent Multiplexer
+brew "qemu"              # VM backend for the Gondolin sandbox
+brew "e2fsprogs"         # mke2fs, for building Gondolin guest images
 
 # Applications
 cask "ghostty"            # Terminal emulator
