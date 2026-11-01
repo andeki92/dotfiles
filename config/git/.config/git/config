@@ -55,6 +55,11 @@ autocorrect = prompt
 
 [include]
 path = ~/.config/git/config-platform
-
+[credential]
+	guiPrompt = false
+	helper = 
+	helper = /usr/local/share/gcm-core/git-credential-manager
+[credential "https://gitlab.com"]
+	helper = !glab auth git-credential
 [credential "https://dev.azure.com"]
-useHttpPath = true
+	useHttpPath = true

@@ -55,6 +55,8 @@ experimental = true
 # only to a release at least a week old, matching Renovate's
 # minimumReleaseAge. Exact pins are never filtered.
 minimum_release_age = "7d"
+lockfile_platforms = ["linux-arm64", "macos-arm64"]
+not_found_auto_install = false
 
 # Install `pypi:` backend tools (e.g. yamllint) with uv's `uv tool` instead of
 # pipx — no pipx dependency, much faster. Requires the `uv` tool above.

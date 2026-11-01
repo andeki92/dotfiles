@@ -18,11 +18,16 @@ brew "wget"              # Internet file retriever
 brew "zsh"               # Improved shell
 brew "zsh-completions"   # Additional completions for zsh
 
+# Backup and Maintenance
+brew "asimov" if OS.mac? # Excludes build output and caches from Time Machine, daily
+
 # Git-interaction
 brew "glab"              # Gitlab CLI
 
 # Agentic Work
 brew "herdr"             # Agent Multiplexer
+brew "qemu"              # VM backend for the Gondolin sandbox
+brew "e2fsprogs"         # mke2fs, for building Gondolin guest images
 
 # Applications
 cask "ghostty"            # Terminal emulator
@@ -35,7 +40,7 @@ cask "orbstack"           # Alternative to Docker desktop
 cask "intellij-idea"            # IDE for JVM languages
 cask "zed"		                # IDE
 cask "git-credential-manager"
-cask "gdal"                     # GeoSpatial Data Abstraction (for postGIS)
+brew "gdal"                     # GeoSpatial Data Abstraction (for postGIS)
 
 # Fonts
 cask "font-jetbrains-mono-nerd-font"   # Developer font with programming ligatures and icons
