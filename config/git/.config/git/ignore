@@ -84,3 +84,5 @@ config-platform
 
 # Never comitt local claude settings
 **/.claude/settings.local.json
+
+**/.claude/.cc-writes/
