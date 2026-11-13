@@ -8,8 +8,8 @@
 --
 -- Each pin is a session label and the folder it belongs to. A leading ~ is
 -- your home folder.
---   cmd+t     in a pinned session, opens a new tab in its folder
---   "Open Pinned Sessions" in the command palette recreates any that are gone
+--   cmd+t        in a pinned session, opens a new tab in its folder
+--   shift+cmd+k  recreates every pinned session that is gone
 return {
   { label = "dotfiles", dir = "~/.dotfiles" },
   -- { label = "work", dir = "~/code/work" },

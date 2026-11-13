@@ -15,7 +15,7 @@ this package links files, never the folder.
 | --- | --- | --- |
 | `cmd+b` | `new_work` | A small floating pane asks for a worktree's name, such as `123-flaky-tests`. Enter opens a tab of that name running `c -w <name>` in the focused pane's repository. From inside `.claude/worktrees/…` that is the main checkout. Empty input or `ctrl+c` cancels. |
 | `cmd+t` | `pinned_tab` | In a pinned session, a new tab in its directory; elsewhere Rex's own new tab. |
-| palette: "Open Pinned Sessions" | `pinned_sessions` | Recreates any pinned session that is gone. |
+| `shift+cmd+k` | `pinned_sessions` | Recreates any pinned session that is gone. |
 | `cmd+r` | `client.config.reload` | Reloads this file. |
 
 Don't name an issue's worktree `#123`: Claude Code reads `-w "#123"` as merge

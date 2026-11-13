@@ -53,7 +53,8 @@ rex.bind("cmd+b", "new_work")
 
 -- Pinned sessions: each label has a home directory. A new tab (cmd+t) in a
 -- pinned session opens there; other sessions keep Rex's own new tab.
--- "Open Pinned Sessions", from the command palette, recreates any that are gone.
+-- "Open Pinned Sessions" (shift+cmd+k, beside cmd+k's Change Session) recreates
+-- any that are gone.
 --
 -- The pins are each machine's own config and are never committed: they live
 -- in ~/.config/rex/pinned.lua. Start it from pinned.example.lua beside it.
@@ -128,3 +129,4 @@ rex.action{
     return { created = created }
   end,
 }
+rex.bind("shift+cmd+k", "pinned_sessions")
