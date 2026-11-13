@@ -6,7 +6,7 @@ local home = os.getenv("HOME")
 -- expects (it names the whole session after the agent's task). The session
 -- starts as "<Repo> - new work" with a single pane that asks for a worktree's
 -- name, such as 123-flaky-tests. Enter renames the session to
--- "<Repo> - <name>", such as "0th - 123-flaky-tests", and runs
+-- "<Repo> - <name>", such as "Notes - 123-flaky-tests", and runs
 -- `c -w <name>` in the focused pane's repository, or in its main checkout
 -- from inside .claude/worktrees/. Empty input or ctrl+c cancels. The session
 -- removes itself when Claude exits, since Rex keeps a session with no windows.

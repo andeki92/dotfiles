@@ -26,7 +26,7 @@ helpers: servers, test runs, other agents.
 `cmd+b` creates a session titled `<Repo> - new work`, for the repository of
 the pane that has focus, and switches to it. Its one pane asks for a
 worktree's name, such as `123-flaky-tests`. Enter renames the session to
-`<Repo> - <name>`, such as `0th - 123-flaky-tests`, and runs `c -w <name>`
+`<Repo> - <name>`, such as `Notes - 123-flaky-tests`, and runs `c -w <name>`
 there. From inside `.claude/worktrees/…`, the repository is the main checkout.
 Empty input or `ctrl+c` cancels and removes the session.
 
