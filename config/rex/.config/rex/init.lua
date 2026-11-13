@@ -95,7 +95,8 @@ local function load_projects()
   end
   local projects = {}
   for _, p in ipairs(list) do
-    if type(p.label) == "string" and p.label ~= "" and type(p.dir) == "string" then
+    if type(p) == "table" and type(p.label) == "string" and p.label ~= ""
+        and type(p.dir) == "string" then
       table.insert(projects, { label = p.label, dir = (p.dir:gsub("^~", home)) })
     else
       rex.log("warn", "projects.lua: skipped an entry without a label and a dir")
