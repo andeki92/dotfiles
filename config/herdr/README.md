@@ -2,8 +2,9 @@
 
 [herdr](https://herdr.dev) hosts every Claude Code session here. This package
 holds its config and the one local plugin; the Claude side is two hooks in
-`config/claude/.claude/hooks/` and the `claude()` wrapper in
-`config/zsh/.config/zsh/lazy/81-herdr-claude.zsh`.
+`config/claude/.claude/hooks/` and the `claude()` and `c()` wrappers in
+`config/zsh/.config/zsh/lazy/81-herdr-claude.zsh`, which open a bare launch
+in a new herdr tab.
 
 ```
 .config/herdr/
