@@ -11,5 +11,11 @@
 # Claude worktrees
 .claude/worktrees
 
+# Rex: each machine's own pins, and the server's state, which lands here if
+# stow links all of ~/.config/rex on a machine that had none
+config/rex/.config/rex/pinned.lua
+config/rex/.config/rex/logs/
+config/rex/.config/rex/.claude/
+
 # Skill symlinks auto-installed by third-party CLI installers (e.g. hf)
 config/claude/.claude/skills/hf-cli

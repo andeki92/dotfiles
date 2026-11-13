@@ -62,14 +62,20 @@ rex.bind("cmd+b", "new_work")
 -- pinned session opens there; other sessions keep Rex's own new tab.
 -- "Open Pinned Sessions" (ctrl+a p, or the palette) recreates any that are gone.
 --
--- The pins are this machine's own and stay out of the repository: they live
--- in ~/.config/rex/pinned.lua, which returns a list such as
---   return { { label = "notes", dir = "~/notes" } }
--- Without that file there are no pins.
+-- The pins are each machine's own config and are never committed: they live
+-- in ~/.config/rex/pinned.lua. Start it from pinned.example.lua beside it.
+-- Without that file there are no pins, and cmd+t is Rex's own new tab.
 local function load_pins()
   local path = home .. "/.config/rex/pinned.lua"
-  local chunk = loadfile(path)
-  if chunk == nil then return {} end
+  local chunk, load_err = loadfile(path)
+  if chunk == nil then
+    local f = io.open(path, "r")
+    if f ~= nil then
+      f:close()
+      rex.log("warn", "pinned.lua: " .. tostring(load_err))
+    end
+    return {}
+  end
   local ok, list = pcall(chunk)
   if not ok or type(list) ~= "table" then
     rex.log("warn", "pinned.lua: expected a list of { label, dir }")

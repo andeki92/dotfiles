@@ -3,11 +3,12 @@
 [Rex](https://www.superlogical.com/rex/docs) reads one Lua file,
 `~/.config/rex/init.lua`, for its key bindings and custom actions. The server
 keeps its own state (`logs/`, `.claude/`) beside it in `~/.config/rex/`, so
-this package links only the file.
+this package links files, never the folder.
 
 ```
 .config/rex/
-└── init.lua    bindings, the new-work prompt and pinned sessions
+├── init.lua             bindings, the new-work prompt and pinned sessions
+└── pinned.example.lua   a starting point for this machine's pinned.lua
 ```
 
 | Key | Action | What it does |
@@ -23,23 +24,26 @@ worktree with no changes, it removes the worktree and its branch.
 
 ## Pinned sessions
 
-The pins name this machine's own project folders, so they stay out of this
-public repository. `init.lua` reads them from `~/.config/rex/pinned.lua`, a
-plain file next to the link, and has no pins without it:
+Pins are each machine's own config: a session label and the folder it belongs
+to. They often name private project folders, so they never enter this public
+repository. `init.lua` reads them from `~/.config/rex/pinned.lua`, a plain
+file beside the links, and without it has no pins and leaves `cmd+t` to Rex.
+`.gitignore` keeps a stray `pinned.lua` in the package out of commits too.
 
-```lua
-return {
-  { label = "notes", dir = "~/notes" },
-}
-```
+To add or change a pin, edit `~/.config/rex/pinned.lua` and press `cmd+r`.
 
 ## Setup (once per machine)
 
 ```bash
-rm ~/.config/rex/init.lua   # only if it is a plain file, after checking it matches
+mkdir -p ~/.config/rex      # so stow links the files, not the whole folder
 stow rex
+cp ~/.config/rex/pinned.example.lua ~/.config/rex/pinned.lua   # then edit it
 rex config check
 ```
+
+Without the `mkdir`, stow links `~/.config/rex` itself into this repository,
+and Rex's logs and your pins would be written here. A machine that already
+had a plain `~/.config/rex/init.lua` needs it removed before `stow rex`.
 
 After editing, `rex config check` reports errors with their line, and
 `rex config reload` (or `cmd+r`) applies the file. To try an action from a
