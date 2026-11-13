@@ -3,7 +3,8 @@
   "env": {
     "GIT_CONFIG_VALUE_1": "/Users/akle/.config/glab-agent/git-credential",
     "GLAB_CONFIG_DIR": "/Users/akle/.config/glab-agent",
-    "SSL_CERT_FILE": "/etc/ssl/cert.pem"
+    "SSL_CERT_FILE": "/etc/ssl/cert.pem",
+    "CLAUDE_CODE_SUBAGENT_EFFORT": "medium"
   },
   "includeCoAuthoredBy": false,
   "permissions": {
@@ -139,6 +140,9 @@
       "effortLevel": "high"
     },
     "claude-opus-5-5": {
+      "effortLevel": "high"
+    },
+    "claude-fable-5-2": {
       "effortLevel": "high"
     }
   },
