@@ -3,12 +3,31 @@
 # subcommands (`-p`, `--resume`, `mcp`, ...), and any shell outside herdr or
 # without herdr/jq on PATH, pass straight through to the real binary.
 claude() {
+  (( $# == 0 )) && _claude_herdr_tab "command claude" && return
+  command claude "$@"
+}
+
+# c — Claude Code with tracking on, so the flag-gated features DO_NOT_TRACK
+# hides (/advisor among them) work, on the latest Opus at high effort with the
+# latest Fable as advisor. Aliases, not version ids, so a new model needs no
+# edit here. --effort is passed because Opus 5.5 and later ignore the
+# top-level effortLevel setting and start at medium; the flag ranks below
+# /effort, so a level picked mid-session still wins. A bare `c` opens its own
+# herdr tab, as a bare `claude` does.
+c() {
+  local -a flags=(--model opus --effort high --advisor fable)
+  (( $# == 0 )) && _claude_herdr_tab "DO_NOT_TRACK=0 command claude ${flags[*]}" && return
+  DO_NOT_TRACK=0 command claude "${flags[@]}" "$@"
+}
+
+# _claude_herdr_tab <command line> — run the command line in a new, focused
+# herdr tab. Returns 1 when it did not, outside herdr or when herdr refused,
+# so the caller runs it in this pane instead.
+_claude_herdr_tab() {
   if [[ "${HERDR_ENV:-}" != "1" ]] || [[ -z "${HERDR_WORKSPACE_ID:-}" ]] \
-    || (( $# > 0 )) \
     || ! command -v herdr >/dev/null 2>&1 \
     || ! command -v jq >/dev/null 2>&1; then
-    command claude "$@"
-    return
+    return 1
   fi
 
   local created pane_id
@@ -19,11 +38,11 @@ claude() {
 
   if [[ -z "$pane_id" ]]; then
     _claude_herdr_refused "$created"
-    command claude
-    return
+    return 1
   fi
 
-  herdr pane run "$pane_id" "command claude" >/dev/null 2>&1
+  herdr pane run "$pane_id" "$1" >/dev/null 2>&1
+  return 0
 }
 
 # herdr would not open the tab: say why in herdr's own words and hold the
