@@ -1,10 +1,3 @@
--- Migrated from Herdr and Ghostty.
-
--- Herdr (prefix ctrl+a)
-rex.bind("ctrl+a>shift+r", "client.config.reload")
-rex.bind("ctrl+a>ctrl+a", "pane.send_key", { key = "ctrl+a" })
-
--- Ghostty
 rex.bind("cmd+r", "client.config.reload")
 
 local home = os.getenv("HOME")
@@ -60,7 +53,7 @@ rex.bind("cmd+b", "new_work")
 
 -- Pinned sessions: each label has a home directory. A new tab (cmd+t) in a
 -- pinned session opens there; other sessions keep Rex's own new tab.
--- "Open Pinned Sessions" (ctrl+a p, or the palette) recreates any that are gone.
+-- "Open Pinned Sessions", from the command palette, recreates any that are gone.
 --
 -- The pins are each machine's own config and are never committed: they live
 -- in ~/.config/rex/pinned.lua. Start it from pinned.example.lua beside it.
@@ -135,4 +128,3 @@ rex.action{
     return { created = created }
   end,
 }
-rex.bind("ctrl+a>p", "pinned_sessions")
