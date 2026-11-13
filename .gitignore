@@ -11,8 +11,9 @@
 # Claude worktrees
 .claude/worktrees
 
-# Rex: the server's state, which lands here if
-# stow links all of ~/.config/rex on a machine that had none
+# Rex: each machine's own projects, and the server's state, which lands here
+# if stow links all of ~/.config/rex on a machine that had none
+config/rex/.config/rex/projects.lua
 config/rex/.config/rex/logs/
 config/rex/.config/rex/.claude/
 

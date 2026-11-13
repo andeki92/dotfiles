@@ -7,13 +7,15 @@ this package links the file, never the folder.
 
 ```
 .config/rex/
-└── init.lua    bindings and the new-work session
+├── init.lua               bindings, the new-work session and the projects
+└── projects.example.lua   a starting point for this machine's projects.lua
 ```
 
 | Key | Action | What it does |
 | --- | --- | --- |
 | `cmd+b` | `new_work` | Starts a piece of work as its own Rex session (below). |
 | `cmd+r` | `client.config.reload` | Reloads this file. |
+| `shift+cmd+p`, then a project | `project_<label>` | Goes to a favourite project's session (below). |
 
 ## One session per piece of work
 
@@ -35,16 +37,41 @@ too when they hold no changes; otherwise it asks.
 Don't name an issue's worktree `#123`: Claude Code reads `-w "#123"` as merge
 request 123. Use the bare number, as in `123-slug`.
 
+## Projects
+
+Each favourite project is an entry in Rex's command palette, `Project:
+<label>`, under a Projects heading. Press `shift+cmd+p`, type part of the
+name, and press Enter. It switches to the session labelled `<label>`, in any
+case, or creates it with a shell in the project's folder. From then on
+`cmd+k` lists it with the other sessions, and `cmd+b` from it starts work in
+that repository.
+
+The list is each machine's own and is never committed, since it often names
+private folders. `init.lua` reads it from `~/.config/rex/projects.lua`, a
+plain file beside the links. `projects.example.lua` shows the format. To add a
+project, add a line there and press `cmd+r`:
+
+```lua
+return {
+  { label = "Dotfiles", dir = "~/.dotfiles" },
+  { label = "Notes",    dir = "~/notes" },
+}
+```
+
+Without the file there are no project entries. An entry with no `label` or
+`dir`, or a file that fails to load, is logged as a warning.
+
 ## Setup (once per machine)
 
 ```bash
-mkdir -p ~/.config/rex      # so stow links the file, not the whole folder
+mkdir -p ~/.config/rex      # so stow links the files, not the whole folder
 stow rex
+cp ~/.config/rex/projects.example.lua ~/.config/rex/projects.lua   # then edit it
 rex config check
 ```
 
 Without the `mkdir`, stow links `~/.config/rex` itself into this repository,
-and Rex's logs would be written here. A machine that already has a plain
+and Rex's logs and your projects would be written here. A machine that already has a plain
 `~/.config/rex/init.lua` needs it removed before `stow rex`.
 
 After editing, `rex config check` reports errors with their line, and
