@@ -6,7 +6,7 @@ local home = os.getenv("HOME")
 -- expects (it names the whole session after the agent's task). The session
 -- starts as "<Repo> - new work" with a single pane that asks for a worktree's
 -- name, such as 123-flaky-tests. Enter renames the session to
--- "<Repo> - <name>", such as "0th - 123-flaky-tests", and runs
+-- "<Repo> - <name>", such as "Notes - 123-flaky-tests", and runs
 -- `c -w <name>` in the focused pane's repository, or in its main checkout
 -- from inside .claude/worktrees/. Empty input or ctrl+c cancels. The session
 -- removes itself when Claude exits, since Rex keeps a session with no windows.
@@ -68,3 +68,82 @@ rex.action{
   end,
 }
 rex.bind("cmd+b", "new_work")
+
+-- Projects: one command palette entry per favourite project, "Project: <label>"
+-- under a Projects heading. shift+cmd+p, type part of the name, Enter. It
+-- switches to the project's session, the one labelled <label> in any case, or
+-- creates it with a shell in the project's folder.
+--
+-- The list is this machine's own and is never committed: it lives in
+-- ~/.config/rex/projects.lua. Start it from projects.example.lua beside it,
+-- and press cmd+r after editing. Without the file there are no entries.
+local function load_projects()
+  local path = home .. "/.config/rex/projects.lua"
+  local chunk, load_err = loadfile(path)
+  if chunk == nil then
+    local f = io.open(path, "r")
+    if f ~= nil then
+      f:close()
+      rex.log("warn", "projects.lua: " .. tostring(load_err))
+    end
+    return {}
+  end
+  local ok, list = pcall(chunk)
+  if not ok or type(list) ~= "table" then
+    rex.log("warn", "projects.lua: expected a list of { label, dir }")
+    return {}
+  end
+  local projects = {}
+  for _, p in ipairs(list) do
+    if type(p) == "table" and type(p.label) == "string" and p.label ~= ""
+        and type(p.dir) == "string" then
+      table.insert(projects, { label = p.label, dir = (p.dir:gsub("^~", home)) })
+    else
+      rex.log("warn", "projects.lua: skipped an entry without a label and a dir")
+    end
+  end
+  return projects
+end
+
+local function find_session(label)
+  local list, err = rex.call("session.list")
+  if err ~= nil then error(err, 0) end
+  for _, s in ipairs(list.sessions or {}) do
+    if type(s.label) == "string" and s.label:lower() == label:lower() then
+      return s.session_id
+    end
+  end
+  return nil
+end
+
+local used = {}
+for _, p in ipairs(load_projects()) do
+  -- Action names take lowercase letters, digits and underscores only.
+  local name = "project_" .. p.label:lower():gsub("[^a-z0-9]+", "_")
+  while used[name] do name = name .. "_" end
+  used[name] = true
+  rex.action{
+    name     = name,
+    title    = "Project: " .. p.label,
+    category = "Projects",
+    keywords = "project go open switch " .. p.label,
+    run      = function(ctx, args)
+      local id = find_session(p.label)
+      if id == nil then
+        local s, err = rex.call("session.create", {
+          label = p.label,
+          initial_windows = { {
+            layout = rex.layout.block{
+              flavor  = "com.superlogical.terminal.shell",
+              options = { cwd = p.dir },
+            },
+          } },
+        })
+        if err ~= nil then error(err, 0) end
+        id = s.session_id
+      end
+      pcall(rex.client.queue, "session.select", { session_id = id })
+      return { session_id = id, dir = p.dir }
+    end,
+  }
+end
