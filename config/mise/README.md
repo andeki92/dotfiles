@@ -13,7 +13,7 @@ project that needs its own.
 - `config/zsh/.config/zsh/lazy/70-updates.zsh` — `miseup` (`mise upgrade`) and
   the weekly "updates available" nudge.
 - `.github/renovate.json` — Renovate's `mise` manager proposes version bumps
-  for the global config (lua is held back for LazyVim).
+  for the global config.
 
 ## Conventions
 

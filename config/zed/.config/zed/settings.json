@@ -21,7 +21,7 @@
   "ui_font_size": 16,
   "buffer_font_size": 15,
 
-  // Catppuccin theming — kept consistent with ghostty / starship / nvim.
+  // Catppuccin theming — kept consistent with ghostty / starship.
   // The extensions are auto-installed on launch (needs network the first time);
   // system appearance switches Latte (light) <-> Macchiato (dark), mirroring
   // ghostty's `light:catppuccin-latte,dark:catppuccin-macchiato`.

@@ -18,7 +18,7 @@ stow.
 ## Theming
 
 Kept consistent with the rest of the setup — Catppuccin **Macchiato** (dark) /
-**Latte** (light), matching ghostty, starship, and nvim. Both flavors are
+**Latte** (light), matching ghostty and starship. Both flavors are
 applied via system appearance, mirroring ghostty's `light:latte / dark:macchiato`
 auto-switch.
 

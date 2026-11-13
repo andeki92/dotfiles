@@ -32,12 +32,6 @@
       "matchUpdateTypes": ["major"],
       "groupName": "mise tools (major)",
       "automerge": false
-    },
-    {
-      "description": "Pin lua — nvim requires a specific version, don't auto-update",
-      "matchManagers": ["mise"],
-      "matchPackageNames": ["lua"],
-      "enabled": false
     }
   ],
   "mise": { "enabled": true }
