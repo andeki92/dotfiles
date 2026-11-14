@@ -2,9 +2,16 @@
 # focused herdr tab instead of the pane it was typed in. Any flags or
 # subcommands (`-p`, `--resume`, `mcp`, ...), and any shell outside herdr or
 # without herdr/jq on PATH, pass straight through to the real binary.
+#
+# Every session starts without your gitlab.com credential helper, the
+# GIT_CONFIG_* trio eager/10-platform.zsh exports, so agents reach gitlab.com
+# only through 0th's `1st`. `claude plugin ...` keeps it: adding and updating
+# the private zeroth marketplace needs your glab login.
+_claude_strip=(env -u GIT_CONFIG_COUNT -u GIT_CONFIG_KEY_0 -u GIT_CONFIG_VALUE_0)
 claude() {
-  (( $# == 0 )) && _claude_herdr_tab "command claude" && return
-  command claude "$@"
+  [[ "${1:-}" == plugin ]] && { command claude "$@"; return; }
+  (( $# == 0 )) && _claude_herdr_tab "${_claude_strip[*]} claude" && return
+  "${_claude_strip[@]}" claude "$@"
 }
 
 # c — Claude Code with tracking on, so the flag-gated features DO_NOT_TRACK
@@ -16,8 +23,8 @@ claude() {
 # herdr tab, as a bare `claude` does.
 c() {
   local -a flags=(--model opus --effort high --advisor fable)
-  (( $# == 0 )) && _claude_herdr_tab "DO_NOT_TRACK=0 command claude ${flags[*]}" && return
-  DO_NOT_TRACK=0 command claude "${flags[@]}" "$@"
+  (( $# == 0 )) && _claude_herdr_tab "${_claude_strip[*]} DO_NOT_TRACK=0 claude ${flags[*]}" && return
+  "${_claude_strip[@]}" DO_NOT_TRACK=0 claude "${flags[@]}" "$@"
 }
 
 # _claude_herdr_tab <command line> — run the command line in a new, focused

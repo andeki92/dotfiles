@@ -28,6 +28,12 @@ typeset -U path
 if is_macos; then
   # macOS-specific minimal settings
   path=(/usr/local/bin /usr/bin /bin /usr/sbin /sbin $HOME/.local/bin $path)
+  # Your own git reaches gitlab.com through glab. This lives in the shell, not
+  # git/config-macos, so the claude launchers (lazy/81-herdr-claude.zsh) can
+  # strip it and agent sessions find no gitlab.com credential.
+  export GIT_CONFIG_COUNT=1
+  export GIT_CONFIG_KEY_0=credential.https://gitlab.com.helper
+  export GIT_CONFIG_VALUE_0='!glab auth git-credential'
 elif is_linux; then
   # Linux-specific minimal settings
   path=(/usr/local/bin /usr/bin /bin /usr/local/sbin /usr/sbin /sbin $HOME/.local/bin $path)
