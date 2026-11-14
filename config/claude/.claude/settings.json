@@ -1,12 +1,10 @@
 {
   "cleanupPeriodDays": 365,
-  "env": {
-    "GIT_CONFIG_VALUE_1": "/Users/akle/.config/glab-agent/git-credential",
-    "GLAB_CONFIG_DIR": "/Users/akle/.config/glab-agent",
-    "SSL_CERT_FILE": "/etc/ssl/cert.pem",
-    "CLAUDE_CODE_SUBAGENT_EFFORT": "medium"
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
   },
-  "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
       "Bash(claude --version)"
@@ -16,12 +14,10 @@
       "ExitPlanMode",
       "DesignSync",
       "NotebookEdit",
-      "SendMessage",
       "PushNotification",
       "RemoteTrigger",
       "ReportFindings",
       "ScheduleWakeup",
-      "AskUserQuestion",
       "CronCreate",
       "CronDelete",
       "CronList"
@@ -93,44 +89,16 @@
   "enabledPlugins": {
     "skill-creator@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true,
-    "akle-skills@skills": true
+    "workflow@zeroth": true
   },
   "extraKnownMarketplaces": {
-    "skills": {
+    "zeroth": {
       "source": {
         "source": "git",
-        "url": "https://gitlab.com/bache-klever/skills.git"
+        "url": "https://gitlab.com/bache-klever/0th.git",
+        "sparsePaths": [".claude-plugin", "skills"]
       },
       "autoUpdate": true
-    }
-  },
-  "sandbox": {
-    "network": {
-      "allowedDomains": [
-        "gitlab.com",
-        "github.com"
-      ],
-      "allowLocalBinding": true
-    },
-    "filesystem": {
-      "allowWrite": [
-        "/private/var/folders/*/*/T/*",
-        "/private/var/folders/*/*/T/*/*",
-        "/private/var/folders/*/*/T/*/*/*"
-      ],
-      "denyRead": [
-        "~/.cargo/credentials.toml",
-        "~/.cargo/credentials"
-      ],
-      "allowRead": [
-        "~/.rustup",
-        "~/.cargo",
-        "~/.local/bin",
-        "~/.local/share/uv",
-        "~/.local/share/mise",
-        "~/.venvs",
-        "~/.config/glab-agent"
-      ]
     }
   },
   "feedbackDrafts": "off",

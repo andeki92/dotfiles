@@ -6,8 +6,9 @@ guiPrompt = false
 helper =
 helper = /usr/local/share/gcm-core/git-credential-manager
 
-# gitlab.com authenticates through glab instead. The blank helper clears the
-# GCM entry above, which git would otherwise ask first.
+# gitlab.com gets no helper from files: the blank clears the GCM entry above.
+# Your shell adds `!glab auth git-credential` through GIT_CONFIG_* in
+# zsh/eager/10-platform.zsh, and the claude launchers strip it, so agent
+# sessions reach gitlab.com only through 0th's `1st`.
 [credential "https://gitlab.com"]
 helper =
-helper = !glab auth git-credential
