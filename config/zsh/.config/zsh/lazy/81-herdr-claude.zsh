@@ -21,10 +21,16 @@ claude() {
 # top-level effortLevel setting and start at medium; the flag ranks below
 # /effort, so a level picked mid-session still wins. A bare `c` opens its own
 # herdr tab, as a bare `claude` does.
+#
+# Code Mode (experimental) is on by default (0th's ADR-050); a session started
+# in it resumes only with it on. `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=0 c` opts
+# one launch out, for a session telemetry must trace: Code Mode won't start
+# while CLAUDE_CODE_ENABLE_TELEMETRY is set.
 c() {
   local -a flags=(--model opus --effort high --advisor fable)
-  (( $# == 0 )) && _claude_herdr_tab "${_claude_strip[*]} DO_NOT_TRACK=0 claude ${flags[*]}" && return
-  "${_claude_strip[@]}" DO_NOT_TRACK=0 claude "${flags[@]}" "$@"
+  local mode="CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=${CLAUDE_CODE_EXPERIMENTAL_CODE_MODE:-1}"
+  (( $# == 0 )) && _claude_herdr_tab "${_claude_strip[*]} $mode DO_NOT_TRACK=0 claude ${flags[*]}" && return
+  "${_claude_strip[@]}" "$mode" DO_NOT_TRACK=0 claude "${flags[@]}" "$@"
 }
 
 # _claude_herdr_tab <command line> — run the command line in a new, focused
