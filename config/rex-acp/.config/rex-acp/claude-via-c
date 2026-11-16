@@ -1,0 +1,8 @@
+#!/bin/zsh -f
+# Claude Code started the way `c` starts it: Code Mode, the latest Opus at
+# high effort with Fable as advisor, tracking on, and no gitlab.com credential
+# helper. rex-acp's `c` agent points its Claude adapter here through
+# CLAUDE_CODE_EXECUTABLE. `c` is a zsh function, so this loads the file that
+# defines it, and nothing else, which keeps stdout free for stream-json.
+source "${XDG_CONFIG_HOME:-$HOME/.config}/zsh/lazy/81-herdr-claude.zsh" || exit 1
+c "$@"

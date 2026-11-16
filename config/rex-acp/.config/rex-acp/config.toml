@@ -1,0 +1,24 @@
+# rex-acp: the agents `rex-acp [AGENT]` starts, and the default.
+# Reference: https://gitlab.com/bache-klever/rex-acp (README, "Config").
+
+default = "c"
+
+# Claude Code exactly as `c` starts it, Code Mode and all: claude-via-c, beside
+# this file, loads `c` and runs it. The Claude adapter starts the program
+# CLAUDE_CODE_EXECUTABLE names; zsh expands $HOME, which TOML can't. Extra
+# arguments, such as `rex-acp c -- -w 123-flaky-tests`, reach claude.
+[agents.c]
+command = ["zsh", "-fc", 'CLAUDE_CODE_EXECUTABLE="$HOME/.config/rex-acp/claude-via-c" exec rex-acp claude-agent -- "$@"', "c"]
+
+# What `c` runs, without Code Mode: Claude Code on the latest Opus at high effort, with the latest
+# Fable as advisor. Tracking on, so flag-gated features such as the advisor work.
+[agents.opus]
+adapter = "claude"
+args = ["--model", "opus", "--effort", "high", "--advisor", "fable"]
+env = { DO_NOT_TRACK = "0" }
+
+# Cheap and fast, for quick questions.
+[agents.haiku]
+adapter = "claude"
+args = ["--model", "haiku"]
+env = { DO_NOT_TRACK = "0" }

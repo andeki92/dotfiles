@@ -7,59 +7,52 @@ this package links the file, never the folder.
 
 ```
 .config/rex/
-├── init.lua               bindings, the new-work session and the projects
+├── init.lua               bindings and the new-work session
 └── projects.example.lua   a starting point for this machine's projects.lua
 ```
 
 | Key | Action | What it does |
 | --- | --- | --- |
-| `cmd+b` | `new_work` | Starts a piece of work as its own Rex session (below). |
+| `cmd+b` | `new_work` | Starts a piece of work in a project, as its own Rex session (below). |
 | `cmd+r` | `client.config.reload` | Reloads this file. |
-| `shift+cmd+p`, then a project | `project_<label>` | Goes to a favourite project's session (below). |
 
-## One session per piece of work
+## New work: one session per piece of work
 
-Rex's agent hook names the whole session after the agent's task, so each piece
-of work gets a session of its own. Its tabs and splits hold that work's
-helpers: servers, test runs, other agents.
+`cmd+b` opens a new session whose one pane lists this machine's projects in
+fzf. Type part of a name and press Enter, then give a worktree's name, such as
+`123-flaky-tests`, or press Enter alone for the main checkout. The session is
+named `<project> · <worktree>`, or just `<project>`, so the sidebar shows
+where every piece of work runs, and rex-acp starts in the project's folder with
+its `c` agent: Claude Code as `c` starts it, Code Mode and all, in that
+worktree. Esc, or `ctrl+c` at the worktree prompt, cancels and removes the
+session.
 
-`cmd+b` creates a session titled `<Repo> - new work`, for the repository of
-the pane that has focus, and switches to it. Its one pane asks for a
-worktree's name, such as `123-flaky-tests`. Enter renames the session to
-`<Repo> - <name>`, such as `Notes - 123-flaky-tests`, and runs `c -w <name>`
-there. From inside `.claude/worktrees/…`, the repository is the main checkout.
-Empty input or `ctrl+c` cancels and removes the session.
+When rex-acp exits (`ctrl+d` in its input pane), the session removes itself,
+because Rex keeps a session whose last window has closed. The worktree stays:
+Claude Code only offers to remove it when it runs in a terminal of its own.
 
-When Claude exits, the session removes itself, because Rex keeps a session
-whose last window has closed. Claude Code removes the worktree and its branch
-too when they hold no changes; otherwise it asks.
+Agents leave the session's name alone; `~/.claude/CLAUDE.md` tells them to
+name the tab instead.
 
 Don't name an issue's worktree `#123`: Claude Code reads `-w "#123"` as merge
 request 123. Use the bare number, as in `123-slug`.
 
 ## Projects
 
-Each favourite project is an entry in Rex's command palette, `Project:
-<label>`, under a Projects heading. Press `shift+cmd+p`, type part of the
-name, and press Enter. It switches to the session labelled `<label>`, in any
-case, or creates it with a shell in the project's folder. From then on
-`cmd+k` lists it with the other sessions, and `cmd+b` from it starts work in
-that repository.
-
 The list is each machine's own and is never committed, since it often names
 private folders. `init.lua` reads it from `~/.config/rex/projects.lua`, a
-plain file beside the links. `projects.example.lua` shows the format. To add a
-project, add a line there and press `cmd+r`:
+plain file beside the links, every time `cmd+b` opens the picker, so an edit
+needs no reload. `projects.example.lua` shows the format:
 
 ```lua
 return {
-  { label = "Dotfiles", dir = "~/.dotfiles" },
-  { label = "Notes",    dir = "~/notes" },
+  { label = "dotfiles", dir = "~/.dotfiles" },
+  { label = "notes",    dir = "~/notes" },
 }
 ```
 
-Without the file there are no project entries. An entry with no `label` or
-`dir`, or a file that fails to load, is logged as a warning.
+The picker lists them in the file's order. Without the file, `cmd+b` says
+there are no projects; a file that fails to load is reported the same way.
 
 ## Setup (once per machine)
 
