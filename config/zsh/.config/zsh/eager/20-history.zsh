@@ -21,16 +21,17 @@ setopt HIST_IGNORE_SPACE       # a leading space keeps a command out of history
 setopt HIST_REDUCE_BLANKS      # collapse extra whitespace before saving
 setopt HIST_VERIFY             # show what !! and friends expand to before running
 
-# Keep commands that look like they carry a secret out of the file: a value
-# given to something named like a credential (GITHUB_TOKEN=..., --password=...,
-# ?session=...) or an auth header. Mentioning one (kubectl get secret, grep
-# token) is fine. Returning 2 keeps the line in this shell's own history, so
+# Keep commands that look like they carry a secret out of the file: a literal
+# value given to something named like a credential (GITHUB_TOKEN=abc,
+# --password=x, ?session=...) or an auth header. A reference is saved as
+# usual: TOKEN="$(security ...)", TOKEN=$OTHER, an empty TOKEN=, or a mention
+# such as kubectl get secret or grep token. Returning 2 keeps the line in this shell's own history, so
 # up-arrow still finds it, but never writes it, so it doesn't spread to other
 # shells or outlive the session.
 _history_skip_secrets() {
   emulate -L zsh -o extended_glob
   local name='(password|passwd|passphrase|token|secret|session|api[_-]#key|private[_-]#key)'
-  [[ $1 == (#i)*${~name}[a-z0-9_]#=* ||
+  [[ $1 == (#i)*${~name}[a-z0-9_]#=[\"\']#[^\$\"\'[:space:]]* ||
      $1 == (#i)*(bearer[[:space:]]|authorization:|cookie:|x-api-key:)* ]] && return 2
   return 0
 }
