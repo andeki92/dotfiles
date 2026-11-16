@@ -3,8 +3,8 @@
 [herdr](https://herdr.dev) hosts every Claude Code session here. This package
 holds its config and the one local plugin; the Claude side is two hooks in
 `config/claude/.claude/hooks/` and the `claude()` and `c()` wrappers in
-`config/zsh/.config/zsh/lazy/81-herdr-claude.zsh`, which open a bare launch
-in a new herdr tab.
+`config/zsh/.config/zsh/eager/47-ai.zsh`, which no longer open a new herdr
+tab.
 
 ```
 .config/herdr/
@@ -30,7 +30,6 @@ again after a herdr upgrade: herdr's docs ask for an integration reinstall.
 | Working / idle / blocked | herdr | screen detection (`HERDR_AGENT=claude`) |
 | Resume after server restart | herdr | `hooks/herdr-agent-state.sh`, herdr-managed |
 | What the session is doing | Claude | its terminal title, shown via `terminal_title_stripped` |
-| New tab per `claude` | us | `claude()` zsh wrapper |
 | Worktree ↔ workspace | us | `hooks/herdr-worktree.sh` |
 | PR / MR and CI | us | `pr-status` plugin, `$pr` token |
 

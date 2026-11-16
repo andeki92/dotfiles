@@ -1,14 +1,8 @@
-# mise-en-place integration for zsh
-# Load critical PATH integration immediately, defer completions
-
-# Check if mise is installed
-if command -v mise &>/dev/null; then
-  # Critical: Use eval directly for mise activation to ensure proper PATH setup
+# mise-en-place: activate eagerly, so tools are on PATH before the prompt.
+# Completion comes from Homebrew's site-functions/_mise, which compinit
+# (lazy/60-completion.zsh) picks up; nothing to load here.
+if (( $+commands[mise] )); then
   eval "$(mise activate zsh)"
-  
-  # Defer only the completion loading as it's not critical for functionality
-  zsh-defer eval "$(mise completion zsh)"
 else
-  # Even the error message is deferred to not slow down startup
-  zsh-defer echo "mise is not installed. Run 'brew install mise' to install it."
-fi 
+  print -u2 "mise not found: add it to the Brewfile (config/brew) and run brew bundle --global."
+fi

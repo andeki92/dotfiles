@@ -13,10 +13,11 @@ if command -v fd &> /dev/null; then
   # Search directories
   export FZF_ALT_C_COMMAND='fd --type directory --color=never --follow --hidden --exclude .git --exclude node_modules --strip-cwd-prefix 2>/dev/null'
 else
-  # Fallback to find if fd not available - use basename for cleaner display
+  # Fallback to find if fd not available. sed strips the leading ./, as GNU
+  # find's -printf "%P" would; BSD find on macOS has no -printf.
   export FZF_DEFAULT_COMMAND='find . -type f -not -path "*/\.git/*" -not -path "*/node_modules/*" 2>/dev/null'
-  export FZF_CTRL_T_COMMAND='find . -type f -not -path "*/\.git/*" -not -path "*/node_modules/*" -printf "%P\n" 2>/dev/null'
-  export FZF_ALT_C_COMMAND='find . -type d -not -path "*/\.git/*" -not -path "*/node_modules/*" -printf "%P\n" 2>/dev/null'
+  export FZF_CTRL_T_COMMAND='find . -type f -not -path "*/\.git/*" -not -path "*/node_modules/*" 2>/dev/null | sed "s|^\./||"'
+  export FZF_ALT_C_COMMAND='find . -mindepth 1 -type d -not -path "*/\.git/*" -not -path "*/node_modules/*" 2>/dev/null | sed "s|^\./||"'
 fi
 
 # Add preview capabilities with better error handling and formatting - uses explicit quoting for Ghostty

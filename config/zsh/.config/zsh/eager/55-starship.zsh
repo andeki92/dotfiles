@@ -1,19 +1,14 @@
-# Starship Prompt Initialization
-# Note: Starship doesn't work well with zsh-defer, so we load it directly
-
-# Check if starship is installed
-if (( $+commands[starship] )); then
-  # Initialize starship directly
-  eval "$(starship init zsh)"
+# Starship prompt. Eager, because it draws the first prompt; its init script
+# comes from the cache (eager/16-cached-init.zsh). starship itself comes from
+# mise (config/mise), so this runs after eager/50-mise.zsh.
+if _cached_init starship starship init zsh --print-full-init; then
+  source "$REPLY"
+  # starship.toml has no right_format, so the right prompt is always empty;
+  # without this, starship still runs once more per prompt to print nothing.
+  # Remove this line if you add a right_format.
+  RPROMPT=''
 else
-  # Set a basic fallback prompt if starship is not installed
   PROMPT='%F{cyan}> %f'
   RPROMPT=''
-  
-  # Enable colors for the fallback prompt
-  autoload -Uz colors && colors
-  
-  # Output warning about missing starship (only once at startup)
-  echo "Warning: Starship is not installed. Using fallback prompt."
-  echo "Install with: brew install starship"
-fi 
+  print -u2 "starship not found: using a plain prompt. It comes from mise (config/mise)."
+fi

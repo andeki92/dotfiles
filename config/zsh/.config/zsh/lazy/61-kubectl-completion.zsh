@@ -4,18 +4,13 @@
 
 _setup_k8s_completion() {
   # Only setup completions if commands exist
-  if (( $+commands[kubectl] )); then
-    source <(kubectl completion zsh)
+  # Cached per kubectl binary (eager/16-cached-init.zsh): generating it costs
+  # a 25ms kubectl run.
+  if _cached_init kubectl kubectl completion zsh; then
+    source "$REPLY"
   fi
 
-  # Completion for kubectx and kubens if installed
-  if (( $+commands[kubectx] )); then
-    [[ -f ~/.config/kubectx/completion/kubectx.zsh ]] && source ~/.config/kubectx/completion/kubectx.zsh
-  fi
-
-  if (( $+commands[kubens] )); then
-    [[ -f ~/.config/kubectx/completion/kubens.zsh ]] && source ~/.config/kubectx/completion/kubens.zsh
-  fi
+  # kubectx and kubens: vendored in completions/, found by compinit
 }
 
 # Defer the completion setup to run after the main completion system is initialized

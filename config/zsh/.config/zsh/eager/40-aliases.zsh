@@ -9,12 +9,13 @@ alias .....='cd ../../../..'
 
 # General
 alias h='history'
-alias rl='typeset -U path && unset __ZSHRC_ALREADY_LOADED && source ~/.zshrc && clear'
+# rl — reload by replacing the shell, not re-sourcing .zshrc on top of it:
+# re-sourcing keeps aliases and functions a newer config no longer defines.
+alias rl='exec zsh'
 
 # Listing
 alias l='ls -lah'
 alias la='ls -lAh'
 alias ll='ls -lh'
 
-# AI
-alias oc='opencode'
+# AI agents (claude, c, oc): eager/47-ai.zsh

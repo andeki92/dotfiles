@@ -6,7 +6,7 @@ UPDATE_TIMESTAMPS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/zsh/updates"
 mkdir -p "$UPDATE_TIMESTAMPS_DIR"
 
 # Config - how often to remind for updates (in days)
-: ${UPDATE_REMINDER_DAYS:=3}  # Default to 3 day if not set elsewhere
+: ${UPDATE_REMINDER_DAYS:=3}  # Default to 3 days if not set elsewhere
 
 # ==== Update Functions ====
 
@@ -39,17 +39,11 @@ update_all() {
 _needs_update() {
   local timestamp_file="$UPDATE_TIMESTAMPS_DIR/$1-update"
 
-  # If timestamp doesn't exist, definitely needs update
-  if [[ ! -f "$timestamp_file" ]]; then
-    return 0  # true in shell logic
-  fi
-
-  # Check if it's been more than UPDATE_REMINDER_DAYS since last update
-  local last_update=$(stat -f "%m" "$timestamp_file")
-  local now=$(date +%s)
-  local days_since=$(( (now - last_update) / 86400 ))
-
-  [[ $days_since -ge $UPDATE_REMINDER_DAYS ]]
+  # Up to date when the timestamp was touched less than UPDATE_REMINDER_DAYS
+  # ago. A glob qualifier (m: modified, h: hours) reads the age without
+  # stat, whose flags differ between macOS and Linux. Missing file: due.
+  local -a fresh=( $timestamp_file(N.mh-$(( UPDATE_REMINDER_DAYS * 24 ))) )
+  (( ! $#fresh ))
 }
 
 # ==== Reminder System ====
@@ -83,5 +77,7 @@ alias updateall="update_all"
 
 # ==== Auto-check on startup ====
 
-# Run the check deferred so it doesn't slow down startup
-zsh-defer check_updates
+# Run the check deferred so it doesn't slow down startup. -1 -2: zsh-defer
+# sends a task's stdout and stderr to /dev/null by default, which hid this
+# reminder.
+zsh-defer -1 -2 check_updates
