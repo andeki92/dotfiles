@@ -1,8 +1,8 @@
 # Homebrew aliases and functions
 # Provides shortcuts for common Homebrew operations
 
-# Update Homebrew, upgrade all packages, and clean up
-alias brewup="brew update && brew upgrade && brew cleanup"
+# brewup (update, upgrade, cleanup) is in lazy/70-updates.zsh, which also
+# records the update for the reminder.
 
 # Show what would be installed/upgraded without actually doing it
 alias brewdry="brew upgrade --dry-run"
@@ -54,16 +54,5 @@ brewedit() {
 # Display path to global Brewfile
 alias brewfile="echo ${XDG_CONFIG_HOME:-$HOME/.config}/homebrew/Brewfile"
 
-# Sync Brewfile from system to dotfiles repository
-brewsync() {
-  local src="${XDG_CONFIG_HOME:-$HOME/.config}/homebrew/Brewfile"
-  local dest="$HOME/.dotfiles/config/brew/.config/homebrew/Brewfile"
-
-  if [[ -f "$src" ]]; then
-    cp "$src" "$dest"
-    echo "Brewfile synced from $src to $dest"
-  else
-    echo "Error: Brewfile not found at $src"
-    return 1
-  fi
-}
+# No brewsync: ~/.config/homebrew is stowed from this repo, so brewdump
+# already writes the repo's Brewfile.

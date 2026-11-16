@@ -1,0 +1,4 @@
+#compdef kubens kns=kubens
+# Vendored unchanged from ahmetb/kubectx v0.11.0 completion/ (Apache-2.0,
+# see LICENSE-kubectx): mise installs kubectx as a bare binary, without these.
+_arguments "1: :(- $(kubectl get namespaces -o=jsonpath='{range .items[*].metadata.name}{@}{"\n"}{end}'))"

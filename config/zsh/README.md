@@ -2,14 +2,19 @@
 
 ## Structure
 - **eager/**: Eagerly loaded config files (core, platform, env, history, Homebrew, aliases)
-- **lazy/**: Lazily loaded plugins and heavy config (using zsh-defer)
+- **lazy/**: Functions, completion and integrations that can wait for the first prompt
 - **plugins/**: Bundled plugins (e.g., zsh-defer)
 - `.zshrc`: Entrypoint, sources all config in order
 
 ## Load Order
-1. Eager files: `*.zsh` in numeric order
-2. Lazy files: `lazy/*.zsh` in numeric order (using zsh-defer)
-3. Aliases: Always last
+1. Eager files: `eager/*.zsh` in numeric order, before the first prompt
+2. Lazy files: `lazy/*.zsh` in numeric order, as one zsh-defer task once the
+   first prompt is drawn. Nothing in `lazy/` exists in `zsh -i -c`, so
+   anything a command line or script needs belongs in `eager/`.
+3. Tasks the lazy files queue with zsh-defer themselves (compinit, kubectl
+   completion, the update reminder)
+
+`scripts/benchmark.sh` times `zsh -i -c exit`, so it measures eager files only.
 
 ## Optimization Checklist
 - [ ] Use `zprof` to profile startup and identify slow segments

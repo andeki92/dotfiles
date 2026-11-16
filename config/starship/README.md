@@ -10,13 +10,11 @@
 
 ## Integration with Zsh
 
-Starship is integrated with our Zsh configuration directly (not lazy-loaded):
-
-```
-config/zsh/.config/zsh/eager/30-starship.zsh
-```
-
-**Note:** We found that Starship doesn't work well with zsh-defer, so it's loaded directly rather than being lazy-loaded. Fortunately, Starship is designed to be very fast, so this doesn't significantly impact shell startup time.
+`config/zsh/.config/zsh/eager/55-starship.zsh` loads Starship eagerly, since
+it draws the first prompt and can't wait for zsh-defer. It sources the
+output of `starship init zsh --print-full-init` from a cache
+(`eager/16-cached-init.zsh`), regenerated when the starship binary changes,
+so startup doesn't fork starship to get it.
 
 ## Customization
 
@@ -27,11 +25,7 @@ To customize the prompt:
 
 ## Installation
 
-Starship is installed via Homebrew in our setup:
-
-```bash
-brew install starship
-```
+Starship is installed by mise (`config/mise/.config/mise/config.toml`).
 
 Our dotfiles will automatically set up the configuration when stowed:
 

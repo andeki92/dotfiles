@@ -1,0 +1,22 @@
+#compdef kubectx kctx=kubectx
+# Vendored unchanged from ahmetb/kubectx v0.11.0 completion/ (Apache-2.0,
+# see LICENSE-kubectx): mise installs kubectx as a bare binary, without these.
+
+local KUBECTX="${HOME}/.kube/kubectx"
+PREV=""
+
+local context_array=("${(@f)$(kubectl config get-contexts --output='name')}")
+local all_contexts=(\'${^context_array}\')
+
+if [ -f "$KUBECTX" ]; then
+    # show '-' only if there's a saved previous context
+    local PREV=$(cat "${KUBECTX}")
+
+    _arguments \
+      "-d:*: :(${all_contexts})" \
+      "(- *): :(- ${all_contexts})"
+else
+    _arguments \
+      "-d:*: :(${all_contexts})" \
+      "(- *): :(${all_contexts})"
+fi

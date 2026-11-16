@@ -1,22 +1,20 @@
 # Platform detection
 # These functions allow for platform-specific configurations
 
+# $OSTYPE and $(<file) need no fork, unlike $(uname).
+
 is_macos() {
-  [[ "$(uname)" == "Darwin" ]]
+  [[ $OSTYPE == darwin* ]]
 }
 
 is_linux() {
-  [[ "$(uname)" == "Linux" ]]
+  [[ $OSTYPE == linux* ]]
 }
 
 is_wsl() {
-  # Most reliable WSL detection method:
-  # Check for /proc/sys/fs/binfmt_misc/WSLInterop
-  [[ -e /proc/sys/fs/binfmt_misc/WSLInterop ]] ||
-  # Fallback: check kernel version string for "microsoft" or "Microsoft"
-  [[ "$(uname -r)" =~ [Mm]icrosoft ]] ||
-  # Fallback: check if WSL_DISTRO_NAME environment variable exists
-  [[ -n "${WSL_DISTRO_NAME}" ]]
+  # WSL's interop entry, then its env var, then "microsoft" in the kernel version
+  [[ -e /proc/sys/fs/binfmt_misc/WSLInterop || -n "${WSL_DISTRO_NAME:-}" ]] ||
+  [[ -r /proc/version && "$(</proc/version)" == *[Mm]icrosoft* ]]
 }
 
 # Ensure PATH elements are unique to prevent duplication during reload
@@ -29,7 +27,7 @@ if is_macos; then
   # macOS-specific minimal settings
   path=(/usr/local/bin /usr/bin /bin /usr/sbin /sbin $HOME/.local/bin $path)
   # Your own git reaches gitlab.com through glab. This lives in the shell, not
-  # git/config-macos, so the claude launchers (lazy/81-herdr-claude.zsh) can
+  # git/config-macos, so the claude launchers (eager/47-ai.zsh) can
   # strip it and agent sessions find no gitlab.com credential.
   export GIT_CONFIG_COUNT=1
   export GIT_CONFIG_KEY_0=credential.https://gitlab.com.helper

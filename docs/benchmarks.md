@@ -8,6 +8,7 @@ Measured locally every now and again with `./scripts/benchmark.sh --save`; there
 
 | Date | Description | Median | Average |
 |------|-------------|--------|---------|
+| 2026-11-16 | Defer lazy/ for real, cache starship and fzf init | .063s | .063s |
 | 2025-04-28 | Add defered setups | .060s | .061s |
 | 2025-04-28 | Introduce homebrew | .060s | .060s |
 | 2025-04-28 | Update hist settings | .050s | .050s |

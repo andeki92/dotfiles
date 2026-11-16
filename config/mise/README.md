@@ -9,9 +9,10 @@ project that needs its own.
 - `.config/mise/config.toml` — the global toolset and settings, stowed to
   `~/.config/mise/config.toml`.
 - `config/zsh/.config/zsh/eager/50-mise.zsh` — `mise activate zsh` runs eagerly
-  so PATH is right before the first prompt; completions are deferred.
+  so PATH is right before the first prompt; completion comes from Homebrew's
+  `_mise` in site-functions.
 - `config/zsh/.config/zsh/lazy/70-updates.zsh` — `miseup` (`mise upgrade`) and
-  the weekly "updates available" nudge.
+  the "updates available" nudge (every 3 days by default).
 - `.github/renovate.json` — Renovate's `mise` manager proposes version bumps
   for the global config.
 

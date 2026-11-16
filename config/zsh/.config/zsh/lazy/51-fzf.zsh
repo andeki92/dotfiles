@@ -3,9 +3,10 @@
 
 # Quick file open with editor
 fe() {
-  local files
-  # Use cleaner formatting with shortened paths for better readability
-  IFS=$'\n' files=($(fd --type file --hidden --follow --exclude ".git" 2>/dev/null |
+  local -a files
+  # One element per line. (Not `IFS=$'\n' files=(...)`: with no command
+  # after them, both assignments stick, and IFS stays changed in the shell.)
+  files=("${(@f)$(fd --type file --hidden --follow --exclude ".git" 2>/dev/null |
     fzf --query="$1" --multi --select-1 --exit-0 \
         --preview '[[ -f {} ]] && bat --style=numbers --color=always --line-range :300 {} || echo "Not a file"' \
         --preview-window="right:60%" \
@@ -16,9 +17,9 @@ fe() {
         --pointer="→" \
         --marker="✓" \
         --header="Select file to edit (ESC=exit, Enter=open)" \
-        --bind="ctrl-/:toggle-preview"))
+        --bind="ctrl-/:toggle-preview")}")
 
-  [[ -n "$files" ]] && ${EDITOR:-vim} "${files[@]}"
+  [[ -n "${files[1]}" ]] && ${EDITOR:-vim} "${files[@]}"
 }
 
 # cd to selected directory
@@ -113,14 +114,14 @@ ffx() {
 # Load FZF shell integration (completions and key bindings)
 # =======================================================
 
-# fzf shell integration: key-bindings (^R, ^T, ^[c) + completion.
-# eval — NOT source <(...) — so it stays zsh-defer-safe.
-if command -v fzf &>/dev/null; then
-  if fzf --zsh &>/dev/null; then
-    eval "$(fzf --zsh)"                    # fzf 0.48+
+# fzf shell integration: key-bindings (^R, ^T, ^[c) + completion. The
+# `fzf --zsh` script is cached per fzf binary (eager/16-cached-init.zsh).
+if (( $+commands[fzf] )); then
+  if _cached_init fzf fzf --zsh; then
+    source "$REPLY"                        # fzf 0.48+
   else
-    # Older fzf: source on-disk scripts, auto-locating the base dir.
-    for _b in ~/.fzf "$(brew --prefix fzf 2>/dev/null)" \
+    # Older fzf has no --zsh: source its on-disk scripts.
+    for _b in ~/.fzf ${HOMEBREW_PREFIX:+$HOMEBREW_PREFIX/opt/fzf} \
               /usr/local/opt/fzf /opt/homebrew/opt/fzf /usr/share/fzf; do
       [[ -r "$_b/shell/key-bindings.zsh" ]] && source "$_b/shell/key-bindings.zsh"
       [[ -r "$_b/shell/completion.zsh"   ]] && source "$_b/shell/completion.zsh"

@@ -1,5 +1,12 @@
 #!/usr/bin/env zsh
 
+# One KUBECONFIG list: ~/.kube/config first, then every file in
+# ~/.kube/configs/ (such as homelab's task talos:kube-login). (N) lets the
+# glob match nothing. A shell started before a new file appears needs a restart.
+export KUBECONFIG="$HOME/.kube/config"
+for f in "$HOME"/.kube/configs/*.yaml(N); do KUBECONFIG="$KUBECONFIG:$f"; done
+unset f
+
 # kubectl aliases
 alias k='kubectl'
 alias kg='kubectl get'
@@ -51,33 +58,30 @@ kstatus() {
   kubectl get pods -o wide
 }
 
-# Helper function to follow logs of the most recent pod matching a pattern
-klp() {
-  if [[ -z "$1" ]]; then
-    echo "Usage: klp <pod-name-pattern>"
-    return 1
-  fi
-  POD=$(kubectl get pods | grep "$1" | head -n 1 | awk '{print $1}')
-  if [[ -z "$POD" ]]; then
-    echo "No pod matching pattern: $1"
-    return 1
-  fi
-  echo "Following logs for pod: $POD"
-  kubectl logs -f "$POD"
+# _kpod <pattern> — print the first pod whose name matches <pattern> (a regex)
+_kpod() {
+  kubectl get pods --no-headers 2>/dev/null | awk -v p="$1" '$1 ~ p { print $1; exit }'
 }
 
-# Helper function to exec into the most recent pod matching a pattern
+# Helper function to follow logs of the first pod matching a pattern
+klp() {
+  [[ -n "$1" ]] || { echo "Usage: klp <pod-name-pattern>"; return 1; }
+  local pod
+  pod=$(_kpod "$1")
+  [[ -n "$pod" ]] || { echo "No pod matching pattern: $1"; return 1; }
+  echo "Following logs for pod: $pod"
+  kubectl logs -f "$pod"
+}
+
+# Helper function to exec into the first pod matching a pattern:
+# kep <pattern> [command [args...]], sh by default
 kep() {
-  if [[ -z "$1" ]]; then
-    echo "Usage: kep <pod-name-pattern> [command]"
-    return 1
-  fi
-  POD=$(kubectl get pods | grep "$1" | head -n 1 | awk '{print $1}')
-  if [[ -z "$POD" ]]; then
-    echo "No pod matching pattern: $1"
-    return 1
-  fi
-  CMD=${2:-"sh"}
-  echo "Executing $CMD in pod: $POD"
-  kubectl exec -it "$POD" -- $CMD
-} 
+  [[ -n "$1" ]] || { echo "Usage: kep <pod-name-pattern> [command [args...]]"; return 1; }
+  local pod
+  pod=$(_kpod "$1")
+  [[ -n "$pod" ]] || { echo "No pod matching pattern: $1"; return 1; }
+  local -a cmd=("${@:2}")
+  (( $#cmd )) || cmd=(sh)
+  echo "Executing ${cmd[*]} in pod: $pod"
+  kubectl exec -it "$pod" -- "${cmd[@]}"
+}

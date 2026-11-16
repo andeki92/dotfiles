@@ -14,7 +14,7 @@ This Zsh configuration follows a modular structure with eager and lazy loading:
 
 A reminder system is included that periodically checks when you last updated your package managers. It:
 
-- Shows reminders when updates are due (default: every 7 days)
+- Shows reminders when updates are due (default: every 3 days)
 - Provides convenient update commands
 - Tracks when updates were last performed
 - Runs after your prompt appears (doesn't slow down startup)
@@ -42,15 +42,21 @@ You can customize the reminder frequency by setting `UPDATE_REMINDER_DAYS` in yo
 ### Package Managers
 
 - **Homebrew**: Managed in eager loading for core functionality
-- **mise-en-place**: Lazily loaded to improve shell startup time
+- **mise-en-place**: activated eagerly (`eager/50-mise.zsh`), so tools are on PATH before the first prompt
 
 ## Loading Order
 
-1. Core system & environment variables (eager)
-2. Prompt & basic interactivity (eager)
-3. Package managers & version managers (lazy)
-4. Completions & enhanced features (lazy)
-5. Aliases & user customizations (lazy)
+1. Core system, environment variables and helpers (eager)
+2. Package managers & version managers (eager)
+3. Aliases, tool functions and the prompt (eager)
+4. Completions, fzf integration & heavier functions (lazy, deferred with zsh-defer)
+
+### Cached init scripts
+
+`eager/16-cached-init.zsh` defines `_cached_init`, which keeps the output of an
+init command (`starship init`, `fzf --zsh`) under `$XDG_CACHE_HOME/zsh/init/`
+and regenerates it when the command's binary resolves to a different file.
+Delete that directory to force a refresh.
 
 ## PATH Management
 
@@ -65,6 +71,7 @@ This approach:
 1. Uses zsh's `path` array which automatically maps to the `PATH` environment variable
 2. The `-U` flag ensures only unique elements are kept in the array
 3. When adding to PATH, we use the array syntax: `path=(/new/path $path)`
-4. The reload alias also reinforces uniqueness: `alias rl='typeset -U path && source ~/.zshrc'`
+This pattern prevents PATH from growing with duplicates when the configuration is sourced again.
 
-This pattern prevents PATH from growing with duplicates when reloading the shell configuration multiple times. 
+To reload, use `rl` (`exec zsh`): it starts a fresh shell, so aliases and
+functions that a newer config no longer defines don't linger.
