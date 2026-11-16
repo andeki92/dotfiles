@@ -16,7 +16,12 @@
 # No settings.json change, no edit to this dispatcher's core logic.
 set -uo pipefail
 
-HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The hook's own directory without forking dirname: settings.json calls it by
+# absolute path, so BASH_SOURCE has a slash; fall back to cd/pwd otherwise.
+case "${BASH_SOURCE[0]}" in
+  /*) HOOK_DIR="${BASH_SOURCE[0]%/*}" ;;
+  *)  HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" ;;
+esac
 LINTERS_DIR="$HOOK_DIR/linters"
 
 # Need jq to read the hook payload. If it's missing, degrade to a no-op rather
@@ -30,7 +35,11 @@ file_path="$(jq -r '.tool_input.file_path // empty' 2>/dev/null)"
 # Lower-cased extension.
 filename="${file_path##*/}"
 ext="${filename##*.}"
-ext="$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"
+if (( BASH_VERSINFO[0] >= 4 )); then
+  ext="${ext,,}"   # no fork
+else
+  ext="$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"   # macOS /bin/bash 3.2
+fi
 
 # Map extension -> linter script. Several extensions can share one linter.
 case "$ext" in

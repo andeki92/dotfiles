@@ -27,6 +27,11 @@
 #   set CLAUDE_ALLOW_BASH_WRITE=1, or append the token '# claude-allow-write'.
 set -uo pipefail
 
+# Speed: this runs before every Bash call, so it starts no process past bash
+# itself and one jq. Matching is bash's [[ =~ ]] (POSIX ERE, the same regexes
+# grep -E used here before), applied line by line as grep did. Helpers return
+# through globals rather than $(...), which would fork a subshell each.
+
 command -v jq >/dev/null 2>&1 || exit 0   # no jq -> degrade to no-op, never block
 
 cmd="$(jq -r '.tool_input.command // empty' 2>/dev/null)"
@@ -56,6 +61,29 @@ EOF
 
 # --- Helpers ----------------------------------------------------------------
 
+# any_line <ERE> — true when some line of $cmd matches, as `grep -Eq` would.
+any_line() {
+  local line
+  while IFS= read -r line; do
+    [[ $line =~ $1 ]] && return 0
+  done <<< "$cmd"
+  return 1
+}
+
+# all_matches <ERE> — every match on every line of $cmd into MATCHES, as
+# `grep -oE` would list them.
+all_matches() {
+  local line rest
+  MATCHES=()
+  while IFS= read -r line; do
+    rest=$line
+    while [[ -n $rest && $rest =~ $1 ]]; do
+      MATCHES+=("${BASH_REMATCH[0]}")
+      rest=${rest#*"${BASH_REMATCH[0]}"}
+    done
+  done <<< "$cmd"
+}
+
 # A redirect/tee/heredoc target counts as "temp/scratch" — always allowed.
 # SC2016: the '$TMPDIR' patterns match the *literal, un-expanded* text as it
 # appears in the command string; we deliberately do not want expansion here.
@@ -71,13 +99,15 @@ is_temp_target() {
   esac
 }
 
-# Does a target path look like a source/config file we'd want edited via Edit?
 src_ext_re='\.(js|jsx|ts|tsx|mjs|cjs|py|pyi|go|rs|rb|php|java|kt|kts|scala|swift|c|h|cc|cpp|cxx|hpp|cs|sh|bash|zsh|fish|lua|vim|el|yaml|yml|toml|ini|cfg|conf|json|json5|jsonc|md|mdx|rst|adoc|html|htm|xml|css|scss|sass|less|styl|vue|svelte|sql|graphql|gql|proto|tf|hcl|gradle|properties|env|zshrc|bashrc|gitignore|gitconfig)$'
 src_name_re='^(Makefile|Dockerfile|Gemfile|Rakefile|Brewfile|Procfile|Vagrantfile|\.gitignore|\.gitconfig|\.zshrc|\.bashrc|\.env|\.editorconfig|\.stowrc)$'
 looks_like_source() {
-  local base="${1##*/}"
-  printf '%s' "$base" | grep -Eiq "$src_ext_re" && return 0
-  printf '%s' "$base" | grep -Eq  "$src_name_re" && return 0
+  local base="${1##*/}" hit=1
+  shopt -s nocasematch
+  [[ $base =~ $src_ext_re ]] && hit=0
+  shopt -u nocasematch
+  [ "$hit" = 0 ] && return 0
+  [[ $base =~ $src_name_re ]] && return 0
   return 1
 }
 
@@ -87,10 +117,11 @@ looks_like_source() {
 # parsed for redirects or edit idioms — otherwise prose like "Latte <-> Mocha"
 # reads as `> Mocha`. The `<<DELIM` operator itself is kept, so a genuine
 # `cat > file <<EOF` write is still detected via its real `>` redirect below.
+# Sets STRIPPED.
 strip_heredoc_bodies() {
   local line delim='' inhd=0 out=''
   local hd_re='<<-?[[:space:]]*["'\'']?([A-Za-z_][A-Za-z0-9_]*)'
-  while IFS= read -r line || [ -n "$line" ]; do
+  while IFS= read -r line; do
     if [ "$inhd" = 1 ]; then
       local trimmed="${line#"${line%%[![:space:]]*}"}"   # ltrim (covers <<- tabs)
       [ "$trimmed" = "$delim" ] && inhd=0
@@ -102,8 +133,8 @@ strip_heredoc_bodies() {
       delim="${BASH_REMATCH[1]}"
       inhd=1
     fi
-  done < <(printf '%s' "$1")
-  printf '%s' "$out"
+  done <<< "$1"
+  STRIPPED="${out%"${out##*[!$'\n']}"}"   # drop trailing newlines, as $(...) did
 }
 
 # Blank out the *contents* of quoted strings (and their quotes) so prose inside
@@ -111,6 +142,7 @@ strip_heredoc_bodies() {
 # is never parsed as a redirect or edit idiom. Real redirects and idioms live
 # OUTSIDE quotes and survive untouched. Escapes are handled leniently; per the
 # precision bias, a missed block beats a false one.
+# Sets STRIPPED.
 strip_quoted() {
   local s="$1" out='' q='' ch i n=${#1}
   for (( i = 0; i < n; i++ )); do
@@ -125,39 +157,35 @@ strip_quoted() {
     fi
     out+="$ch"
   done
-  printf '%s' "$out"
+  STRIPPED="${out%"${out##*[!$'\n']}"}"
 }
 
 # From here on, match against the de-data'd command: heredoc bodies removed and
 # quoted-string contents blanked, leaving only the shell skeleton.
-cmd="$(strip_heredoc_bodies "$cmd")"
-cmd="$(strip_quoted "$cmd")"
+strip_heredoc_bodies "$cmd"; cmd=$STRIPPED
+strip_quoted "$cmd"; cmd=$STRIPPED
 
 # --- 1. In-place stream editors. Near-zero false positives. -----------------
 # sed -i / --in-place / -i.bak / -ri ; perl -i / -pi ; ruby -i ; gawk -i inplace.
 # `[^|;&<>]*` keeps the flag on the SAME simple command as the tool name, so a
 # downstream `| sed` in a pipeline isn't mis-attributed.
-if printf '%s' "$cmd" | grep -Eq '(^|[^[:alnum:]_/])g?sed[^|;&<>]*([[:space:]]-[a-zA-Z]*i([.=[:space:]]|$)|[[:space:]]--in-place)'; then
-  block "in-place edit via 'sed -i' (use Edit instead)"
-fi
-if printf '%s' "$cmd" | grep -Eq '(^|[^[:alnum:]_/])perl[^|;&<>]*[[:space:]]-[a-zA-Z]*i([.=[:space:]]|$)'; then
-  block "in-place edit via 'perl -i' (use Edit instead)"
-fi
-if printf '%s' "$cmd" | grep -Eq '(^|[^[:alnum:]_/])ruby[^|;&<>]*[[:space:]]-[a-zA-Z]*i([.=[:space:]]|$)'; then
-  block "in-place edit via 'ruby -i' (use Edit instead)"
-fi
-if printf '%s' "$cmd" | grep -Eq '(^|[^[:alnum:]_/])g?awk[^|;&<>]*-i[[:space:]]+inplace|inplace=1'; then
-  block "in-place edit via 'awk -i inplace' (use Edit instead)"
-fi
+sed_re='(^|[^[:alnum:]_/])g?sed[^|;&<>]*([[:space:]]-[a-zA-Z]*i([.=[:space:]]|$)|[[:space:]]--in-place)'
+perl_re='(^|[^[:alnum:]_/])perl[^|;&<>]*[[:space:]]-[a-zA-Z]*i([.=[:space:]]|$)'
+ruby_re='(^|[^[:alnum:]_/])ruby[^|;&<>]*[[:space:]]-[a-zA-Z]*i([.=[:space:]]|$)'
+awk_re='(^|[^[:alnum:]_/])g?awk[^|;&<>]*-i[[:space:]]+inplace|inplace=1'
+any_line "$sed_re"  && block "in-place edit via 'sed -i' (use Edit instead)"
+any_line "$perl_re" && block "in-place edit via 'perl -i' (use Edit instead)"
+any_line "$ruby_re" && block "in-place edit via 'ruby -i' (use Edit instead)"
+any_line "$awk_re"  && block "in-place edit via 'awk -i inplace' (use Edit instead)"
 
 # --- 2. Inline interpreter write-scripts. -----------------------------------
 # python/node/ruby/perl invoked with inline code (-c/-e) that writes a file or
 # does in-place editing. Running a real *.py/*.js script is untouched; only the
 # inline form combined with a write indicator trips this.
-if printf '%s' "$cmd" | grep -Eq '(^|[^[:alnum:]_/])(python[0-9.]*|node|deno|bun|ruby|perl)[^|;&]*[[:space:]]-(c|e)([[:space:]]|=|")'; then
-  if printf '%s' "$cmd" | grep -Eq "open\([^)]*['\"][wax]b?\+?['\"]|\.write_text\(|\.writelines?\(|\.write\(|writeFileSync|fs\.writeFile|fileinput[^;]*inplace[[:space:]]*=[[:space:]]*True|>[[:space:]]*open\("; then
-    block "inline interpreter writing a file (use Write/Edit instead)"
-  fi
+inline_re='(^|[^[:alnum:]_/])(python[0-9.]*|node|deno|bun|ruby|perl)[^|;&]*[[:space:]]-(c|e)([[:space:]]|=|")'
+write_re="open\([^)]*['\"][wax]b?\+?['\"]|\.write_text\(|\.writelines?\(|\.write\(|writeFileSync|fs\.writeFile|fileinput[^;]*inplace[[:space:]]*=[[:space:]]*True|>[[:space:]]*open\("
+if any_line "$inline_re" && any_line "$write_re"; then
+  block "inline interpreter writing a file (use Write/Edit instead)"
 fi
 
 # --- 3. File-content writes: redirects, tee, heredocs. ----------------------
@@ -168,8 +196,9 @@ fi
 has_heredoc=0
 case "$cmd" in *'<<'*) has_heredoc=1 ;; esac
 
-while IFS= read -r raw; do
-  [ -n "$raw" ] || continue
+redirect_re='>>?[[:space:]]*[^[:space:]|;&<>()]+'
+all_matches "$redirect_re"
+for raw in ${MATCHES[@]+"${MATCHES[@]}"}; do
   target="${raw##*>}"                               # strip leading > / >>
   target="${target#"${target%%[![:space:]]*}"}"     # ltrim whitespace
   [ -n "$target" ] || continue
@@ -180,14 +209,19 @@ while IFS= read -r raw; do
   if looks_like_source "$target"; then
     block "redirect writing a source file ('$target' — use Write/Edit instead)"
   fi
-done < <(printf '%s' "$cmd" | grep -oE '>>?[[:space:]]*[^[:space:]|;&<>()]+' || true)
+done
 
 # tee writing a source-looking file (tee's whole job is to write files).
-tee_target="$(printf '%s' "$cmd" | grep -oE '(^|[|[:space:]])tee([[:space:]]+-[a-zA-Z]+)*[[:space:]]+[^[:space:]|;&]+' | grep -oE '[^[:space:]|;&]+$' || true)"
-if [ -n "$tee_target" ] && ! is_temp_target "$tee_target"; then
+tee_re='(^|[|[:space:]])tee([[:space:]]+-[a-zA-Z]+)*[[:space:]]+[^[:space:]|;&]+'
+tee_tok_re='[^[:space:]|;&]+$'
+all_matches "$tee_re"
+for m in ${MATCHES[@]+"${MATCHES[@]}"}; do
+  [[ $m =~ $tee_tok_re ]] || continue
+  tee_target="${BASH_REMATCH[0]}"
+  is_temp_target "$tee_target" && continue
   if [ "$has_heredoc" = 1 ] || looks_like_source "$tee_target"; then
     block "file write via 'tee $tee_target' (use Write instead)"
   fi
-fi
+done
 
 exit 0
