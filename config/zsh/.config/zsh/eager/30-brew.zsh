@@ -35,9 +35,5 @@ if [[ -n "$HOMEBREW_PREFIX" ]]; then
     fpath=("$HOMEBREW_PREFIX/share/zsh/site-functions" $fpath)
   fi
   
-  # Speed up brew installation by avoiding unnecessary git status checks
-  export HOMEBREW_NO_AUTO_UPDATE=1
-  
-  # Disable analytics
-  export HOMEBREW_NO_ANALYTICS=1
+  # HOMEBREW_NO_AUTO_UPDATE and HOMEBREW_NO_ANALYTICS: ~/.zshenv
 fi 

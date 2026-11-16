@@ -4,10 +4,8 @@
 # Prevent infinite function nesting
 export FUNCNEST=200
 
-# XDG Base Directory Specification
-export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
-export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
-export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+# XDG_*_HOME, DO_NOT_TRACK, KUBECONFIG and the Homebrew switches come from
+# ~/.zshenv (config/zsh/.zshenv), which every zsh reads first.
 
 # eager/ runs now, before the first prompt.
 for config_file in "$XDG_CONFIG_HOME/zsh/eager"/*.zsh(N); do
