@@ -1,5 +1,12 @@
 #!/usr/bin/env zsh
 
+# One KUBECONFIG list: ~/.kube/config first, then every file in
+# ~/.kube/configs/ (such as homelab's task talos:kube-login). (N) lets the
+# glob match nothing. A shell started before a new file appears needs a restart.
+export KUBECONFIG="$HOME/.kube/config"
+for f in "$HOME"/.kube/configs/*.yaml(N); do KUBECONFIG="$KUBECONFIG:$f"; done
+unset f
+
 # kubectl aliases
 alias k='kubectl'
 alias kg='kubectl get'
