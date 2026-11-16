@@ -34,8 +34,9 @@ local function load_projects()
 end
 
 -- New work: a new Rex session for one piece of work in one project. Its one
--- pane shows the projects in fzf; Enter asks for a worktree's name, such as
--- 123-flaky-tests, or nothing for the main checkout. The session is then named
+-- pane shows the projects in fzf, drawn as a box like Rex's own palette; Enter
+-- asks, in the same box, for a worktree's name, such as 123-flaky-tests, or
+-- nothing for the main checkout (spaces become dashes, a leading # goes). The session is then named
 -- "<project> · <worktree>", or just "<project>", and rex-acp starts in the
 -- project's folder with its `c` agent, Claude Code as `c` starts it, in
 -- that worktree (`-w <name>`). Esc, empty input at fzf or ctrl+c cancels.
@@ -52,23 +53,51 @@ local new_work_prompt = [=[
 rex() { command "${REX_BIN_DIR:+$REX_BIN_DIR/}rex" "$@"; }
 done_() { rex kill "$REX_SESSION" >/dev/null 2>&1; exit 0; }
 trap done_ INT
-print -n "\e[H\e[2J"
-pick=$(print -r -- "$1" | fzf --delimiter=$'\t' --with-nth=1 --reverse \
-  --prompt='project > ' --header='New work in rex-acp  (Enter picks; Esc cancels)') || done_
-label=${pick%%$'\t'*} dir=${pick#*$'\t'}
-print -n "\e[H\e[2J"
-print -P "%BNew work%b in ${label//\%/%%}  %F{8}(a worktree's name, or empty for the main checkout; ctrl+c cancels)%f"
-read -r "name?worktree: " || done_
+# modal ROWS LABEL FOOTER [fzf options]: fzf as a box in the middle of the
+# pane, like Rex's own palette: a search line, the list, and the keys below.
+modal() {
+  local rows=$1 label=$2 footer=$3; shift 3
+  local size; size=$(stty size 2>/dev/null) || size="24 80"
+  local h=${size% *} w=${size#* }
+  local bw=$(( w > 72 ? 64 : w - 4 )) bh=$(( rows + 6 ))
+  (( bh > h - 2 )) && bh=$(( h - 2 ))
+  local top=$(( (h - bh) / 3 )) side=$(( (w - bw) / 2 ))
+  fzf --layout=reverse --margin="$top,$side,$(( h - top - bh )),$side" \
+    --border=rounded --border-label=" $label " --border-label-pos=3 --padding=0,1 \
+    --input-border=line --footer-border=line --footer="$footer" \
+    --info=inline-right --no-scrollbar --pointer='' --gutter=' ' --highlight-line \
+    --prompt='› ' --no-separator \
+    --color='border:8,label:7:bold,input-border:8,footer-border:8,footer:8,info:8,ghost:8' \
+    --color='prompt:4,query:15,fg:7,fg+:15:bold,bg+:236,hl:4:bold,hl+:4:bold' \
+    "$@"
+}
+projects=$(print -r -- "$1" | while IFS=$'\t' read -r label dir; do
+  printf '%s\t%s\t%-22s \e[90m%s\e[0m\n' "$label" "$dir" "$label" "${${${dir:h}/#$HOME/~}:t}"
+done)
+rows=("${(@f)projects}")
+pick=$(print -r -- "$projects" | modal $#rows 'New work' '↵ choose   esc cancel' \
+  --ansi --delimiter=$'\t' --with-nth=3 --nth=1 --ghost='Search projects') || done_
+label=${pick%%$'\t'*} rest=${pick#*$'\t'} dir=${rest%%$'\t'*}
+out=$(modal 0 "$label · new work" '↵ start   esc cancel' --print-query \
+  --ghost='worktree name, or nothing for the main checkout' \
+  --info=hidden --footer-border=none </dev/null)
+(( $? == 130 )) && done_
+name=${out%%$'\n'*}
+name=${${name//[[:space:]]/-}#\#}
 title=$label
 [[ -n $name ]] && title="$label · $name"
 rex session rename "$REX_SESSION" "$title" >/dev/null 2>&1
 cd -- "$dir" || { read -rk1 "?cannot enter $dir; press a key to close "; done_; }
+print -n "\e[H\e[2J"
 trap ':' INT
 args=()
 [[ -n $name ]] && args=(-- -w "$name")
 zsh -ic 'rex-acp c "$@"' new-work "${args[@]}"
 st=$?
-(( st == 0 )) || read -rk1 "?rex-acp exited with status $st; press a key to close "
+if (( st != 0 )); then
+  while read -rs -t 0.05 -k 1 _; do :; done   # keys typed before now don't count
+  read -rk1 "?rex-acp exited with status $st; press a key to close "
+fi
 done_
 ]=]
 

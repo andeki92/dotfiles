@@ -1,8 +1,17 @@
 #!/bin/zsh -f
-# Claude Code started the way `c` starts it: Code Mode, the latest Opus at
-# high effort with Fable as advisor, tracking on, and no gitlab.com credential
-# helper. rex-acp's `c` agent points its Claude adapter here through
-# CLAUDE_CODE_EXECUTABLE. `c` is a zsh function, so this loads the file that
-# defines it, and nothing else, which keeps stdout free for stream-json.
-source "${XDG_CONFIG_HOME:-$HOME/.config}/zsh/lazy/81-herdr-claude.zsh" || exit 1
-c "$@"
+# Claude Code started by `c`, however and wherever your zsh defines it today:
+# Code Mode, the model and advisor flags, tracking on, the gitlab.com helper
+# kept out. rex-acp's `c` agent points its Claude adapter here through
+# CLAUDE_CODE_EXECUTABLE.
+#
+# An interactive zsh loads the config that defines `c`. Its startup output is
+# thrown away and stdout and stderr come back only for `c` itself, because
+# stdout carries rex-acp's stream-json and one stray byte breaks it.
+exec zsh -i -c '
+  exec 1>&3 2>&4 3>&- 4>&-
+  if ! whence -w c >/dev/null; then
+    print -u2 "claude-via-c: no c function in your interactive zsh"
+    exit 127
+  fi
+  c "$@"
+' c "$@" 3>&1 4>&2 >/dev/null 2>&1
