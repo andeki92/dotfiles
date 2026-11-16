@@ -1,7 +1,6 @@
 #!/usr/bin/env zsh
 
 if [[ -n "$GHOSTTY_QUICK_TERMINAL" && -z "$HERDR_ENV" && $- == *i* ]]; then
-    #!/usr/bin/env bash
     # Attach the Ghostty quick terminal to whichever herdr pane is currently focused.
     # Falls back to the full herdr UI if resolution fails for any reason.
 

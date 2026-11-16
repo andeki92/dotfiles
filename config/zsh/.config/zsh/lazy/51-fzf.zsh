@@ -37,11 +37,12 @@ fcd() {
   [[ -n "$dir" ]] && cd "$dir"
 }
 
-# Kill process
+# Kill processes picked with fzf: fkill [signal], TERM by default (fkill 9
+# for SIGKILL)
 fkill() {
   local pid
   pid=$(ps -ef | sed 1d |
-        fzf -m --header="[kill process]" \
+        fzf -m \
             --prompt="Kill > " \
             --pointer="→" \
             --height=50% \
@@ -51,7 +52,7 @@ fkill() {
         awk '{print $2}')
 
   if [ "x$pid" != "x" ]; then
-    echo $pid | xargs kill -${1:-9}
+    echo $pid | xargs kill -${1:-TERM}
   fi
 }
 

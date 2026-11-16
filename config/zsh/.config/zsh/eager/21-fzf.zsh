@@ -45,19 +45,22 @@ fi'"
 
 export FZF_CTRL_R_OPTS="--ansi --prompt='History > ' --header='Command history (Ctrl+R, Enter=execute)' --preview='echo {}' --preview-window=down:3:wrap --bind='ctrl-y:execute-silent(echo -n {2..} | pbcopy)'"
 
-# Add key bindings if in interactive mode
+# Keys that run a command (fp, fcd, fe are in lazy/51-fzf.zsh). Each is a
+# widget, not `bindkey -s 'fp^M'`, which typed the name onto whatever was
+# already on the line and ran the mix. push-line parks the line you were
+# typing and puts it back at the next prompt.
 if [[ $- == *i* ]]; then
-  # Ctrl+P - Quick project switching (fp function must be defined in another file)
-  bindkey -s '^p' 'fp^M'
-
-  # Ctrl+O - Directory navigation (fcd function must be defined in another file)
-  bindkey -s '^o' 'fcd^M'
-
-  # Ctrl+F - File navigation with fe()
-  bindkey -s '^f' 'fe^M'
-
-  # Ctrl+H - History search
-  bindkey -s '^h' 'fh^M'
+  _bind_command() {  # _bind_command <key> <command>
+    eval "_run_$2() { zle push-line; BUFFER=${(q)2}; zle accept-line }"
+    zle -N _run_$2
+    bindkey "$1" _run_$2
+  }
+  _bind_command '^p' fp    # Ctrl+P - project switcher
+  _bind_command '^o' fcd   # Ctrl+O - cd into a directory
+  _bind_command '^f' fe    # Ctrl+F - open files in $EDITOR
+  # No Ctrl+H: some terminals send it for Backspace. fzf's Ctrl+R does what
+  # fh did; fh is still there to type.
+  unfunction _bind_command
 fi
 
 # Note: Standard FZF keybindings (Ctrl+T, Ctrl+R) are defined in the lazy-loaded file
