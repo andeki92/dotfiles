@@ -1,0 +1,5 @@
+{
+  "trustedcasks": [
+    "anthropics/tap/ant"
+  ]
+}

@@ -19,3 +19,6 @@ config/rex/.config/rex/.claude/
 
 # Skill symlinks auto-installed by third-party CLI installers (e.g. hf)
 config/claude/.claude/skills/hf-cli
+
+# Homebrew's lock for trust.json (brew trust writes both under ~/.config/homebrew)
+config/brew/.config/homebrew/trust.json.lock
