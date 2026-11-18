@@ -26,10 +26,20 @@ function claude {
 # in it resumes only with it on. `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=0 c` opts
 # one launch out, for a session telemetry must trace: Code Mode won't start
 # while CLAUDE_CODE_ENABLE_TELEMETRY is set.
+#
+# Workspace: plain `c` signs in with your /login, so it runs in the Console's
+# Claude Code workspace. `c --sr` (first argument) runs in Security Research,
+# the workspace with the Defense Access grant, through the Anthropic profile
+# `ant auth login --profile security-research` wrote. A named profile ranks
+# above /login; `/status` shows a Profile row when it is the one in use.
 function c {
-  local -a flags=(--model opus --effort high --advisor fable)
+  local -a flags=(--model opus --effort high --advisor fable) profile=()
+  if [[ "${1:-}" == --sr ]]; then
+    shift
+    profile=(ANTHROPIC_PROFILE=security-research)
+  fi
   local mode="CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=${CLAUDE_CODE_EXPERIMENTAL_CODE_MODE:-1}"
-  "${_claude_strip[@]}" "$mode" DO_NOT_TRACK=0 claude "${flags[@]}" "$@"
+  "${_claude_strip[@]}" "$mode" DO_NOT_TRACK=0 "${profile[@]}" claude "${flags[@]}" "$@"
 }
 
 # opencode

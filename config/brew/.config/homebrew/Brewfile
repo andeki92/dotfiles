@@ -1,6 +1,9 @@
 # Brewfile for dotfiles setup
 # Based on the Brewfile Guidelines from our dotfiles philosophy
 
+# Taps
+tap "anthropics/tap"            # Anthropic's ant CLI
+
 # Development Tools
 brew "coreutils"                # GNU core utilities
 brew "git" if OS.mac?           # Version control
@@ -28,6 +31,7 @@ brew "glab"              # Gitlab CLI
 brew "herdr"             # Agent Multiplexer
 brew "qemu"              # VM backend for the Gondolin sandbox
 brew "e2fsprogs"         # mke2fs, for building Gondolin guest images
+cask "anthropics/tap/ant" # Claude API CLI; `ant auth login` writes the profiles `c --sr` uses
 
 # Applications
 cask "ghostty"            # Terminal emulator
