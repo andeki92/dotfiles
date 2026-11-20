@@ -172,3 +172,10 @@ rex.action{
   end,
 }
 rex.bind("cmd+b", "new_work")
+
+-- rex-acp's questions in the command palette: the acp_ask action, from the
+-- file `rex-acp rex-setup` writes beside this one, when there is one.
+do
+  local acp = loadfile(home .. "/.config/rex/rex-acp.lua")
+  if acp ~= nil then acp() end
+end
