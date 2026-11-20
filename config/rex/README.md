@@ -18,14 +18,18 @@ this package links the file, never the folder.
 
 ## New work: one session per piece of work
 
-`cmd+b` opens a new session whose one pane lists this machine's projects in
-fzf. Type part of a name and press Enter, then give a worktree's name, such as
-`123-flaky-tests`, or press Enter alone for the main checkout. The session is
+`cmd+b` asks two questions in Rex's command palette (`rex.ui`). First the
+project: type part of its name and press Return. Then the worktree: one Claude
+Code already made under `.claude/worktrees` (its branch shows beside it), the
+main checkout, or a new name typed into the field, such as `123-flaky-tests`.
+The session is
 named `<project> · <worktree>`, or just `<project>`, so the sidebar shows
 where every piece of work runs, and rex-acp starts in the project's folder with
 its `c` agent: Claude Code as `c` starts it, Code Mode and all, in that
-worktree. Esc, or `ctrl+c` at the worktree prompt, cancels and removes the
-session.
+worktree. Esc at either question cancels, before any session is made.
+
+If rex-acp fails to start, its pane says so and waits for a key before the
+session goes.
 
 When rex-acp exits (`ctrl+d` in its input pane), the session removes itself,
 because Rex keeps a session whose last window has closed. The worktree stays:
@@ -68,5 +72,7 @@ and Rex's logs and your projects would be written here. A machine that already h
 `~/.config/rex/init.lua` needs it removed before `stow rex`.
 
 After editing, `rex config check` reports errors with their line, and
-`rex config reload` (or `cmd+r`) applies the file. To try an action from a
-copy without reloading, run `rex do path/to/init.lua --action new_work`.
+`rex config reload` (or `cmd+r`) applies the file. `rex do new_work
+project=dotfiles worktree=` skips the questions, for the main checkout. The
+questions only show for an action the server has loaded, so a copy run with
+`rex do path/to/init.lua --action new_work` needs both arguments.

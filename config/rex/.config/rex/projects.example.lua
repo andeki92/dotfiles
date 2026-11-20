@@ -4,7 +4,7 @@
 --   cp ~/.config/rex/projects.example.lua ~/.config/rex/projects.lua
 --
 -- projects.lua is never committed, so it can name private folders. cmd+b
--- opens a new session with the projects in fzf; the one picked names the
+-- lists the projects in the command palette; the one picked names the new
 -- session, "<label> · <worktree>", and rex-acp starts in its folder. The file
 -- is read on every cmd+b, so an edit needs no reload.
 --

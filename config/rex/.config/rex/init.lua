@@ -33,69 +33,68 @@ local function load_projects()
   return projects
 end
 
--- New work: a new Rex session for one piece of work in one project. Its one
--- pane shows the projects in fzf, drawn as a box like Rex's own palette; Enter
--- asks, in the same box, for a worktree's name, such as 123-flaky-tests, or
--- nothing for the main checkout (spaces become dashes, a leading # goes). The session is then named
--- "<project> · <worktree>", or just "<project>", and rex-acp starts in the
--- project's folder with its `c` agent, Claude Code as `c` starts it, in
--- that worktree (`-w <name>`). Esc, empty input at fzf or ctrl+c cancels.
--- The session removes itself when rex-acp exits, since Rex keeps a session
--- with no windows.
+-- New work: a new Rex session for one piece of work in one project. Two
+-- questions in the command palette (rex.ui) pick it: the project, then a
+-- worktree, one Claude Code already made under .claude/worktrees, the main
+-- checkout, or a new name typed into the filter, such as 123-flaky-tests
+-- (spaces become dashes, a leading # goes). Esc at either cancels, before any
+-- session exists. The session is then named "<project> · <worktree>", or just
+-- "<project>", and rex-acp starts in the project's folder with its `c` agent,
+-- Claude Code as `c` starts it, in that worktree (`-w <name>`). The session
+-- removes itself when rex-acp exits, since Rex keeps a session with no
+-- windows.
 --
--- The prompt runs in a bare zsh (-f), so it shows at once and ctrl+c is caught
--- from the start; only rex-acp gets the interactive shell, so Claude sees what
--- every other terminal sees. A session made by an action gets the server's
--- PATH, which lacks mise's tools, so path_prepend adds mise's shims for fzf.
--- Rex exports REX_BIN_DIR into every pane, which finds `rex` without a PATH.
--- $1 is the projects, one "label<TAB>dir" a line.
-local new_work_prompt = [=[
+-- `project=` and `worktree=` skip the questions (worktree= alone for the main
+-- checkout), so `rex do new_work project=rex-acp worktree=` needs no app.
+-- rex.ui only asks from an action the server loaded: `rex do init.lua
+-- --action new_work` gets "unsupported" unless both are given.
+
+local function tilde(p) return (p:gsub("^" .. home:gsub("%p", "%%%0"), "~")) end
+
+-- The folder a project sits in, as a quiet second line: "bache-klever", "~".
+local function parent(p)
+  local d = tilde(p):match("^(.*)/[^/]+$") or "~"
+  return d:match("[^/]+$") or d
+end
+
+-- The worktrees Claude Code made with -w, as { name, branch }, from
+-- <dir>/.claude/worktrees/<name>. None when dir isn't a git repository.
+local function worktrees(dir)
+  local r = rex.exec({ "git", "-C", dir, "worktree", "list", "--porcelain" }, { timeout = 5 })
+  local found = {}
+  if r == nil or not r.ok then return found end
+  local cur
+  for line in (r.stdout .. "\n"):gmatch("([^\n]*)\n") do
+    local path = line:match("^worktree (.+)$")
+    if path then
+      cur = { name = path:match("/%.claude/worktrees/([^/]+)$") }
+    elseif cur and cur.name then
+      cur.branch = line:match("^branch refs/heads/(.+)$") or cur.branch
+      if line == "detached" then cur.branch = "detached" end
+      if line == "" then table.insert(found, cur); cur = nil end
+    end
+  end
+  return found
+end
+
+-- The session's one pane: rex-acp in the project, then the session goes. It
+-- runs in a bare zsh (-f); only rex-acp gets the interactive shell, so Claude
+-- sees what every other terminal sees. Rex exports REX_BIN_DIR into every
+-- pane, which finds `rex` without a PATH. $1 is the folder, $2 the worktree.
+local new_work_run = [=[
 rex() { command "${REX_BIN_DIR:+$REX_BIN_DIR/}rex" "$@"; }
 done_() { rex kill "$REX_SESSION" >/dev/null 2>&1; exit 0; }
 trap done_ INT
-# modal ROWS LABEL FOOTER [fzf options]: fzf as a box in the middle of the
-# pane, like Rex's own palette: a search line, the list, and the keys below.
-modal() {
-  local rows=$1 label=$2 footer=$3; shift 3
-  local size; size=$(stty size 2>/dev/null) || size="24 80"
-  local h=${size% *} w=${size#* }
-  local bw=$(( w > 72 ? 64 : w - 4 )) bh=$(( rows + 6 ))
-  (( bh > h - 2 )) && bh=$(( h - 2 ))
-  local top=$(( (h - bh) / 3 )) side=$(( (w - bw) / 2 ))
-  fzf --layout=reverse --margin="$top,$side,$(( h - top - bh )),$side" \
-    --border=rounded --border-label=" $label " --border-label-pos=3 --padding=0,1 \
-    --input-border=line --footer-border=line --footer="$footer" \
-    --info=inline-right --no-scrollbar --pointer='' --gutter=' ' --highlight-line \
-    --prompt='› ' --no-separator \
-    --color='border:8,label:7:bold,input-border:8,footer-border:8,footer:8,info:8,ghost:8' \
-    --color='prompt:4,query:15,fg:7,fg+:15:bold,bg+:236,hl:4:bold,hl+:4:bold' \
-    "$@"
-}
-projects=$(print -r -- "$1" | while IFS=$'\t' read -r label dir; do
-  printf '%s\t%s\t%-22s \e[90m%s\e[0m\n' "$label" "$dir" "$label" "${${${dir:h}/#$HOME/~}:t}"
-done)
-rows=("${(@f)projects}")
-pick=$(print -r -- "$projects" | modal $#rows 'New work' '↵ choose   esc cancel' \
-  --ansi --delimiter=$'\t' --with-nth=3 --nth=1 --ghost='Search projects') || done_
-label=${pick%%$'\t'*} rest=${pick#*$'\t'} dir=${rest%%$'\t'*}
-out=$(modal 0 "$label · new work" '↵ start   esc cancel' --print-query \
-  --ghost='worktree name, or nothing for the main checkout' \
-  --info=hidden --footer-border=none </dev/null)
-(( $? == 130 )) && done_
-name=${out%%$'\n'*}
-name=${${name//[[:space:]]/-}#\#}
-title=$label
-[[ -n $name ]] && title="$label · $name"
-rex session rename "$REX_SESSION" "$title" >/dev/null 2>&1
-cd -- "$dir" || { read -rk1 "?cannot enter $dir; press a key to close "; done_; }
-print -n "\e[H\e[2J"
+cd -- "$1" || { read -rk1 "?cannot enter $1; press a key to close "; done_; }
 trap ':' INT
 args=()
-[[ -n $name ]] && args=(-- -w "$name")
-zsh -ic 'rex-acp c "$@"' new-work "${args[@]}"
+[[ -n $2 ]] && args=(-- -w "$2")
+# +m: no job control, so the interactive shell leaves the terminal with this
+# one and the failure prompt below can still read a key.
+zsh +m -ic 'rex-acp c "$@"' new-work "${args[@]}"
 st=$?
 if (( st != 0 )); then
-  while read -rs -t 0.05 -k 1 _; do :; done   # keys typed before now don't count
+  while read -rs -t 0.05 -k 1 _; do :; done
   read -rk1 "?rex-acp exited with status $st; press a key to close "
 fi
 done_
@@ -105,26 +104,62 @@ rex.action{
   name  = "new_work",
   title = "New Work in a Project",
   keywords = "project worktree claude rex-acp session new",
+  args  = { project = "string?", worktree = "string?" },
   run   = function(ctx, args)
     local projects = load_projects()
     if #projects == 0 then
       error("no projects: list them in ~/.config/rex/projects.lua", 0)
     end
-    local lines = {}
-    for _, p in ipairs(projects) do
-      table.insert(lines, p.label .. "\t" .. p.dir)
+
+    local project
+    if args.project ~= nil then
+      for _, p in ipairs(projects) do
+        if p.label == args.project or p.dir == args.project then project = p end
+      end
+      if project == nil then error("no project named " .. args.project, 0) end
+    else
+      local items = {}
+      for _, p in ipairs(projects) do
+        table.insert(items, { id = p.label, title = p.label, subtitle = parent(p.dir), icon = "folder" })
+      end
+      local label = rex.ui.pick{
+        title = "New work", placeholder = "Search projects", confirm = "Choose", items = items,
+      }
+      if label == nil then return end
+      for _, p in ipairs(projects) do
+        if p.label == label then project = p end
+      end
     end
+
+    local name = args.worktree
+    if name == nil then
+      -- "." can't be a worktree's name, so it stands for the main checkout.
+      local items = { { id = ".", title = "Main checkout", subtitle = tilde(project.dir), icon = "folder" } }
+      for _, w in ipairs(worktrees(project.dir)) do
+        table.insert(items, { id = w.name, icon = "branch", detail = w.branch })
+      end
+      local picked = rex.ui.pick{
+        title = project.label .. " · new work", placeholder = "Pick a worktree, or type a new name",
+        confirm = "Start", items = items, allow_other = true,
+      }
+      if picked == nil then return end
+      if type(picked) == "table" then name = picked.text
+      elseif picked == "." then name = ""
+      else name = picked end
+    end
+    name = name:gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s+", "-"):gsub("^#", "")
+
+    local title = project.label
+    if name ~= "" then title = project.label .. " · " .. name end
     local s, err = rex.call("session.create", {
-      label = "new work",
+      label = title,
       initial_windows = { {
         layout = rex.layout.block{
           flavor  = "com.superlogical.terminal.shell",
           options = {
-            cwd     = home,
+            cwd     = project.dir,
             shell   = "none",
-            path_prepend = { home .. "/.local/share/mise/shims" },
-            command = { "zsh", "-f", "-c", new_work_prompt, "new-work",
-                        table.concat(lines, "\n") },
+            command = { "zsh", "-f", "-c", new_work_run, "new-work", project.dir, name },
           },
         },
       } },
@@ -133,7 +168,7 @@ rex.action{
     -- Show it. Only an action run from a key or the palette has a client to
     -- ask; from the CLI there may be none, and the session is still made.
     pcall(rex.client.queue, "session.select", { session_id = s.session_id })
-    return { session_id = s.session_id }
+    return { session_id = s.session_id, label = title }
   end,
 }
 rex.bind("cmd+b", "new_work")
