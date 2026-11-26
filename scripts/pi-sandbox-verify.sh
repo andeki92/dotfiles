@@ -255,7 +255,7 @@ try {
   });
   checks.ghToolsPresent = await send({
     type: "bash",
-    command: "git --version && gh --version | head -n 1 && kustomize version",
+    command: "git --version && gh --version | head -n 1 && rg --version | head -n 1 && jq --version",
   });
   checks.ghExfilToNpmBlocked = await send({
     type: "bash",
@@ -275,11 +275,11 @@ try {
   });
   checks.skillMountRead = await send({
     type: "bash",
-    command: "cat /tmp/pi-skills/*gitops-kustomize/SKILL.md 2>&1",
+    command: "cat /tmp/pi-skills/*sandbox-pr-workflow/SKILL.md 2>&1",
   });
   checks.skillMountReadOnly = await send({
     type: "bash",
-    command: "echo tamper >> /tmp/pi-skills/*gitops-kustomize/SKILL.md 2>&1",
+    command: "echo tamper >> /tmp/pi-skills/*sandbox-pr-workflow/SKILL.md 2>&1",
   });
   checks.mntC = await send({ type: "bash", command: "ls -la /mnt/c 2>&1" });
   checks.powershell = await send({ type: "bash", command: "powershell.exe -Command 'echo pwned' 2>&1" });
@@ -324,12 +324,12 @@ assertCheck("decoy abs .oci/config blocked", rc("decoyOciAbs") !== 0 && !out("de
 assertCheck("decoy OCI_/KUBECONFIG/AWS_/PI_SANDBOX_GH_TOKEN env vars scrubbed", out("decoyEnv") === "OCI=|PROF=|KUBE=|AWS=|SCOPED=", out("decoyEnv"));
 assertCheck("guest sees ONLY dummy ghp_ placeholder (never real GitHub token)", /^GH=ghp_[A-Za-z0-9]{36}\|GITHUB=ghp_[A-Za-z0-9]{36}$/.test(out("ghPlaceholder")) && !out("ghPlaceholder").includes("DECOY_"), out("ghPlaceholder"));
 assertCheck("gh auth git-credential returns placeholder only", rc("ghCredHelper") === 0 && out("ghCredHelper").includes("password=ghp_") && !out("ghCredHelper").includes("DECOY_"), out("ghCredHelper"));
-assertCheck("git, gh, and kustomize installed in KVM guest image", rc("ghToolsPresent") === 0 && out("ghToolsPresent").includes("git version") && out("ghToolsPresent").includes("gh version"), out("ghToolsPresent"));
+assertCheck("git, gh, ripgrep, and jq installed in KVM guest image", rc("ghToolsPresent") === 0 && out("ghToolsPresent").includes("git version") && out("ghToolsPresent").includes("gh version") && out("ghToolsPresent").includes("ripgrep"), out("ghToolsPresent"));
 assertCheck("sending GH_TOKEN placeholder to non-GitHub allowlisted host (npmjs.org) is blocked", /403|Forbidden|blocked/i.test(out("ghExfilToNpmBlocked")), out("ghExfilToNpmBlocked").slice(0, 200));
 assertCheck("git clone of allowlisted repo (octocat/Hello-World) succeeds inside VM", rc("ghCloneAllowed") === 0 && out("ghCloneAllowed").includes("/tmp/test-clone/README"), out("ghCloneAllowed"));
 assertCheck("access to non-allowlisted GitHub repo (torvalds/linux) blocked by repo guard", /403|Forbidden|allowed_repos/i.test(out("ghRepoBlocked")), out("ghRepoBlocked").slice(0, 200));
 assertCheck("GitHub GraphQL blocked under allowed_repos (prevents inline-arg bypass)", /403|Forbidden|GraphQL/i.test(out("ghGraphqlBlocked")), out("ghGraphqlBlocked").slice(0, 200));
-assertCheck("trusted skill gitops-kustomize/SKILL.md readable inside VM", rc("skillMountRead") === 0 && out("skillMountRead").includes("GitOps Kustomize Workflow"), out("skillMountRead").slice(0, 200));
+assertCheck("trusted skill sandbox-pr-workflow/SKILL.md readable inside VM", rc("skillMountRead") === 0 && out("skillMountRead").includes("Sandbox PR Workflow"), out("skillMountRead").slice(0, 200));
 assertCheck("trusted skill mount is strictly read-only inside VM", rc("skillMountReadOnly") !== 0, out("skillMountReadOnly").slice(0, 200));
 assertCheck("listing /mnt/c fails inside VM", rc("mntC") !== 0, out("mntC"));
 assertCheck("powershell.exe unreachable inside VM", rc("powershell") !== 0 && !out("powershell").includes("pwned"), out("powershell"));
@@ -337,7 +337,7 @@ assertCheck("non-allowlisted host (example.com) blocked", /403|Forbidden|denied|
 assertCheck("allowlisted registry (registry.npmjs.org) reachable", rc("allowedHost") === 0 && out("allowedHost").includes("{}"), out("allowedHost"));
 
 const cmdNames = (checks.commands?.data?.commands ?? []).map((c) => c.name);
-assertCheck("team package skill & prompt loaded", cmdNames.includes("skill:gitops-kustomize") && cmdNames.includes("gitops-review"), JSON.stringify(cmdNames));
+assertCheck("team package skill & prompt loaded", cmdNames.includes("skill:sandbox-pr-workflow") && cmdNames.includes("diff-review"), JSON.stringify(cmdNames));
 
 if (failures > 0) process.exit(1);
 NODE
@@ -380,8 +380,8 @@ if (ev.repoName !== "demo-repo") throw new Error(`unexpected repoName: ${ev.repo
 if (ev.sandbox?.active !== true || ev.sandbox?.escapeHatchUsed !== false) {
   throw new Error(`unexpected sandbox metadata: ${JSON.stringify(ev.sandbox)}`);
 }
-if (!Array.isArray(ev.loadedSkills) || !ev.loadedSkills.includes("gitops-kustomize")) {
-  throw new Error(`loadedSkills missing gitops-kustomize: ${JSON.stringify(ev.loadedSkills)}`);
+if (!Array.isArray(ev.loadedSkills) || !ev.loadedSkills.includes("sandbox-pr-workflow")) {
+  throw new Error(`loadedSkills missing sandbox-pr-workflow: ${JSON.stringify(ev.loadedSkills)}`);
 }
 for (const forbidden of ["prompt", "output", "command", "content", "env", "cwd"]) {
   if (forbidden in ev) throw new Error(`forbidden field found: ${forbidden}`);

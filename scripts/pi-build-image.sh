@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build and tag the Gondolin guest image (`pi-sandbox:latest`) containing
-# git, gh (GitHub CLI), kustomize, ripgrep, jq, node, python3, and uv, plus
+# git, gh (GitHub CLI), ripgrep, jq, node, python3, and uv, plus
 # pre-baked /etc/gitconfig (gh HTTPS credential helper) and /workspace mount point.
 #
 # Safe to re-run; pass --force to rebuild even when pi-sandbox:latest already exists.
@@ -23,7 +23,7 @@ while [[ $# -gt 0 ]]; do
 Usage: pi-build-image.sh [--force] [--tag REF]
 
 Builds and tags the Gondolin guest image (default: pi-sandbox:latest)
-with git, gh (github-cli), kustomize, ripgrep, jq, node, python3, and uv.
+with git, gh (github-cli), ripgrep, jq, node, python3, and uv.
 EOF
       exit 0
       ;;

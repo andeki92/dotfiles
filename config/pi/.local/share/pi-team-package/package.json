@@ -1,7 +1,7 @@
 {
   "name": "pi-team-package",
   "version": "0.1.0",
-  "description": "Team Pi baseline package: fail-closed Gondolin sandbox, metadata-only usage insights, GitOps skills, and templates.",
+  "description": "Team Pi baseline package: fail-closed Gondolin sandbox, metadata-only usage insights, skills, prompts, and templates.",
   "type": "module",
   "private": true,
   "keywords": [

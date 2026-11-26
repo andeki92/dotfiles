@@ -238,11 +238,11 @@ else
   warn "herdr not found on PATH; skipping 'herdr integration install pi'"
 fi
 
-# 8. Build custom Gondolin guest image (pi-sandbox:latest with git, gh, kustomize) if build tools exist
+# 8. Build custom Gondolin guest image (pi-sandbox:latest with git, gh, ripgrep, jq) if build tools exist
 if [[ -x "$SCRIPT_DIR/pi-build-image.sh" ]]; then
   if command -v cpio >/dev/null 2>&1 && command -v lz4 >/dev/null 2>&1 && \
      { command -v mke2fs >/dev/null 2>&1 || command -v mkfs.ext4 >/dev/null 2>&1 || [[ -x /usr/sbin/mke2fs ]]; }; then
-    log "Ensuring custom Gondolin image (pi-sandbox:latest with git, gh, kustomize) is built..."
+    log "Ensuring custom Gondolin image (pi-sandbox:latest with git, gh, ripgrep, jq) is built..."
     "$SCRIPT_DIR/pi-build-image.sh"
   else
     warn "Skipping custom Gondolin image build (install cpio, lz4, e2fsprogs then run ./scripts/pi-build-image.sh for git + gh inside KVM)."

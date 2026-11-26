@@ -7,7 +7,7 @@
 
 [vm]
 # Custom Gondolin guest image tag built by scripts/pi-build-image.sh
-# (includes git, gh, kustomize, ripgrep, jq, node, python3, uv).
+# (includes git, gh, ripgrep, jq, node, python3, uv).
 image = "pi-sandbox:latest"
 # Backend: "krun" (default on Linux x86_64 / Apple Silicon) or "qemu".
 # vmm = "krun"
@@ -35,7 +35,7 @@ token_file = "~/.config/sandbox-gh-token"
 use_host_auth = false
 #
 # Host-side GitHub repository allowlist (supports `*` in repo name,
-# e.g. ["my-org/my-repo", "my-org/gitops-*"]).
+# e.g. ["my-org/my-repo", "my-org/service-*"]).
 # - Must use "owner/repo" syntax; invalid entries fail closed at startup.
 # - When non-empty, GitHub GraphQL (/graphql) is also blocked on the proxy
 #   because GraphQL queries can target arbitrary repos via inline arguments

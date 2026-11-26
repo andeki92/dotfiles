@@ -36,7 +36,7 @@ extra_allowed_hosts = [
 [github]
 token_file = "~/.config/sandbox-gh-token"
 use_host_auth = true
-allowed_repos = ["myorg/repo-a", "myorg/gitops-*"]
+allowed_repos = ["myorg/repo-a", "myorg/service-*"]
 `);
 
 	assert.equal(parsed.vm.image, "pi-sandbox:latest");
@@ -46,7 +46,7 @@ allowed_repos = ["myorg/repo-a", "myorg/gitops-*"]
 		"artifactory.internal.example",
 	]);
 	assert.equal(parsed.github.use_host_auth, true);
-	assert.deepEqual(parsed.github.allowed_repos, ["myorg/repo-a", "myorg/gitops-*"]);
+	assert.deepEqual(parsed.github.allowed_repos, ["myorg/repo-a", "myorg/service-*"]);
 });
 
 test("loadSandboxConfig merges sandbox.toml with sandbox.local.toml overrides", () => {
@@ -152,9 +152,9 @@ test("buildGuestEnv scrubs OCI, KUBECONFIG, cloud, SSH, host git tokens, and pas
 test("toGuestPath maps workspace and trusted skill mounts while keeping other external paths in guest root", () => {
 	const skillMounts = [
 		{
-			hostDir: "/home/dev/.local/share/pi-team-package/skills/gitops-kustomize",
-			realHostDir: "/home/dev/.dotfiles/config/pi/.local/share/pi-team-package/skills/gitops-kustomize",
-			guestDir: "/tmp/pi-skills/0-gitops-kustomize",
+			hostDir: "/home/dev/.local/share/pi-team-package/skills/sandbox-pr-workflow",
+			realHostDir: "/home/dev/.dotfiles/config/pi/.local/share/pi-team-package/skills/sandbox-pr-workflow",
+			guestDir: "/tmp/pi-skills/0-sandbox-pr-workflow",
 		},
 	];
 	assert.equal(
@@ -169,21 +169,21 @@ test("toGuestPath maps workspace and trusted skill mounts while keeping other ex
 		toGuestPath(
 			"/work/repo",
 			"/workspace",
-			"/home/dev/.local/share/pi-team-package/skills/gitops-kustomize/SKILL.md",
+			"/home/dev/.local/share/pi-team-package/skills/sandbox-pr-workflow/SKILL.md",
 			"/work/repo",
 			skillMounts,
 		),
-		"/tmp/pi-skills/0-gitops-kustomize/SKILL.md",
+		"/tmp/pi-skills/0-sandbox-pr-workflow/SKILL.md",
 	);
 	assert.equal(
 		toGuestPath(
 			"/work/repo",
 			"/workspace",
-			"/home/dev/.dotfiles/config/pi/.local/share/pi-team-package/skills/gitops-kustomize/scripts/check.sh",
+			"/home/dev/.dotfiles/config/pi/.local/share/pi-team-package/skills/sandbox-pr-workflow/scripts/check.sh",
 			"/work/repo",
 			skillMounts,
 		),
-		"/tmp/pi-skills/0-gitops-kustomize/scripts/check.sh",
+		"/tmp/pi-skills/0-sandbox-pr-workflow/scripts/check.sh",
 	);
 	assert.equal(
 		toGuestPath("/work/repo", "/workspace", "~/.kube/config", "/work/repo", skillMounts),
@@ -204,7 +204,7 @@ test("buildTrustedSkillMounts mounts external skill dirs read-only and refuses s
 	try {
 		const fakeHome = path.join(tmp, "home");
 		const workspace = path.join(fakeHome, "work", "app");
-		const pkgSkillDir = path.join(fakeHome, ".local", "share", "pi-team-package", "skills", "gitops");
+		const pkgSkillDir = path.join(fakeHome, ".local", "share", "pi-team-package", "skills", "pr-workflow");
 		const projectSkillDir = path.join(workspace, ".pi", "skills", "local-skill");
 		const kubeDir = path.join(fakeHome, ".kube");
 
@@ -231,7 +231,7 @@ test("buildTrustedSkillMounts mounts external skill dirs read-only and refuses s
 		);
 		assert.equal(mounts.length, 1);
 		assert.equal(mounts[0].realHostDir, fs.realpathSync(pkgSkillDir));
-		assert.equal(mounts[0].guestDir, "/tmp/pi-skills/0-gitops");
+		assert.equal(mounts[0].guestDir, "/tmp/pi-skills/0-pr-workflow");
 	} finally {
 		fs.rmSync(tmp, { recursive: true, force: true });
 	}
@@ -265,12 +265,12 @@ test("loadEgressPolicy fails closed on invalid allowed_repos or allowed_hosts in
 extra_allowed_hosts = ["charts.example.org"]
 
 [github]
-allowed_repos = ["myorg/app-one", "myorg/gitops-*"]
+allowed_repos = ["myorg/app-one", "myorg/service-*"]
 `,
 		);
 		const fromToml = loadEgressPolicy({}, loadSandboxConfig({}, cfgPath));
 		assert.ok(fromToml.allowedHosts.includes("charts.example.org"));
-		assert.deepEqual(fromToml.allowedGitHubRepos, ["myorg/app-one", "myorg/gitops-*"]);
+		assert.deepEqual(fromToml.allowedGitHubRepos, ["myorg/app-one", "myorg/service-*"]);
 
 		// Full URL in allowed_repos must FAIL CLOSED (never silently normalize to [])
 		fs.writeFileSync(
@@ -343,13 +343,13 @@ test("resolveGitHubAuth reads token_file / use_host_auth from sandbox.toml and e
 });
 
 test("evaluateGitHubRepoAccess enforces allowed_repos on git/REST and blocks GraphQL unconditionally", () => {
-	const allowed = ["myorg/platform-gitops", "myorg/service-*"];
-	assert.equal(isGitHubRepoAllowed("myorg/platform-gitops", allowed), true);
+	const allowed = ["myorg/platform-infra", "myorg/service-*"];
+	assert.equal(isGitHubRepoAllowed("myorg/platform-infra", allowed), true);
 	assert.equal(isGitHubRepoAllowed("myorg/service-payments.git", allowed), true);
 	assert.equal(isGitHubRepoAllowed("otherorg/secret-repo", allowed), false);
 
 	assert.equal(
-		evaluateGitHubRepoAccess("https://github.com/myorg/platform-gitops.git/info/refs", allowed).allowed,
+		evaluateGitHubRepoAccess("https://github.com/myorg/platform-infra.git/info/refs", allowed).allowed,
 		true,
 	);
 	assert.equal(

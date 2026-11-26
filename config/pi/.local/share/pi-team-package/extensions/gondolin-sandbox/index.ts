@@ -697,7 +697,7 @@ export default function (pi: ExtensionAPI) {
 				[
 					`Gondolin VM: ${activeVm.id}`,
 					`Config: ${activeConfigFiles.length > 0 ? activeConfigFiles.join(" + ") : "(defaults — create ~/.config/sandbox.toml)"}`,
-					`Image: ${activeBackend?.imagePath ?? "alpine-base (run scripts/pi-build-image.sh for git+gh+kustomize)"}`,
+					`Image: ${activeBackend?.imagePath ?? "alpine-base (run scripts/pi-build-image.sh for git+gh)"}`,
 					`Backend: ${activeBackend?.vmm ?? "unknown"} (rootfs: ${activeBackend?.rootfsMode ?? "unknown"})`,
 					`Workspace mount: ${realLocalCwd} -> ${activeBackend?.guestWorkspace ?? "/workspace"}`,
 					`Trusted skill mounts (ro): ${activeSkillMounts.length}`,

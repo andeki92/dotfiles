@@ -6,9 +6,9 @@ Self-contained Pi package for a baseline coding-agent setup. Designed to be inst
 
 - `extensions/gondolin-sandbox/` — Fail-closed Gondolin micro-VM sandbox for Pi's built-in file/shell tools and `!` commands, configured via `~/.config/sandbox.toml`, with allowlisted environment variables and default-deny HTTP(S) egress.
 - `extensions/usage-insights/` — Metadata-only local JSONL usage recorder (`schemaVersion: 1`) with a single isolated `exportUsageEvent()` sink ready for an OTLP/HTTP collector.
-- `gondolin-image/` — Custom Alpine guest image definition (`pi-sandbox:latest`) with `git`, `gh`, `kustomize`, `ripgrep`, `jq`, `node`, `python3`, and `uv`.
-- `skills/gitops-kustomize/` — GitOps skill for Kubernetes + Argo CD + kustomize.
-- `prompts/gitops-review.md` — `/gitops-review` diff review template.
+- `gondolin-image/` — Custom Alpine guest image definition (`pi-sandbox:latest`) with `git`, `gh`, `ripgrep`, `jq`, `node`, `python3`, and `uv`.
+- `skills/sandbox-pr-workflow/` — Clone, edit, test, push, and PR workflow for the sandbox.
+- `prompts/diff-review.md` — `/diff-review` pre-PR diff review template.
 - `templates/` — Reference `AGENTS.md`, `settings.template.json` (`defaultProjectTrust: "ask"`, `codemode` enabled, pinned third-party packages), and `subagents.config.json`.
 - `pi-pin.json` — Single source of truth for the pinned Pi version and third-party package pins.
 

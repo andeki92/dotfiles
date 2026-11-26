@@ -71,8 +71,8 @@ test("exportUsageEvent writes valid v1 JSONL with strictly allowlisted metadata 
 			totalToolCalls: 3,
 			totalToolErrors: 1,
 			loadedExtensions: ["pi-team-package"],
-			loadedSkills: ["gitops-kustomize"],
-			invokedSkills: ["gitops-kustomize"],
+			loadedSkills: ["sandbox-pr-workflow"],
+			invokedSkills: ["sandbox-pr-workflow"],
 			sandbox: { active: true, escapeHatchUsed: false, backend: "krun" },
 			// Attempted forbidden fields that must be stripped by allowlist serializer:
 			prompt: "SECRET PROMPT",

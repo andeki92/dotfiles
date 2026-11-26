@@ -47,7 +47,7 @@ export const GITHUB_SECRET_HOSTS: readonly string[] = [
 	"uploads.github.com",
 ];
 
-/** Default custom Gondolin image built by scripts/pi-build-image.sh (includes git, gh, kustomize). */
+/** Default custom Gondolin image built by scripts/pi-build-image.sh (includes git, gh, ripgrep, jq). */
 export const DEFAULT_CUSTOM_IMAGE_TAG = "pi-sandbox:latest";
 
 /** Clean guest-only PATH containing only standard Linux paths (no /mnt/c or host paths). */
