@@ -1,0 +1,51 @@
+# Gondolin micro-VM sandbox configuration (~/.config/sandbox.toml).
+#
+# Put machine-local or private overrides (such as repo allowlists or enabling
+# host `gh` auth) in ~/.config/sandbox.local.toml (gitignored).
+# Never place raw tokens in tracked dotfiles — use `token_file` (chmod 600)
+# or the PI_SANDBOX_GH_TOKEN environment variable.
+
+[vm]
+# Custom Gondolin guest image tag built by scripts/pi-build-image.sh
+# (includes git, gh, ripgrep, jq, node, python3, uv).
+image = "pi-sandbox:latest"
+# Backend: "krun" (default on Linux x86_64 / Apple Silicon) or "qemu".
+# vmm = "krun"
+# Rootfs mode: "readonly" (default, no qemu-img needed) or "cow".
+# rootfs = "readonly"
+
+[network]
+# Extra HTTPS hostnames appended to the built-in default-deny allowlist
+# (git hosts + standard package registries).
+extra_allowed_hosts = []
+# Uncomment to replace the built-in default host allowlist completely:
+# allowed_hosts = ["github.com", "api.github.com", "uploads.github.com", "registry.npmjs.org"]
+
+[github]
+# GitHub CLI (`gh`) and HTTPS `git` authenticate via Gondolin host-side secret
+# substitution: the VM only ever receives an opaque dummy `ghp_` placeholder,
+# never the real token.
+#
+# Recommended: store a fine-grained, repo-scoped PAT in a 0600 file:
+token_file = "~/.config/sandbox-gh-token"
+#
+# Alternative: set `use_host_auth = true` (in ~/.config/sandbox.local.toml)
+# to delegate your host `gh auth token` via placeholder substitution.
+# Pair with `allowed_repos` to limit which repos the VM can touch.
+use_host_auth = false
+#
+# Host-side GitHub repository allowlist (supports `*` in repo name,
+# e.g. ["my-org/my-repo", "my-org/service-*"]).
+# - Must use "owner/repo" syntax; invalid entries fail closed at startup.
+# - When non-empty, GitHub GraphQL (/graphql) is also blocked on the proxy
+#   because GraphQL queries can target arbitrary repos via inline arguments
+#   (git HTTPS and REST API /repos/<owner>/<repo>/... remain allowed).
+# - For full `gh` GraphQL workflows (e.g. `gh pr create`), prefer a GitHub
+#   fine-grained repository-scoped PAT in `token_file` with `allowed_repos = []`,
+#   letting GitHub enforce repo scope server-side across Git, REST, and GraphQL.
+allowed_repos = []
+
+[git]
+# Optional commit author overrides inside the VM (defaults to host `git config`).
+# user_name = ""
+# user_email = ""

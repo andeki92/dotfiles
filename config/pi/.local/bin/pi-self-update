@@ -1,0 +1,285 @@
+#!/usr/bin/env bash
+# Wrapper for Pi's self-update (`PI_SELF_UPDATE_COMMAND` / `selfUpdateCommand`)
+# and pinned managed installer used by `scripts/pi-bootstrap.sh`.
+#
+# Ensures Pi versions only move when `piVersion` in pi-pin.json moves.
+# Uses Pi's official release API manifests (`package.json` + `package-lock.json`)
+# to create the exact managed-install layout under `~/.pi/agent/install/`.
+
+set -euo pipefail
+
+PI_PACKAGE="@earendil-works/pi-coding-agent"
+PI_INSTALLER_API_BASE="${PI_INSTALLER_API_BASE:-https://pi.dev/api/installer/releases}"
+AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
+MANAGED_ROOT="$AGENT_DIR/install"
+XDG_DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
+TEAM_PKG_DIR="${PI_TEAM_PACKAGE_DIR:-$XDG_DATA/pi-team-package}"
+PIN_FILE="${PI_PIN_FILE:-$TEAM_PKG_DIR/pi-pin.json}"
+BIN_DIR="${PI_BIN_DIR:-$HOME/.local/bin}"
+
+MODE="update"
+FORCE=0
+OFFERED_VERSION=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --sync)
+      MODE="sync"
+      shift
+      ;;
+    --force)
+      FORCE=1
+      shift
+      ;;
+    --pin-file)
+      PIN_FILE="$2"
+      shift 2
+      ;;
+    -h|--help)
+      cat <<'EOF'
+Usage: pi-self-update [--sync] [--force] [--pin-file PATH] [packageName version installSpec]
+
+Keeps Pi pinned to the version declared in pi-pin.json.
+- Invoked by `pi update` via PI_SELF_UPDATE_COMMAND / selfUpdateCommand.
+- Invoked with `--sync` by scripts/pi-bootstrap.sh to install or align Pi to the pin.
+EOF
+      exit 0
+      ;;
+    *)
+      # Arguments from Pi's selfUpdateCommand placeholders: {packageName} {version} {installSpec}
+      if [[ -z "$OFFERED_VERSION" && "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        OFFERED_VERSION="$1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    printf 'pi-self-update: required command not found: %s\n' "$1" >&2
+    exit 1
+  fi
+}
+
+require_cmd node
+require_cmd npm
+require_cmd curl
+
+if ! node -e 'const [maj,min] = process.versions.node.split(".").map(Number); process.exit(maj > 22 || (maj === 22 && min >= 19) ? 0 : 1)'; then
+  printf 'pi-self-update: Pi requires Node.js >= 22.19.0 (found %s)\n' "$(node --version)" >&2
+  exit 1
+fi
+
+if [[ ! -f "$PIN_FILE" ]]; then
+  printf 'pi-self-update: pin file not found: %s\n' "$PIN_FILE" >&2
+  exit 1
+fi
+
+PINNED_VERSION="$(node -e '
+const fs = require("node:fs");
+const pin = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+if (typeof pin.piVersion !== "string" || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(pin.piVersion)) {
+  throw new Error("invalid piVersion in pin file");
+}
+process.stdout.write(pin.piVersion);
+' "$PIN_FILE")"
+
+CURRENT_VERSION=""
+if [[ -r "$MANAGED_ROOT/current-version" ]]; then
+  CURRENT_VERSION="$(tr -d '[:space:]' < "$MANAGED_ROOT/current-version")"
+elif command -v pi >/dev/null 2>&1; then
+  CURRENT_VERSION="$(pi --version 2>/dev/null | head -n 1 | tr -d '[:space:]' || true)"
+fi
+
+write_managed_launcher() {
+  local launcher="$AGENT_DIR/bin/pi"
+  local launcher_tmp="$launcher.tmp.$$"
+  mkdir -p "$AGENT_DIR/bin"
+  cat > "$launcher_tmp" <<'EOF'
+#!/bin/sh
+case "$0" in
+  */*) pi_launcher="$0" ;;
+  *) pi_launcher=$(command -v "$0") || exit 127 ;;
+esac
+while [ -L "$pi_launcher" ]; do
+  pi_link=$(readlink "$pi_launcher") || exit 1
+  case "$pi_link" in
+    /*) pi_launcher="$pi_link" ;;
+    *) pi_launcher=${pi_launcher%/*}/$pi_link ;;
+  esac
+done
+pi_bin_dir=${pi_launcher%/*}
+pi_agent_dir=${pi_bin_dir%/*}
+pi_current_file=$pi_agent_dir/install/current-version
+if ! IFS= read -r pi_current_version < "$pi_current_file"; then
+  printf 'Could not read managed Pi version from %s.\n' "$pi_current_file" >&2
+  exit 1
+fi
+pi_release_bin=$pi_agent_dir/install/releases/$pi_current_version/node_modules/.bin/pi
+if [ ! -x "$pi_release_bin" ]; then
+  printf 'Managed Pi executable is missing: %s\n' "$pi_release_bin" >&2
+  exit 1
+fi
+
+# Mandatory external sandbox preflight for coding sessions.
+# Runs BEFORE exec'ing Pi so a broken/missing Gondolin import or extension
+# cannot be swallowed by Pi's extension loader and fall back to host tools.
+# Bypassed ONLY for non-session CLI subcommands or explicit `PI_SANDBOX_UNSAFE=1` (`pi-unsafe`).
+if [ "${PI_SANDBOX_UNSAFE:-0}" != "1" ]; then
+  case "${1:-}" in
+    install|remove|uninstall|update|list|config|auth|mcp|-v|--version|-h|--help|--list-models)
+      ;;
+    *)
+      pi_xdg_data=${XDG_DATA_HOME:-$HOME/.local/share}
+      pi_team_pkg=${PI_TEAM_PACKAGE_DIR:-$pi_xdg_data/pi-team-package}
+      pi_preflight=$pi_team_pkg/extensions/gondolin-sandbox/preflight.mjs
+      if [ -z "${PI_TEAM_PACKAGE_DIR:-}" ] && [ ! -r "$pi_preflight" ] && [ -r "${PI_CODING_AGENT_DIR:-$pi_agent_dir}/settings.json" ]; then
+        pi_settings_pkg=$(node - "${PI_CODING_AGENT_DIR:-$pi_agent_dir}" <<'NODE' 2>/dev/null || true
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const agentDir = process.argv[2];
+const s = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
+for (const entry of s.packages || []) {
+  const src = typeof entry === "string" ? entry : entry?.source;
+  if (typeof src !== "string" || src.startsWith("npm:") || src.startsWith("git:") || src.includes("://")) continue;
+  const resolved = src.startsWith("~/") ? path.join(os.homedir(), src.slice(2)) : path.resolve(agentDir, src);
+  const pf = path.join(resolved, "extensions", "gondolin-sandbox", "preflight.mjs");
+  if (fs.existsSync(pf)) { process.stdout.write(pf); break; }
+}
+NODE
+)
+        if [ -n "$pi_settings_pkg" ] && [ -r "$pi_settings_pkg" ]; then
+          pi_preflight=$pi_settings_pkg
+        fi
+      fi
+      if [ ! -r "$pi_preflight" ]; then
+        printf '[pi-sandbox] FATAL: Mandatory sandbox preflight missing: %s\n' "$pi_preflight" >&2
+        printf '[pi-sandbox] Refusing to start Pi with host tools (fail-closed).\n' >&2
+        printf '[pi-sandbox] Run scripts/pi-bootstrap.sh, or use `pi-unsafe` if you explicitly intend to run unsandboxed.\n' >&2
+        exit 2
+      fi
+      PI_CODING_AGENT_DIR=${PI_CODING_AGENT_DIR:-$pi_agent_dir} node "$pi_preflight" "$@" || exit $?
+      ;;
+  esac
+fi
+
+PI_MANAGED_INSTALL_ROOT=$pi_agent_dir/install
+export PI_MANAGED_INSTALL_ROOT
+exec "$pi_release_bin" "$@"
+EOF
+  chmod 0755 "$launcher_tmp"
+  mv -f "$launcher_tmp" "$launcher"
+}
+
+MANAGED_RELEASE_BIN="$MANAGED_ROOT/releases/$PINNED_VERSION/node_modules/.bin/pi"
+
+if [[ "$FORCE" -eq 0 && "$CURRENT_VERSION" == "$PINNED_VERSION" && -x "$MANAGED_RELEASE_BIN" && -L "$BIN_DIR/pi" ]]; then
+  # Keep the managed launcher script in sync even when the Pi version itself did not change.
+  write_managed_launcher
+  if [[ "$MODE" == "update" && -n "$OFFERED_VERSION" && "$OFFERED_VERSION" != "$PINNED_VERSION" ]]; then
+    printf 'Pi is pinned to %s via %s (upstream offered %s).\n' "$PINNED_VERSION" "$PIN_FILE" "$OFFERED_VERSION"
+    printf 'To upgrade, bump "piVersion" in pi-pin.json and run: pi-self-update --sync\n'
+  else
+    printf 'Pi %s is already installed and matches the repo pin.\n' "$PINNED_VERSION"
+  fi
+  exit 0
+fi
+
+download_artifact() {
+  local url="$1" dest="$2" label="$3" status
+  status="$(curl -fsSL -w '%{http_code}' -o "$dest" "$url" || true)"
+  if [[ "$status" != "200" ]]; then
+    rm -f "$dest"
+    printf 'pi-self-update: failed to fetch %s from %s (HTTP %s)\n' "$label" "$url" "${status:-err}" >&2
+    exit 1
+  fi
+}
+
+mkdir -p "$MANAGED_ROOT/staging" "$MANAGED_ROOT/releases" "$AGENT_DIR/bin" "$BIN_DIR"
+
+STAGE_DIR="$MANAGED_ROOT/staging/install-$$-$(date +%s)"
+trap 'rm -rf "$STAGE_DIR"' EXIT
+mkdir -p "$STAGE_DIR"
+
+printf 'Installing pinned Pi %s from official release lockfile...\n' "$PINNED_VERSION"
+download_artifact "$PI_INSTALLER_API_BASE/$PINNED_VERSION/package.json" "$STAGE_DIR/package.json" "package.json"
+download_artifact "$PI_INSTALLER_API_BASE/$PINNED_VERSION/package-lock.json" "$STAGE_DIR/package-lock.json" "package-lock.json"
+
+# Validate downloaded release artifacts against the pinned version.
+node - "$STAGE_DIR/package.json" "$STAGE_DIR/package-lock.json" "$PI_PACKAGE" "$PINNED_VERSION" <<'NODE'
+const fs = require("node:fs");
+const [pkgPath, lockPath, piPkg, version] = process.argv.slice(2);
+const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+const lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+const root = lock.packages?.[""];
+const piEntry = lock.packages?.[`node_modules/${piPkg}`];
+if (pkg.version !== version || pkg.dependencies?.[piPkg] !== version) {
+  throw new Error(`package.json does not match ${piPkg}@${version}`);
+}
+if (lock.lockfileVersion !== 3 || root?.dependencies?.[piPkg] !== version || piEntry?.version !== version) {
+  throw new Error(`package-lock.json does not match ${piPkg}@${version}`);
+}
+NODE
+
+(
+  cd "$STAGE_DIR"
+  npm ci --ignore-scripts --min-release-age=0 --omit=dev --include=optional --no-fund --no-audit --loglevel=error --progress=false
+)
+
+STAGED_BIN="$STAGE_DIR/node_modules/.bin/pi"
+if [[ ! -x "$STAGED_BIN" ]]; then
+  printf 'pi-self-update: staged Pi binary missing at %s\n' "$STAGED_BIN" >&2
+  exit 1
+fi
+
+VERIFIED_VERSION="$("$STAGED_BIN" --version | head -n 1 | tr -d '[:space:]')"
+if [[ "$VERIFIED_VERSION" != "$PINNED_VERSION" ]]; then
+  printf 'pi-self-update: smoke test returned %s, expected %s\n' "$VERIFIED_VERSION" "$PINNED_VERSION" >&2
+  exit 1
+fi
+
+RELEASE_DIR="$MANAGED_ROOT/releases/$PINNED_VERSION"
+if [[ -d "$RELEASE_DIR" ]]; then
+  rm -rf "$RELEASE_DIR"
+fi
+mv "$STAGE_DIR" "$RELEASE_DIR"
+
+# Write managed-install.json marker (compatible with Pi's official installer layout).
+MARKER_TMP="$MANAGED_ROOT/managed-install.json.tmp.$$"
+node - "$MARKER_TMP" "$BIN_DIR/pi" <<'NODE'
+const fs = require("node:fs");
+const [markerPath, entryPath] = process.argv.slice(2);
+fs.writeFileSync(
+  markerPath,
+  `${JSON.stringify(
+    {
+      kind: "pi-managed-install",
+      schemaVersion: 1,
+      layout: "releases-v1",
+      entrypoint: { type: "symlink", path: entryPath },
+    },
+    null,
+    2,
+  )}\n`,
+);
+NODE
+mv -f "$MARKER_TMP" "$MANAGED_ROOT/managed-install.json"
+
+# Write managed launcher script at ~/.pi/agent/bin/pi.
+write_managed_launcher
+LAUNCHER="$AGENT_DIR/bin/pi"
+
+# Activate current version and link ~/.local/bin/pi -> ~/.pi/agent/bin/pi.
+CUR_TMP="$MANAGED_ROOT/current-version.tmp.$$"
+printf '%s\n' "$PINNED_VERSION" > "$CUR_TMP"
+mv -f "$CUR_TMP" "$MANAGED_ROOT/current-version"
+
+if [[ -e "$BIN_DIR/pi" && ! -L "$BIN_DIR/pi" ]]; then
+  printf 'pi-self-update: refusing to overwrite non-symlink %s\n' "$BIN_DIR/pi" >&2
+  exit 1
+fi
+ln -sfn "$LAUNCHER" "$BIN_DIR/pi"
+
+printf 'Installed pinned Pi %s at %s\n' "$PINNED_VERSION" "$BIN_DIR/pi"

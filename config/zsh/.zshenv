@@ -12,6 +12,7 @@
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+export ATUIN_CONFIG_DIR="${ATUIN_CONFIG_DIR:-$XDG_CONFIG_HOME/atuin}"
 
 # Each is a default: a value the parent set wins, as when `c` starts claude
 # with DO_NOT_TRACK=0 or a project's .env sets KUBECONFIG.

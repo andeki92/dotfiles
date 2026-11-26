@@ -22,3 +22,10 @@ config/claude/.claude/skills/hf-cli
 
 # Homebrew's lock for trust.json (brew trust writes both under ~/.config/homebrew)
 config/brew/.config/homebrew/trust.json.lock
+
+# Installed runtime dependencies for the local Pi team package (recreated by scripts/pi-bootstrap.sh)
+config/pi/.local/share/pi-team-package/node_modules/
+
+# Machine-local sandbox overrides and host-side GitHub token file (never commit)
+config/pi/.config/sandbox.local.toml
+config/pi/.config/sandbox-gh-token

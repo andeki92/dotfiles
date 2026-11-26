@@ -1,0 +1,22 @@
+# System-wide git configuration baked into the pi-sandbox Gondolin guest image.
+# Uses gh CLI as the HTTPS credential helper for GitHub; gh reads $GH_TOKEN,
+# which inside Gondolin holds an opaque placeholder substituted ONLY on the host
+# for github.com / api.github.com / uploads.github.com.
+
+[credential "https://github.com"]
+	helper = !/usr/bin/gh auth git-credential
+
+[credential "https://gist.github.com"]
+	helper = !/usr/bin/gh auth git-credential
+
+[safe]
+	directory = *
+
+[init]
+	defaultBranch = main
+
+[pull]
+	ff = only
+
+[http]
+	sslCAInfo = /run/gondolin/ca-certificates.crt

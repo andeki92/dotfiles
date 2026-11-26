@@ -1,0 +1,26 @@
+{
+  "$schema": "https://pi.dev/schemas/settings.schema.json",
+  "defaultProjectTrust": "ask",
+  "defaultTools": [
+    "+codemode"
+  ],
+  "codemode": {
+    "mode": "on"
+  },
+  "enableInstallTelemetry": false,
+  "enableAnalytics": false,
+  "selfUpdateCommand": [
+    "pi-self-update",
+    "{packageName}",
+    "{version}",
+    "{installSpec}"
+  ],
+  "packages": [
+    "~/.local/share/pi-team-package",
+    "npm:pi-web-access@0.48.0",
+    "npm:pi-subagents@0.90.0",
+    "npm:@juicesharp/rpiv-todo@2.15.0",
+    "npm:@juicesharp/rpiv-ask-user-question@2.15.0",
+    "npm:@plannotator/pi-extension@0.29.4"
+  ]
+}

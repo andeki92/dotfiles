@@ -31,6 +31,8 @@ brew "glab"              # Gitlab CLI
 brew "herdr"             # Agent Multiplexer
 brew "qemu"              # VM backend for the Gondolin sandbox
 brew "e2fsprogs"         # mke2fs, for building Gondolin guest images
+brew "cpio"              # initramfs archive tool for Gondolin guest images
+brew "lz4"               # initramfs compression for Gondolin guest images
 cask "anthropics/tap/ant" # Claude API CLI; `ant auth login` writes the profiles `c --sr` uses
 
 # Applications
