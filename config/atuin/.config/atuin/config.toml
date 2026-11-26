@@ -1,0 +1,13 @@
+# Atuin configuration — strictly local mode.
+# No remote sync, no background daemon, no Threads capture, no update checks.
+
+auto_sync = false
+update_check = false
+secrets_filter = true
+
+[daemon]
+enabled = false
+autostart = false
+
+[threads]
+enabled = false

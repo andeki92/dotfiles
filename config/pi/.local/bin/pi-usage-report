@@ -1,0 +1,308 @@
+#!/usr/bin/env node
+/**
+ * pi-usage-report — summarises metadata-only Pi usage JSONL events and
+ * (when Atuin is installed) counts agent-run commands tagged `author=pi`.
+ */
+
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+function parseArgs(argv) {
+	const args = {
+		file:
+			process.env.PI_USAGE_LOG_PATH ||
+			path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state"), "pi", "usage.jsonl"),
+		days: null,
+		json: false,
+	};
+
+	for (let i = 0; i < argv.length; i++) {
+		const token = argv[i];
+		if (token === "--file" && argv[i + 1]) {
+			args.file = path.resolve(argv[++i]);
+		} else if (token === "--days" && argv[i + 1]) {
+			const n = Number(argv[++i]);
+			if (!Number.isFinite(n) || n <= 0) {
+				console.error("Invalid --days value (expected positive number).");
+				process.exit(1);
+			}
+			args.days = n;
+		} else if (token === "--json") {
+			args.json = true;
+		} else if (token === "-h" || token === "--help") {
+			console.log(
+				[
+					"Usage: pi-usage-report [--file PATH] [--days N] [--json]",
+					"",
+					"Summarises local Pi usage JSONL metadata (sessions/day, models, tokens,",
+					"cost, tools, skills, sandbox-off sessions) and Atuin author=pi counts.",
+				].join("\n"),
+			);
+			process.exit(0);
+		} else {
+			console.error(`Unknown argument: ${token}`);
+			process.exit(1);
+		}
+	}
+
+	return args;
+}
+
+function queryAtuinPiCounts(days) {
+	try {
+		const cmdArgs = ["search", "--filter-mode", "global", "--author", "pi", "--format", "{time}"];
+		if (days !== null) {
+			const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+			cmdArgs.push("--after", since);
+		}
+		cmdArgs.push("--", "");
+		const out = execFileSync("atuin", cmdArgs, {
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+			timeout: 5000,
+			env: {
+				...process.env,
+				ATUIN_SESSION: process.env.ATUIN_SESSION || "pi-usage-report",
+			},
+		});
+		const lines = out
+			.split("\n")
+			.map((l) => l.trim())
+			.filter(Boolean);
+
+		const byDay = {};
+		for (const line of lines) {
+			const day = line.slice(0, 10);
+			if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+				byDay[day] = (byDay[day] || 0) + 1;
+			}
+		}
+		return { available: true, totalCommands: lines.length, byDay };
+	} catch (error) {
+		if (error && error.code === "ENOENT") {
+			return { available: false, reason: "atuin not on PATH" };
+		}
+		// Atuin exits non-zero if history DB doesn't exist yet or has 0 matches in some builds.
+		const stderr = typeof error?.stderr === "string" ? error.stderr.trim() : "";
+		if (error?.status === 1 && !stderr) {
+			return { available: true, totalCommands: 0, byDay: {} };
+		}
+		return { available: false, reason: stderr || "atuin query failed" };
+	}
+}
+
+function formatDuration(ms) {
+	const totalSec = Math.round(ms / 1000);
+	const h = Math.floor(totalSec / 3600);
+	const m = Math.floor((totalSec % 3600) / 60);
+	const s = totalSec % 60;
+	if (h > 0) return `${h}h ${m}m ${s}s`;
+	if (m > 0) return `${m}m ${s}s`;
+	return `${s}s`;
+}
+
+function formatInt(n) {
+	return Math.round(n).toLocaleString("en-US");
+}
+
+function formatUsd(n) {
+	return `$${n.toFixed(4)}`;
+}
+
+const opts = parseArgs(process.argv.slice(2));
+const cutoffMs = opts.days !== null ? Date.now() - opts.days * 86_400_000 : null;
+
+const events = [];
+let malformedLines = 0;
+
+if (fs.existsSync(opts.file)) {
+	const raw = fs.readFileSync(opts.file, "utf8");
+	for (const line of raw.split("\n")) {
+		const trimmed = line.trim();
+		if (!trimmed) continue;
+		try {
+			const parsed = JSON.parse(trimmed);
+			if (parsed && parsed.eventType === "session_summary") {
+				const ts = Date.parse(parsed.startedAt || parsed.endedAt || "");
+				if (cutoffMs !== null && Number.isFinite(ts) && ts < cutoffMs) continue;
+				events.push(parsed);
+			}
+		} catch {
+			malformedLines += 1;
+		}
+	}
+}
+
+const sessionsByDay = {};
+const models = {};
+const tools = {};
+const loadedSkills = {};
+const invokedSkills = {};
+let totalTurns = 0;
+let totalDurationMs = 0;
+let totalTokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
+let totalCostUsd = 0;
+let sandboxOnSessions = 0;
+let sandboxOffSessions = 0;
+let escapeHatchSessions = 0;
+
+for (const ev of events) {
+	const day = (ev.startedAt || ev.endedAt || "unknown").slice(0, 10);
+	sessionsByDay[day] = (sessionsByDay[day] || 0) + 1;
+
+	totalTurns += Number(ev.turnCount || 0);
+	totalDurationMs += Number(ev.durationMs || 0);
+
+	const tok = ev.tokens || {};
+	totalTokens.input += Number(tok.input || 0);
+	totalTokens.output += Number(tok.output || 0);
+	totalTokens.cacheRead += Number(tok.cacheRead || 0);
+	totalTokens.cacheWrite += Number(tok.cacheWrite || 0);
+	totalTokens.total += Number(tok.total || 0);
+	totalCostUsd += Number(ev.costUsd?.total || 0);
+
+	if (ev.sandbox?.active) {
+		sandboxOnSessions += 1;
+	} else {
+		sandboxOffSessions += 1;
+	}
+	if (ev.sandbox?.escapeHatchUsed) {
+		escapeHatchSessions += 1;
+	}
+
+	const used = Array.isArray(ev.modelsUsed) && ev.modelsUsed.length > 0
+		? ev.modelsUsed
+		: ev.provider || ev.model
+			? [
+					{
+						provider: ev.provider || "unknown",
+						model: ev.model || "unknown",
+						responses: 0,
+						tokens: ev.tokens || {},
+						costUsd: ev.costUsd || {},
+					},
+				]
+			: [];
+
+	for (const m of used) {
+		const key = `${m.provider}/${m.model}`;
+		if (!models[key]) {
+			models[key] = { sessions: 0, responses: 0, tokens: 0, costUsd: 0 };
+		}
+		models[key].sessions += 1;
+		models[key].responses += Number(m.responses || 0);
+		models[key].tokens += Number(m.tokens?.total || 0);
+		models[key].costUsd += Number(m.costUsd?.total || 0);
+	}
+
+	for (const [toolName, stats] of Object.entries(ev.toolCalls || {})) {
+		if (!tools[toolName]) tools[toolName] = { calls: 0, errors: 0 };
+		tools[toolName].calls += Number(stats.calls || 0);
+		tools[toolName].errors += Number(stats.errors || 0);
+	}
+
+	for (const s of ev.loadedSkills || []) {
+		loadedSkills[s] = (loadedSkills[s] || 0) + 1;
+	}
+	for (const s of ev.invokedSkills || []) {
+		invokedSkills[s] = (invokedSkills[s] || 0) + 1;
+	}
+}
+
+const atuin = queryAtuinPiCounts(opts.days);
+
+const summary = {
+	file: opts.file,
+	fileExists: fs.existsSync(opts.file),
+	windowDays: opts.days,
+	malformedLines,
+	totals: {
+		sessions: events.length,
+		turns: totalTurns,
+		durationMs: totalDurationMs,
+		tokens: totalTokens,
+		costUsd: Math.round(totalCostUsd * 1_000_000) / 1_000_000,
+		sandboxOnSessions,
+		sandboxOffSessions,
+		escapeHatchSessions,
+	},
+	sessionsByDay,
+	models,
+	tools,
+	invokedSkills,
+	loadedSkills,
+	atuin,
+};
+
+if (opts.json) {
+	console.log(JSON.stringify(summary, null, 2));
+	process.exit(0);
+}
+
+console.log(`Pi Usage Report (${opts.file}${opts.days ? `, last ${opts.days}d` : ""})`);
+console.log("=".repeat(72));
+
+if (!summary.fileExists) {
+	console.log("No usage log found yet. Start and exit a Pi session to record events.");
+} else if (events.length === 0) {
+	console.log("Usage log exists, but 0 session events matched.");
+} else {
+	console.log(
+		`Sessions: ${events.length}  |  Turns: ${totalTurns}  |  Duration: ${formatDuration(totalDurationMs)}`,
+	);
+	console.log(
+		`Tokens:   ${formatInt(totalTokens.total)} total (in ${formatInt(totalTokens.input)}, out ${formatInt(totalTokens.output)}, cacheR ${formatInt(totalTokens.cacheRead)}, cacheW ${formatInt(totalTokens.cacheWrite)})`,
+	);
+	console.log(`Cost:     ${formatUsd(totalCostUsd)}`);
+	console.log(
+		`Sandbox:  ${sandboxOnSessions} active, ${sandboxOffSessions} inactive (${escapeHatchSessions} via pi-unsafe)`,
+	);
+	if (malformedLines > 0) {
+		console.log(`Warning:  skipped ${malformedLines} malformed JSONL line(s)`);
+	}
+
+	console.log("\nSessions per day:");
+	for (const day of Object.keys(sessionsByDay).sort()) {
+		console.log(`  ${day}  ${sessionsByDay[day]}`);
+	}
+
+	const modelRows = Object.entries(models).sort((a, b) => b[1].tokens - a[1].tokens);
+	if (modelRows.length > 0) {
+		console.log("\nModels used:");
+		for (const [name, m] of modelRows) {
+			console.log(
+				`  ${name.padEnd(36)} sessions=${m.sessions}  responses=${m.responses}  tokens=${formatInt(m.tokens)}  cost=${formatUsd(m.costUsd)}`,
+			);
+		}
+	}
+
+	const toolRows = Object.entries(tools).sort((a, b) => b[1].calls - a[1].calls);
+	if (toolRows.length > 0) {
+		console.log("\nMost-used tools:");
+		for (const [name, t] of toolRows.slice(0, 15)) {
+			console.log(`  ${name.padEnd(28)} calls=${String(t.calls).padStart(4)}  errors=${t.errors}`);
+		}
+	}
+
+	const invokedRows = Object.entries(invokedSkills).sort((a, b) => b[1] - a[1]);
+	console.log("\nInvoked skills:");
+	if (invokedRows.length === 0) {
+		console.log("  (none invoked)");
+	} else {
+		for (const [name, count] of invokedRows) {
+			console.log(`  ${name.padEnd(28)} sessions=${count}`);
+		}
+	}
+}
+
+console.log("\nAtuin agent-run commands (author=pi, local DB):");
+if (atuin.available) {
+	console.log(`  Total commands: ${atuin.totalCommands}`);
+	for (const day of Object.keys(atuin.byDay).sort()) {
+		console.log(`  ${day}  ${atuin.byDay[day]}`);
+	}
+} else {
+	console.log(`  Unavailable (${atuin.reason})`);
+}

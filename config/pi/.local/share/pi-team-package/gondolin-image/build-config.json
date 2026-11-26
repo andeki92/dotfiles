@@ -1,0 +1,64 @@
+{
+  "arch": "x86_64",
+  "distro": "alpine",
+  "alpine": {
+    "version": "3.23.7",
+    "kernelPackage": "linux-virt",
+    "kernelImage": "vmlinuz-virt",
+    "rootfsPackages": [
+      "linux-virt",
+      "rng-tools",
+      "bash",
+      "ca-certificates",
+      "ca-certificates-bundle",
+      "curl",
+      "diffutils",
+      "e2fsprogs",
+      "e2fsprogs-extra",
+      "git",
+      "github-cli",
+      "jq",
+      "kustomize",
+      "make",
+      "nodejs",
+      "npm",
+      "openssh",
+      "patch",
+      "python3",
+      "ripgrep",
+      "uv"
+    ],
+    "initramfsPackages": [],
+    "krunfwVersion": "v5.2.1"
+  },
+  "rootfs": {
+    "label": "gondolin-root"
+  },
+  "runtimeDefaults": {
+    "rootfsMode": "readonly"
+  },
+  "postBuild": {
+    "copy": [
+      {
+        "src": "./files/gitconfig",
+        "dest": "/etc/gitconfig"
+      },
+      {
+        "src": "./files/resolv.conf",
+        "dest": "/etc/resolv.conf"
+      },
+      {
+        "src": "./files/workspace",
+        "dest": "/workspace"
+      },
+      {
+        "src": "./files/workspace",
+        "dest": "/data"
+      },
+      {
+        "src": "./files/workspace",
+        "dest": "/etc/gondolin/mitm"
+      }
+    ]
+  }
+}

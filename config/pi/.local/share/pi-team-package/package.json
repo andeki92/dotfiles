@@ -1,0 +1,36 @@
+{
+  "name": "pi-team-package",
+  "version": "0.1.0",
+  "description": "Team Pi baseline package: fail-closed Gondolin sandbox, metadata-only usage insights, GitOps skills, and templates.",
+  "type": "module",
+  "private": true,
+  "keywords": [
+    "pi-package"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/gondolin-sandbox/index.ts",
+      "./extensions/usage-insights/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ],
+    "changelogPath": "./CHANGELOG.md"
+  },
+  "scripts": {
+    "test": "node --test extensions/gondolin-sandbox/policy.test.mjs extensions/usage-insights/schema.test.mjs"
+  },
+  "dependencies": {
+    "@earendil-works/gondolin": "0.14.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  }
+}
