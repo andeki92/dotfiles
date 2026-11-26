@@ -39,8 +39,8 @@ test("sanitizeExtensionSource strips local host paths and credentials", () => {
 		"pi-team-package",
 	);
 	assert.equal(
-		sanitizeExtensionSource("/home/alice/.pi/agent/extensions/atuin.ts"),
-		"atuin.ts",
+		sanitizeExtensionSource("/home/alice/.pi/agent/extensions/custom-ext.ts"),
+		"custom-ext.ts",
 	);
 });
 

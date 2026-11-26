@@ -414,22 +414,5 @@ else
   bad "pi-self-update unexpected output: $UPDATE_OUT"
 fi
 
-if command -v atuin >/dev/null 2>&1; then
-  printf '\n=== 7. Verify Atuin author=pi count in pi-usage-report (isolated temp DB) ===\n'
-  ATUIN_TMP_HOME="$WORK_TMP/atuin-home"
-  mkdir -p "$ATUIN_TMP_HOME"
-  printf 'auto_sync = false\nupdate_check = false\n[daemon]\nenabled = false\nautostart = false\n[threads]\nenabled = false\n' > "$ATUIN_TMP_HOME/config.toml"
-  HIST_ID="$(ATUIN_HOME="$ATUIN_TMP_HOME" ATUIN_CONFIG_DIR="$ATUIN_TMP_HOME" ATUIN_SESSION="verify-sess" atuin history start --author pi --author-kind agent -- "echo verify-atuin-pi" 2>/dev/null || true)"
-  if [[ -n "$HIST_ID" ]]; then
-    ATUIN_HOME="$ATUIN_TMP_HOME" ATUIN_CONFIG_DIR="$ATUIN_TMP_HOME" ATUIN_SESSION="verify-sess" atuin history end --exit 0 -- "$HIST_ID" >/dev/null 2>&1 || true
-  fi
-  REPORT_JSON="$(ATUIN_HOME="$ATUIN_TMP_HOME" ATUIN_CONFIG_DIR="$ATUIN_TMP_HOME" pi-usage-report --file "$USAGE_LOG" --json)"
-  if node -e 'const r = JSON.parse(process.argv[1]); if (!r.atuin?.available || r.atuin.totalCommands !== 1) process.exit(1);' "$REPORT_JSON"; then
-    ok "pi-usage-report accurately counted author=pi commands from Atuin (count=1)"
-  else
-    bad "pi-usage-report Atuin author=pi count mismatch: $REPORT_JSON"
-  fi
-fi
-
 printf '\n=== Summary: %d passed, %d failed ===\n' "$pass" "$fail"
 [[ $fail -eq 0 ]]

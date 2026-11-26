@@ -125,7 +125,7 @@ export function sanitizeExtensionSource(rawSource: string | undefined): string |
 		return trimmed.replace(/\/\/[^/@]+@/, "//").slice(0, 128);
 	}
 
-	// Local filesystem path: keep ONLY the final path segment (e.g. `pi-team-package` or `atuin.ts`).
+	// Local filesystem path: keep ONLY the final path segment (e.g. `pi-team-package` or `custom-ext.ts`).
 	const normalized = trimmed.replace(/\\/g, "/").replace(/\/+$/, "");
 	const base = path.posix.basename(normalized);
 	if (!base || base === "." || base === "..") return null;

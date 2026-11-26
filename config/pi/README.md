@@ -16,7 +16,7 @@ config/pi/
 └── .local/
     ├── bin/
     │   ├── pi-self-update                  # Pinned self-update wrapper (PI_SELF_UPDATE_COMMAND / selfUpdateCommand)
-    │   └── pi-usage-report                 # Summarises usage.jsonl + Atuin author=pi count
+    │   └── pi-usage-report                 # Summarises usage.jsonl metadata
     └── share/
         └── pi-team-package/                # Self-contained Pi package (liftable to its own git repo unchanged)
             ├── package.json
@@ -54,24 +54,23 @@ scripts/
    ```
    *(Optional)* Installing `qemu-utils` or `qemu-system-x86` enables writable copy-on-write rootfs mounted at `/workspace`. Without `qemu-img`, Gondolin uses `krun` with a read-only rootfs, writable tmpfs `/tmp` + `/root`, and mounts the project at `/tmp/workspace` (boot + first exec ~370 ms on WSL2).
 2. **Node.js >= 22.19**, `curl`, `stow` (installed via `mise` / `brew` in dotfiles).
-3. *(Optional)* **Atuin** in local-only mode (`mise install atuin && stow -R atuin`) if you want agent-run command counts in `pi-usage-report`.
 
 ### Bootstrap
 From the dotfiles repo root:
 
 ```bash
-stow -R pi zsh atuin
+stow -R pi zsh
 ./scripts/pi-bootstrap.sh
 ```
 
 `scripts/pi-bootstrap.sh` is idempotent and:
-1. Stows `config/pi` (`~/.local/bin/pi-self-update`, `~/.local/bin/pi-usage-report`, `~/.local/share/pi-team-package`).
+1. Stows `config/pi` (`~/.config/sandbox.toml`, `~/.local/bin/pi-self-update`, `~/.local/bin/pi-usage-report`, `~/.local/share/pi-team-package`).
 2. Installs pinned Pi `1.6.0` using Pi's official release lockfiles (`https://pi.dev/api/installer/releases/1.6.0/package{,-lock}.json`) into `~/.pi/agent/install/`.
 3. Installs the team package's runtime dependencies (`npm ci --ignore-scripts --include=optional`).
 4. Links `~/.pi/agent/AGENTS.md` and merges `~/.pi/agent/settings.json` (`defaultProjectTrust: "ask"`, `defaultTools: ["+codemode"]`, `codemode.mode: "on"`, `selfUpdateCommand`, pinned packages) without clobbering personal model/theme preferences.
 5. Writes `~/.pi/agent/extensions/subagent/config.json` with `forceTopLevelAsync: true` so `pi-subagents` never launches unsandboxed foreground children.
-6. Reconciles pinned third-party packages (`pi update --extensions`).
-7. Installs `herdr integration install pi` and Atuin's Pi hook (`atuin setup --only --agent-history --agents pi --no-threads --no-daemon --no-mcp --sync off`) when those CLIs are present.
+6. Reconciles pinned third-party packages (`pi install`).
+7. Installs `herdr integration install pi` when `herdr` is present, and builds the `pi-sandbox:latest` guest image when `cpio`/`lz4`/`e2fsprogs` are installed.
 
 ### Verify
 ```bash
@@ -183,7 +182,7 @@ Under Gondolin, Pi itself and all extensions run **on the host** with your OS us
    - **`@juicesharp/rpiv-todo@2.15.0`** & **`@juicesharp/rpiv-ask-user-question@2.15.0`**: Pure session/TUI extensions (no network; `ask-user-question` spawns `$VISUAL`/`$EDITOR` only if you invoke external editing).
 3. **Built-in MCP servers (`builtin:mcp`)**: Any configured stdio/HTTP MCP servers execute on the host.
 4. **Read-write project mount**: Malicious edits inside `/workspace` (e.g. `.git/config` hooks/`core.fsmonitor`, `Makefile`, scripts, or `.pi/` project extensions — gated by `defaultProjectTrust: "ask"`, except `sessionDir`) could affect the host if you later execute them outside the VM.
-5. **Host hooks**: `herdr-agent-state.ts` and `atuin.ts` observe Pi tool events on the host.
+5. **Host hooks**: Any host-side observer extensions installed under `~/.pi/agent/extensions/` (such as `herdr-agent-state.ts`) run on the host.
 
 For untrusted repos or full process-level isolation (including third-party extensions and MCP), run the entire Pi process inside Docker Sandboxes or OpenShell (see `docs.pi.dev/latest/containerization`).
 
@@ -250,12 +249,12 @@ Written locally as append-only JSONL (`0600`) to `${XDG_STATE_HOME:-~/.local/sta
 ```
 
 Notes on collection:
-- `loadedExtensions` is derived from `sourceInfo.source` on registered tools and commands (sanitized to package spec or basename only). Pure event-listener extensions that register neither tools nor commands (e.g. `atuin.ts`, `herdr-agent-state.ts`) are not enumerable via Pi's `ExtensionAPI`.
+- `loadedExtensions` is derived from `sourceInfo.source` on registered tools and commands (sanitized to package spec or basename only). Pure event-listener extensions that register neither tools nor commands (e.g. `herdr-agent-state.ts`) are not enumerable via Pi's `ExtensionAPI`.
 - `exportUsageEvent()` in `extensions/usage-insights/schema.ts` is the single sink seam where a future OTLP/HTTP collector exporter attaches.
 
 ### Reporting CLI
 ```bash
-pi-usage-report              # Full local summary + Atuin author=pi count
+pi-usage-report              # Full local summary
 pi-usage-report --days 7     # Last 7 days
 pi-usage-report --json       # Machine-readable JSON
 ```

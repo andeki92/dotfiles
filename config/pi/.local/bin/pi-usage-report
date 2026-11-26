@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 /**
- * pi-usage-report — summarises metadata-only Pi usage JSONL events and
- * (when Atuin is installed) counts agent-run commands tagged `author=pi`.
+ * pi-usage-report — summarises metadata-only Pi usage JSONL events.
  */
 
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -37,7 +35,7 @@ function parseArgs(argv) {
 					"Usage: pi-usage-report [--file PATH] [--days N] [--json]",
 					"",
 					"Summarises local Pi usage JSONL metadata (sessions/day, models, tokens,",
-					"cost, tools, skills, sandbox-off sessions) and Atuin author=pi counts.",
+					"cost, tools, skills, and sandbox-off sessions).",
 				].join("\n"),
 			);
 			process.exit(0);
@@ -48,49 +46,6 @@ function parseArgs(argv) {
 	}
 
 	return args;
-}
-
-function queryAtuinPiCounts(days) {
-	try {
-		const cmdArgs = ["search", "--filter-mode", "global", "--author", "pi", "--format", "{time}"];
-		if (days !== null) {
-			const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
-			cmdArgs.push("--after", since);
-		}
-		cmdArgs.push("--", "");
-		const out = execFileSync("atuin", cmdArgs, {
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "pipe"],
-			timeout: 5000,
-			env: {
-				...process.env,
-				ATUIN_SESSION: process.env.ATUIN_SESSION || "pi-usage-report",
-			},
-		});
-		const lines = out
-			.split("\n")
-			.map((l) => l.trim())
-			.filter(Boolean);
-
-		const byDay = {};
-		for (const line of lines) {
-			const day = line.slice(0, 10);
-			if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
-				byDay[day] = (byDay[day] || 0) + 1;
-			}
-		}
-		return { available: true, totalCommands: lines.length, byDay };
-	} catch (error) {
-		if (error && error.code === "ENOENT") {
-			return { available: false, reason: "atuin not on PATH" };
-		}
-		// Atuin exits non-zero if history DB doesn't exist yet or has 0 matches in some builds.
-		const stderr = typeof error?.stderr === "string" ? error.stderr.trim() : "";
-		if (error?.status === 1 && !stderr) {
-			return { available: true, totalCommands: 0, byDay: {} };
-		}
-		return { available: false, reason: stderr || "atuin query failed" };
-	}
 }
 
 function formatDuration(ms) {
@@ -211,8 +166,6 @@ for (const ev of events) {
 	}
 }
 
-const atuin = queryAtuinPiCounts(opts.days);
-
 const summary = {
 	file: opts.file,
 	fileExists: fs.existsSync(opts.file),
@@ -233,7 +186,6 @@ const summary = {
 	tools,
 	invokedSkills,
 	loadedSkills,
-	atuin,
 };
 
 if (opts.json) {
@@ -295,14 +247,4 @@ if (!summary.fileExists) {
 			console.log(`  ${name.padEnd(28)} sessions=${count}`);
 		}
 	}
-}
-
-console.log("\nAtuin agent-run commands (author=pi, local DB):");
-if (atuin.available) {
-	console.log(`  Total commands: ${atuin.totalCommands}`);
-	for (const day of Object.keys(atuin.byDay).sort()) {
-		console.log(`  ${day}  ${atuin.byDay[day]}`);
-	}
-} else {
-	console.log(`  Unavailable (${atuin.reason})`);
 }

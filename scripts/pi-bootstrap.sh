@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Idempotent bootstrap script for Pi + team package + Gondolin sandbox +
-# herdr & Atuin integrations.
+# herdr integration.
 #
 # Safe to re-run any number of times by any WSL/Linux/macOS user.
 # Uses no hardcoded usernames or machine-specific absolute paths.
@@ -238,22 +238,7 @@ else
   warn "herdr not found on PATH; skipping 'herdr integration install pi'"
 fi
 
-# 8. Install Atuin Pi agent-history hook in local-only mode (if atuin is installed)
-if command -v atuin >/dev/null 2>&1; then
-  log "Installing Atuin Pi agent-history hook (sync & Threads disabled)..."
-  ATUIN_CFG_DIR="${ATUIN_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/atuin}"
-  if atuin setup --help 2>&1 | grep -q -- '--agent-history'; then
-    ATUIN_CONFIG_DIR="$ATUIN_CFG_DIR" atuin setup --only --agent-history --agents pi --no-threads --no-daemon --no-mcp --sync off
-  elif atuin hook --help 2>&1 | grep -q 'install'; then
-    ATUIN_CONFIG_DIR="$ATUIN_CFG_DIR" atuin hook install pi
-  else
-    warn "Unrecognized atuin CLI version; skipping Pi hook install"
-  fi
-else
-  warn "atuin not found on PATH; skipping Atuin Pi hook install (install via dotfiles mise/brew first)"
-fi
-
-# 9. Build custom Gondolin guest image (pi-sandbox:latest with git, gh, kustomize) if build tools exist
+# 8. Build custom Gondolin guest image (pi-sandbox:latest with git, gh, kustomize) if build tools exist
 if [[ -x "$SCRIPT_DIR/pi-build-image.sh" ]]; then
   if command -v cpio >/dev/null 2>&1 && command -v lz4 >/dev/null 2>&1 && \
      { command -v mke2fs >/dev/null 2>&1 || command -v mkfs.ext4 >/dev/null 2>&1 || [[ -x /usr/sbin/mke2fs ]]; }; then
@@ -264,7 +249,7 @@ if [[ -x "$SCRIPT_DIR/pi-build-image.sh" ]]; then
   fi
 fi
 
-# 10. Preflight KVM virtualization check (informational; pi itself fails closed if missing)
+# 9. Preflight KVM virtualization check (informational; pi itself fails closed if missing)
 if [[ "$(uname -s)" == "Linux" ]]; then
   if [[ -r /dev/kvm && -w /dev/kvm ]]; then
     log "KVM check: /dev/kvm is readable and writable (Gondolin krun ready)."
