@@ -6,10 +6,12 @@ import test from "node:test";
 import {
 	assertSafeWorkspaceDir,
 	buildGuestEnv,
+	buildTrustedSkillMounts,
 	DEFAULT_ALLOWED_HOSTS,
 	evaluateGitHubRepoAccess,
 	GUEST_PATH,
 	isGitHubRepoAllowed,
+	isSafeReadOnlySkillDir,
 	loadEgressPolicy,
 	loadSandboxConfig,
 	resolveBackendConfig,
@@ -147,12 +149,92 @@ test("buildGuestEnv scrubs OCI, KUBECONFIG, cloud, SSH, host git tokens, and pas
 	}
 });
 
-test("toGuestPath maps workspace files into guestWorkspace and keeps external paths in guest root", () => {
-	assert.equal(toGuestPath("/work/repo", "/workspace", "src/app.ts"), "/workspace/src/app.ts");
-	assert.equal(toGuestPath("/work/repo", "/workspace", "/work/repo/README.md"), "/workspace/README.md");
-	assert.equal(toGuestPath("/work/repo", "/workspace", "~/.kube/config"), "/root/.kube/config");
-	assert.equal(toGuestPath("/work/repo", "/workspace", "/home/user/.oci/config"), "/home/user/.oci/config");
-	assert.equal(toGuestPath("/work/repo", "/workspace", "/mnt/c/Windows"), "/mnt/c/Windows");
+test("toGuestPath maps workspace and trusted skill mounts while keeping other external paths in guest root", () => {
+	const skillMounts = [
+		{
+			hostDir: "/home/dev/.local/share/pi-team-package/skills/gitops-kustomize",
+			realHostDir: "/home/dev/.dotfiles/config/pi/.local/share/pi-team-package/skills/gitops-kustomize",
+			guestDir: "/tmp/pi-skills/0-gitops-kustomize",
+		},
+	];
+	assert.equal(
+		toGuestPath("/work/repo", "/workspace", "src/app.ts", "/work/repo", skillMounts),
+		"/workspace/src/app.ts",
+	);
+	assert.equal(
+		toGuestPath("/work/repo", "/workspace", "/work/repo/README.md", "/work/repo", skillMounts),
+		"/workspace/README.md",
+	);
+	assert.equal(
+		toGuestPath(
+			"/work/repo",
+			"/workspace",
+			"/home/dev/.local/share/pi-team-package/skills/gitops-kustomize/SKILL.md",
+			"/work/repo",
+			skillMounts,
+		),
+		"/tmp/pi-skills/0-gitops-kustomize/SKILL.md",
+	);
+	assert.equal(
+		toGuestPath(
+			"/work/repo",
+			"/workspace",
+			"/home/dev/.dotfiles/config/pi/.local/share/pi-team-package/skills/gitops-kustomize/scripts/check.sh",
+			"/work/repo",
+			skillMounts,
+		),
+		"/tmp/pi-skills/0-gitops-kustomize/scripts/check.sh",
+	);
+	assert.equal(
+		toGuestPath("/work/repo", "/workspace", "~/.kube/config", "/work/repo", skillMounts),
+		"/root/.kube/config",
+	);
+	assert.equal(
+		toGuestPath("/work/repo", "/workspace", "/home/dev/.oci/config", "/work/repo", skillMounts),
+		"/home/dev/.oci/config",
+	);
+	assert.equal(
+		toGuestPath("/work/repo", "/workspace", "/mnt/c/Windows", "/work/repo", skillMounts),
+		"/mnt/c/Windows",
+	);
+});
+
+test("buildTrustedSkillMounts mounts external skill dirs read-only and refuses sensitive dirs", () => {
+	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pi-skills-mount-"));
+	try {
+		const fakeHome = path.join(tmp, "home");
+		const workspace = path.join(fakeHome, "work", "app");
+		const pkgSkillDir = path.join(fakeHome, ".local", "share", "pi-team-package", "skills", "gitops");
+		const projectSkillDir = path.join(workspace, ".pi", "skills", "local-skill");
+		const kubeDir = path.join(fakeHome, ".kube");
+
+		fs.mkdirSync(pkgSkillDir, { recursive: true });
+		fs.mkdirSync(projectSkillDir, { recursive: true });
+		fs.mkdirSync(kubeDir, { recursive: true });
+
+		assert.equal(isSafeReadOnlySkillDir(pkgSkillDir, fakeHome), true);
+		assert.equal(isSafeReadOnlySkillDir(kubeDir, fakeHome), false);
+		assert.equal(isSafeReadOnlySkillDir(path.join(fakeHome, ".pi", "agent"), fakeHome), false);
+		assert.equal(isSafeReadOnlySkillDir(path.join(fakeHome, ".pi", "agent", "skills", "mine"), fakeHome), true);
+		assert.equal(isSafeReadOnlySkillDir(fakeHome, fakeHome), false);
+		assert.equal(isSafeReadOnlySkillDir("/", fakeHome), false);
+
+		const mounts = buildTrustedSkillMounts(
+			[
+				path.join(pkgSkillDir, "SKILL.md"),
+				path.join(projectSkillDir, "SKILL.md"), // inside workspace: skipped
+				path.join(kubeDir, "SKILL.md"), // sensitive dir: rejected
+			],
+			workspace,
+			workspace,
+			fakeHome,
+		);
+		assert.equal(mounts.length, 1);
+		assert.equal(mounts[0].realHostDir, fs.realpathSync(pkgSkillDir));
+		assert.equal(mounts[0].guestDir, "/tmp/pi-skills/0-gitops");
+	} finally {
+		fs.rmSync(tmp, { recursive: true, force: true });
+	}
 });
 
 test("assertSafeWorkspaceDir refuses /, HOME, /mnt/c, and credential dirs", () => {
@@ -166,18 +248,16 @@ test("assertSafeWorkspaceDir refuses /, HOME, /mnt/c, and credential dirs", () =
 	assert.doesNotThrow(() => assertSafeWorkspaceDir("/home/dev/projects/app", "/home/dev"));
 });
 
-test("loadEgressPolicy reads sandbox.toml, enforces default-deny allowlist, and supports env overrides", () => {
+test("loadEgressPolicy fails closed on invalid allowed_repos or allowed_hosts instead of silently dropping them", () => {
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pi-egress-test-"));
 	const cfgPath = path.join(tmp, "sandbox.toml");
 	try {
 		const emptyCfg = loadSandboxConfig({}, path.join(tmp, "missing.toml"));
 		const def = loadEgressPolicy({}, emptyCfg);
 		assert.deepEqual(def.allowedHosts, [...DEFAULT_ALLOWED_HOSTS]);
-		assert.ok(def.allowedHosts.includes("registry.npmjs.org"));
-		assert.ok(def.allowedHosts.includes("uploads.github.com"));
-		assert.ok(!def.allowedHosts.includes("example.com"));
 		assert.deepEqual(def.allowedGitHubRepos, []);
 
+		// Valid TOML config
 		fs.writeFileSync(
 			cfgPath,
 			`
@@ -185,22 +265,37 @@ test("loadEgressPolicy reads sandbox.toml, enforces default-deny allowlist, and 
 extra_allowed_hosts = ["charts.example.org"]
 
 [github]
-allowed_repos = ["myorg/app-one"]
+allowed_repos = ["myorg/app-one", "myorg/gitops-*"]
 `,
 		);
 		const fromToml = loadEgressPolicy({}, loadSandboxConfig({}, cfgPath));
 		assert.ok(fromToml.allowedHosts.includes("charts.example.org"));
-		assert.deepEqual(fromToml.allowedGitHubRepos, ["myorg/app-one"]);
+		assert.deepEqual(fromToml.allowedGitHubRepos, ["myorg/app-one", "myorg/gitops-*"]);
 
-		const override = loadEgressPolicy(
-			{
-				PI_SANDBOX_ALLOWED_HOSTS: "registry.npmjs.org, *, github.com",
-				PI_SANDBOX_GH_ALLOWED_REPOS: "myorg/app-two, myorg/gitops-*, invalid",
-			},
-			loadSandboxConfig({}, cfgPath),
+		// Full URL in allowed_repos must FAIL CLOSED (never silently normalize to [])
+		fs.writeFileSync(
+			cfgPath,
+			`
+[github]
+allowed_repos = ["https://github.com/myorg/private"]
+`,
 		);
-		assert.deepEqual(override.allowedHosts, ["registry.npmjs.org", "github.com"]);
-		assert.deepEqual(override.allowedGitHubRepos, ["myorg/app-two", "myorg/gitops-*"]);
+		assert.throws(
+			() => loadEgressPolicy({}, loadSandboxConfig({}, cfgPath)),
+			/Invalid github\.allowed_repos/,
+		);
+
+		// Invalid env override in PI_SANDBOX_GH_ALLOWED_REPOS must FAIL CLOSED
+		assert.throws(
+			() => loadEgressPolicy({ PI_SANDBOX_GH_ALLOWED_REPOS: "myorg/ok, invalid-no-slash" }, emptyCfg),
+			/Invalid github\.allowed_repos/,
+		);
+
+		// Bare wildcard in PI_SANDBOX_ALLOWED_HOSTS must FAIL CLOSED
+		assert.throws(
+			() => loadEgressPolicy({ PI_SANDBOX_ALLOWED_HOSTS: "registry.npmjs.org, *" }, emptyCfg),
+			/Invalid allowed_hosts/,
+		);
 	} finally {
 		fs.rmSync(tmp, { recursive: true, force: true });
 	}
@@ -217,27 +312,22 @@ test("resolveGitHubAuth reads token_file / use_host_auth from sandbox.toml and e
 		loadedFiles: [],
 	};
 	try {
-		// Default: returns null (never silently reads host gh auth)
 		assert.equal(resolveGitHubAuth({}, baseCfg, () => "should-not-be-called"), null);
 
-		// Env var wins
 		const fromEnv = resolveGitHubAuth({ PI_SANDBOX_GH_TOKEN: "tok-env" }, baseCfg);
 		assert.deepEqual(fromEnv, { token: "tok-env", source: "env:PI_SANDBOX_GH_TOKEN" });
 
-		// File with overly broad permissions is rejected
 		fs.writeFileSync(tokenFile, "tok-file\n", { mode: 0o644 });
 		if (process.platform !== "win32") {
 			assert.throws(() => resolveGitHubAuth({}, baseCfg), /permissions are too open/);
 		}
 
-		// File with 0600 succeeds
 		fs.chmodSync(tokenFile, 0o600);
 		assert.deepEqual(resolveGitHubAuth({}, baseCfg), {
 			token: "tok-file",
 			source: "file:token_file",
 		});
 
-		// Opt-in host gh auth via sandbox.toml works when token file absent
 		fs.unlinkSync(tokenFile);
 		assert.deepEqual(
 			resolveGitHubAuth(
@@ -252,7 +342,7 @@ test("resolveGitHubAuth reads token_file / use_host_auth from sandbox.toml and e
 	}
 });
 
-test("evaluateGitHubRepoAccess enforces allowed_repos on git, REST API, and GraphQL variables", () => {
+test("evaluateGitHubRepoAccess enforces allowed_repos on git/REST and blocks GraphQL unconditionally", () => {
 	const allowed = ["myorg/platform-gitops", "myorg/service-*"];
 	assert.equal(isGitHubRepoAllowed("myorg/platform-gitops", allowed), true);
 	assert.equal(isGitHubRepoAllowed("myorg/service-payments.git", allowed), true);
@@ -278,20 +368,12 @@ test("evaluateGitHubRepoAccess enforces allowed_repos on git, REST API, and Grap
 		evaluateGitHubRepoAccess("https://api.github.com/user", allowed).allowed,
 		true,
 	);
-	assert.equal(
-		evaluateGitHubRepoAccess("https://api.github.com/graphql", allowed, {
-			owner: "otherorg",
-			name: "secret",
-		}).allowed,
-		false,
-	);
-	assert.equal(
-		evaluateGitHubRepoAccess("https://api.github.com/graphql", allowed, {
-			owner: "myorg",
-			name: "platform-gitops",
-		}).allowed,
-		true,
-	);
+	// GraphQL MUST be blocked unconditionally whenever allowed_repos is configured
+	const gqlVerdict = evaluateGitHubRepoAccess("https://api.github.com/graphql", allowed);
+	assert.equal(gqlVerdict.allowed, false);
+	assert.match(gqlVerdict.reason ?? "", /GraphQL/i);
+	// Without allowed_repos (e.g. using a fine-grained repo-scoped PAT), GraphQL is permitted
+	assert.equal(evaluateGitHubRepoAccess("https://api.github.com/graphql", []).allowed, true);
 });
 
 test("resolveBackendConfig fails closed when KVM device or runner is missing", () => {

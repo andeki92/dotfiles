@@ -50,25 +50,15 @@ alias oc='opencode'
 export PI_SELF_UPDATE_COMMAND="pi-self-update {packageName} {version} {installSpec}"
 
 _pi_preflight_sandbox() {
-  local kvm_dev="${PI_SANDBOX_KVM_DEVICE:-/dev/kvm}"
-  if [[ "$OSTYPE" == linux* && "${PI_SANDBOX_ALLOW_EMULATION:-0}" != "1" ]]; then
-    if [[ ! -r "$kvm_dev" || ! -w "$kvm_dev" ]]; then
-      print -u2 "[pi] FATAL: Gondolin sandbox requires read/write access to $kvm_dev."
-      if [[ " $(id -nG "$USER" 2>/dev/null) " == *" kvm "* ]]; then
-        print -u2 "[pi] Your user IS in the kvm group, but this shell inherited old groups from its parent session (e.g. a long-running herdr server)."
-        print -u2 "[pi] Fix: from a fresh WSL shell where \`id\` shows kvm, run: herdr server stop && herdr"
-      else
-        print -u2 "[pi] Fix: sudo usermod -aG kvm \"\$USER\" (then restart herdr / start a fresh login)."
-      fi
-      print -u2 "[pi] Refusing to start with host tools. Explicit escape hatch: pi-unsafe"
-      return 2
-    fi
-  fi
-  if [[ -n "${GONDOLIN_KRUN_RUNNER:-}" && ! -x "${GONDOLIN_KRUN_RUNNER}" ]]; then
-    print -u2 "[pi] FATAL: GONDOLIN_KRUN_RUNNER is not executable: $GONDOLIN_KRUN_RUNNER"
-    print -u2 "[pi] Refusing to start with host tools. Explicit escape hatch: pi-unsafe"
+  local xdg_data="${XDG_DATA_HOME:-$HOME/.local/share}"
+  local team_pkg="${PI_TEAM_PACKAGE_DIR:-$xdg_data/pi-team-package}"
+  local preflight="$team_pkg/extensions/gondolin-sandbox/preflight.mjs"
+  if [[ ! -r "$preflight" ]]; then
+    print -u2 "[pi-sandbox] FATAL: Mandatory sandbox preflight missing: $preflight"
+    print -u2 "[pi-sandbox] Refusing to start Pi with host tools. Run scripts/pi-bootstrap.sh or use: pi-unsafe"
     return 2
   fi
+  node "$preflight" "$@" || return $?
   return 0
 }
 
@@ -83,7 +73,7 @@ function pi {
       ;;
   esac
 
-  _pi_preflight_sandbox || return $?
+  _pi_preflight_sandbox "$@" || return $?
   NO_ANON_PING=1 DO_NOT_TRACK="${DO_NOT_TRACK:-1}" \
     PI_SELF_UPDATE_COMMAND="pi-self-update {packageName} {version} {installSpec}" \
     PI_SANDBOX_UNSAFE=0 \

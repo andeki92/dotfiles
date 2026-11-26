@@ -91,6 +91,12 @@ export interface GitIdentity {
 	email?: string;
 }
 
+export interface ReadOnlyHostMount {
+	hostDir: string;
+	realHostDir: string;
+	guestDir: string;
+}
+
 export interface BackendConfig {
 	vmm: "krun" | "qemu";
 	rootfsMode: "readonly" | "cow";
@@ -100,61 +106,90 @@ export interface BackendConfig {
 	qemuPath?: string;
 }
 
-function expandHomePath(raw: string, homeDir: string = os.homedir()): string {
+export function expandHomePath(raw: string, homeDir: string = os.homedir()): string {
 	if (raw === "~") return homeDir;
 	if (raw.startsWith("~/")) return path.join(homeDir, raw.slice(2));
 	return path.resolve(raw);
 }
 
-function asTable(val: unknown): TomlTable | undefined {
-	return typeof val === "object" && val !== null && !Array.isArray(val)
-		? (val as TomlTable)
-		: undefined;
+function expectTable(val: unknown, label: string): TomlTable | undefined {
+	if (val === undefined) return undefined;
+	if (typeof val !== "object" || val === null || Array.isArray(val)) {
+		throw new Error(`Invalid sandbox config: "${label}" must be a TOML table`);
+	}
+	return val as TomlTable;
 }
 
-function asString(val: unknown): string | undefined {
-	return typeof val === "string" && val.trim().length > 0 ? val.trim() : undefined;
+function expectOptionalString(val: unknown, label: string): string | undefined {
+	if (val === undefined) return undefined;
+	if (typeof val !== "string") {
+		throw new Error(`Invalid sandbox config: "${label}" must be a string`);
+	}
+	const trimmed = val.trim();
+	return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function asStringArray(val: unknown): string[] | undefined {
-	if (!Array.isArray(val)) return undefined;
-	return val.filter((x): x is string => typeof x === "string" && x.trim().length > 0);
+function expectOptionalBoolean(val: unknown, label: string): boolean | undefined {
+	if (val === undefined) return undefined;
+	if (typeof val !== "boolean") {
+		throw new Error(`Invalid sandbox config: "${label}" must be a boolean`);
+	}
+	return val;
+}
+
+function expectOptionalStringArray(val: unknown, label: string): string[] | undefined {
+	if (val === undefined) return undefined;
+	if (!Array.isArray(val)) {
+		throw new Error(`Invalid sandbox config: "${label}" must be an array of strings`);
+	}
+	const out: string[] = [];
+	for (const entry of val) {
+		if (typeof entry !== "string") {
+			throw new Error(`Invalid sandbox config: every entry in "${label}" must be a string`);
+		}
+		out.push(entry);
+	}
+	return out;
 }
 
 function mergeTomlIntoConfig(target: SandboxFileConfig, table: TomlTable): void {
-	const vm = asTable(table.vm);
+	const vm = expectTable(table.vm, "vm");
 	if (vm) {
-		const image = asString(vm.image);
-		const vmm = asString(vm.vmm);
-		const rootfs = asString(vm.rootfs);
+		const image = expectOptionalString(vm.image, "vm.image");
+		const vmm = expectOptionalString(vm.vmm, "vm.vmm");
+		const rootfs = expectOptionalString(vm.rootfs, "vm.rootfs");
 		if (image !== undefined) target.vm.image = image;
 		if (vmm !== undefined) target.vm.vmm = vmm;
 		if (rootfs !== undefined) target.vm.rootfs = rootfs;
 	}
 
-	const network = asTable(table.network);
+	const network = expectTable(table.network, "network");
 	if (network) {
-		const allowed = asStringArray(network.allowed_hosts);
-		const extra = asStringArray(network.extra_allowed_hosts);
+		const allowed = expectOptionalStringArray(network.allowed_hosts, "network.allowed_hosts");
+		const extra = expectOptionalStringArray(
+			network.extra_allowed_hosts,
+			"network.extra_allowed_hosts",
+		);
 		if (allowed !== undefined) target.network.allowedHosts = allowed;
 		if (extra !== undefined) {
 			target.network.extraAllowedHosts = [...target.network.extraAllowedHosts, ...extra];
 		}
 	}
 
-	const github = asTable(table.github);
+	const github = expectTable(table.github, "github");
 	if (github) {
-		const tokenFile = asString(github.token_file);
+		const tokenFile = expectOptionalString(github.token_file, "github.token_file");
+		const useHostAuth = expectOptionalBoolean(github.use_host_auth, "github.use_host_auth");
+		const repos = expectOptionalStringArray(github.allowed_repos, "github.allowed_repos");
 		if (tokenFile !== undefined) target.github.tokenFile = tokenFile;
-		if (typeof github.use_host_auth === "boolean") target.github.useHostAuth = github.use_host_auth;
-		const repos = asStringArray(github.allowed_repos);
+		if (useHostAuth !== undefined) target.github.useHostAuth = useHostAuth;
 		if (repos !== undefined) target.github.allowedRepos = repos;
 	}
 
-	const git = asTable(table.git);
+	const git = expectTable(table.git, "git");
 	if (git) {
-		const userName = asString(git.user_name);
-		const userEmail = asString(git.user_email);
+		const userName = expectOptionalString(git.user_name, "git.user_name");
+		const userEmail = expectOptionalString(git.user_email, "git.user_email");
 		if (userName !== undefined) target.git.userName = userName;
 		if (userEmail !== undefined) target.git.userEmail = userEmail;
 	}
@@ -203,32 +238,52 @@ export function loadSandboxConfig(
 	return config;
 }
 
-function parseCsvList(raw: string | undefined): string[] {
-	if (!raw) return [];
-	return raw
-		.split(",")
-		.map((entry) => entry.trim())
-		.filter((entry) => entry.length > 0);
+function parseCsvList(raw: string | undefined): string[] | undefined {
+	if (raw === undefined) return undefined;
+	const trimmed = raw.trim();
+	if (!trimmed) return [];
+	return trimmed.split(",").map((entry) => entry.trim());
 }
 
 function isSafeHostPattern(pattern: string): boolean {
-	return pattern.length > 0 && pattern !== "*" && !/\s/.test(pattern);
-}
-
-function dedupeNormalized(values: string[], validate: (v: string) => boolean): string[] {
-	const seen = new Set<string>();
-	const out: string[] = [];
-	for (const raw of values) {
-		const normalized = raw.trim().toLowerCase();
-		if (!validate(normalized) || seen.has(normalized)) continue;
-		seen.add(normalized);
-		out.push(normalized);
-	}
-	return out;
+	return (
+		pattern.length > 0 &&
+		pattern !== "*" &&
+		!/\s/.test(pattern) &&
+		!pattern.includes("://") &&
+		!pattern.includes("/")
+	);
 }
 
 function isSafeRepoPattern(pattern: string): boolean {
 	return /^[a-z0-9_.-]+\/[a-z0-9_.*-]+$/i.test(pattern);
+}
+
+/**
+ * Validates and deduplicates host or repository restriction patterns.
+ * Fails closed (throws) on any invalid entry so a malformed restriction can
+ * NEVER silently collapse to `[]` and disable enforcement.
+ */
+function validateAndDedupe(
+	values: readonly string[],
+	validate: (v: string) => boolean,
+	label: string,
+): string[] {
+	const seen = new Set<string>();
+	const out: string[] = [];
+	for (const raw of values) {
+		const normalized = raw.trim().toLowerCase();
+		if (!validate(normalized)) {
+			throw new Error(
+				`Invalid ${label} entry ${JSON.stringify(raw)}. Fix your sandbox.toml or environment override (fail-closed).`,
+			);
+		}
+		if (!seen.has(normalized)) {
+			seen.add(normalized);
+			out.push(normalized);
+		}
+	}
+	return out;
 }
 
 export function loadEgressPolicy(
@@ -252,25 +307,29 @@ export function loadEgressPolicy(
 	}
 
 	const envReplace = parseCsvList(env.PI_SANDBOX_ALLOWED_HOSTS);
-	if (envReplace.length > 0) {
+	if (envReplace !== undefined && envReplace.length > 0) {
 		hosts = envReplace;
 		source = "env:PI_SANDBOX_ALLOWED_HOSTS";
 	}
 
 	const envExtra = parseCsvList(env.PI_SANDBOX_EXTRA_ALLOWED_HOSTS);
-	if (envExtra.length > 0) {
+	if (envExtra !== undefined && envExtra.length > 0) {
 		hosts = [...hosts, ...envExtra];
 		source = `${source}+env:PI_SANDBOX_EXTRA_ALLOWED_HOSTS`;
 	}
 
 	const envRepos = parseCsvList(env.PI_SANDBOX_GH_ALLOWED_REPOS);
-	if (envRepos.length > 0) {
+	if (envRepos !== undefined) {
 		allowedGitHubRepos = envRepos;
 	}
 
 	return {
-		allowedHosts: dedupeNormalized(hosts, isSafeHostPattern),
-		allowedGitHubRepos: dedupeNormalized(allowedGitHubRepos, isSafeRepoPattern),
+		allowedHosts: validateAndDedupe(hosts, isSafeHostPattern, "allowed_hosts"),
+		allowedGitHubRepos: validateAndDedupe(
+			allowedGitHubRepos,
+			isSafeRepoPattern,
+			'github.allowed_repos (expected "owner/repo" or "owner/prefix-*")',
+		),
 		source,
 	};
 }
@@ -278,13 +337,6 @@ export function loadEgressPolicy(
 /**
  * Resolves a GitHub token strictly on the host for Gondolin's placeholder
  * substitution (NEVER passed directly into the guest VM).
- *
- * Precedence:
- *   1. PI_SANDBOX_GH_TOKEN env var (fine-grained, repo-scoped PAT)
- *   2. `[github] token_file` from sandbox.toml / sandbox.local.toml
- *      (defaults to `~/.config/sandbox-gh-token`; must be mode 0600)
- *   3. Host `gh auth token` ONLY when `PI_SANDBOX_GH_USE_HOST_AUTH=1`
- *      or `[github] use_host_auth = true`
  */
 export function resolveGitHubAuth(
 	env: NodeJS.ProcessEnv = process.env,
@@ -361,10 +413,15 @@ export function isGitHubRepoAllowed(repoSlug: string, allowedPatterns: readonly 
 	return false;
 }
 
+/**
+ * Host-side check for GitHub HTTP/Git/REST requests when `allowed_repos` is set.
+ * Blocks `/graphql` unconditionally under `allowed_repos` because arbitrary GraphQL
+ * documents (e.g. inline `repository(owner: ..., name: ...)` arguments or aliases)
+ * cannot be safely repo-scoped from request variables alone.
+ */
 export function evaluateGitHubRepoAccess(
 	urlString: string,
 	allowedRepos: readonly string[],
-	graphqlVariables?: Record<string, unknown>,
 ): { allowed: boolean; reason?: string } {
 	if (allowedRepos.length === 0) return { allowed: true };
 
@@ -397,38 +454,20 @@ export function evaluateGitHubRepoAccess(
 	}
 
 	if (host === "api.github.com") {
-		if (segments[0] === "repos" && segments.length >= 3) {
+		if (segments[0]?.toLowerCase() === "graphql") {
+			return {
+				allowed: false,
+				reason:
+					"GitHub GraphQL (/graphql) is blocked while allowed_repos is set because GraphQL queries can target arbitrary repos via inline arguments. Use git HTTPS / REST API (/repos/<owner>/<repo>/...) or a fine-grained repository-scoped PAT with allowed_repos = [].",
+			};
+		}
+		if (segments[0]?.toLowerCase() === "repos" && segments.length >= 3) {
 			const slug = `${segments[1]}/${segments[2].replace(/\.git$/i, "")}`;
 			if (!isGitHubRepoAllowed(slug, allowedRepos)) {
 				return {
 					allowed: false,
 					reason: `GitHub API repository "${slug}" is not in allowed_repos`,
 				};
-			}
-		}
-		if (segments[0] === "graphql" && graphqlVariables) {
-			const owner =
-				typeof graphqlVariables.owner === "string"
-					? graphqlVariables.owner
-					: typeof graphqlVariables.repositoryOwner === "string"
-						? graphqlVariables.repositoryOwner
-						: undefined;
-			const repo =
-				typeof graphqlVariables.repo === "string"
-					? graphqlVariables.repo
-					: typeof graphqlVariables.name === "string"
-						? graphqlVariables.name
-						: typeof graphqlVariables.repositoryName === "string"
-							? graphqlVariables.repositoryName
-							: undefined;
-			if (owner && repo) {
-				const slug = `${owner}/${repo}`;
-				if (!isGitHubRepoAllowed(slug, allowedRepos)) {
-					return {
-						allowed: false,
-						reason: `GitHub GraphQL repository "${slug}" is not in allowed_repos`,
-					};
-				}
 			}
 		}
 		return { allowed: true };
@@ -583,11 +622,99 @@ export function assertSafeWorkspaceDir(
 	}
 }
 
+/**
+ * Checks whether a trusted skill directory is safe to expose read-only inside
+ * the VM (never mounts /, $HOME, /mnt, ~/.kube, ~/.oci, ~/.ssh, or ~/.pi/agent root).
+ */
+export function isSafeReadOnlySkillDir(
+	skillDir: string,
+	homeDir: string = os.homedir(),
+): boolean {
+	const resolved = path.resolve(skillDir);
+	const resolvedHome = path.resolve(homeDir);
+	if (resolved === "/" || resolved === resolvedHome) return false;
+	if (resolved === "/mnt" || resolved.startsWith("/mnt/")) return false;
+
+	const forbiddenExactOrSub = [
+		path.join(resolvedHome, ".kube"),
+		path.join(resolvedHome, ".oci"),
+		path.join(resolvedHome, ".ssh"),
+	];
+	for (const dir of forbiddenExactOrSub) {
+		if (isInsideHostPath(dir, resolved) || isInsideHostPath(resolved, dir)) return false;
+	}
+
+	// Allow skill subdirectories under ~/.pi/agent/skills/... or ~/.pi/agent/npm/...,
+	// but NEVER ~/.pi or ~/.pi/agent root (which contain auth.json and sessions).
+	const piRoot = path.join(resolvedHome, ".pi");
+	const piAgentRoot = path.join(piRoot, "agent");
+	if (resolved === piRoot || resolved === piAgentRoot) return false;
+	if (isInsideHostPath(resolved, piAgentRoot)) return false;
+
+	return true;
+}
+
+/**
+ * Builds deduplicated read-only guest mounts for trusted skill directories that
+ * live outside the project workspace so the model can `read` SKILL.md and
+ * supporting files through the sandbox without any host-read fallback.
+ */
+export function buildTrustedSkillMounts(
+	skillFilePaths: readonly string[],
+	localCwd: string,
+	realLocalCwd: string,
+	homeDir: string = os.homedir(),
+): ReadOnlyHostMount[] {
+	const mounts: ReadOnlyHostMount[] = [];
+	const seenRealDirs = new Set<string>();
+
+	for (const rawFilePath of skillFilePaths) {
+		if (!rawFilePath) continue;
+		const hostDir = path.resolve(path.dirname(rawFilePath));
+		let realHostDir: string;
+		try {
+			realHostDir = fs.realpathSync(hostDir);
+			if (!fs.statSync(realHostDir).isDirectory()) continue;
+		} catch {
+			continue;
+		}
+
+		// Skip skills already inside the mounted project workspace.
+		if (
+			isInsideHostPath(localCwd, hostDir) ||
+			isInsideHostPath(realLocalCwd, realHostDir)
+		) {
+			continue;
+		}
+
+		if (
+			!isSafeReadOnlySkillDir(hostDir, homeDir) ||
+			!isSafeReadOnlySkillDir(realHostDir, homeDir)
+		) {
+			continue;
+		}
+
+		if (seenRealDirs.has(realHostDir)) continue;
+		seenRealDirs.add(realHostDir);
+
+		const safeBase =
+			path
+				.basename(realHostDir)
+				.replace(/[^A-Za-z0-9_.-]/g, "_")
+				.slice(0, 48) || "skill";
+		const guestDir = `/tmp/pi-skills/${mounts.length}-${safeBase}`;
+		mounts.push({ hostDir, realHostDir, guestDir });
+	}
+
+	return mounts;
+}
+
 export function toGuestPath(
 	localCwd: string,
 	guestWorkspace: string,
 	inputPath: string,
 	realLocalCwd?: string,
+	extraMounts: readonly ReadOnlyHostMount[] = [],
 ): string {
 	const trimmed = stripAtPrefix(inputPath.trim());
 	if (!trimmed) return guestWorkspace;
@@ -604,6 +731,21 @@ export function toGuestPath(
 				return rel ? path.posix.join(guestWorkspace, toPosix(rel)) : guestWorkspace;
 			}
 		}
+
+		// Translate paths inside explicitly mounted read-only trusted skill directories.
+		for (const mount of extraMounts) {
+			for (const base of mount.realHostDir !== mount.hostDir
+				? [mount.hostDir, mount.realHostDir]
+				: [mount.hostDir]) {
+				if (isInsideHostPath(base, trimmed)) {
+					const rel = path.relative(base, trimmed);
+					return rel ? path.posix.join(mount.guestDir, toPosix(rel)) : mount.guestDir;
+				}
+			}
+		}
+
+		// Any other absolute path resolves inside the guest root, where host
+		// ~/.kube, ~/.oci, ~/.ssh, and /mnt/c do not exist.
 		return path.posix.resolve("/", toPosix(trimmed));
 	}
 
@@ -686,9 +828,23 @@ export function resolveBackendConfig(
 			fs.accessSync(kvmDevice, fs.constants.R_OK | fs.constants.W_OK);
 		} catch {
 			if (!allowEmulation) {
+				let hint = `On WSL2/Linux, ensure nested virtualization is enabled and run: sudo usermod -aG kvm "$USER" (then restart herdr / start a fresh login).`;
+				try {
+					const user = env.USER || os.userInfo().username;
+					const dbGroups = execFileSync("id", ["-nG", user], {
+						encoding: "utf8",
+						stdio: ["ignore", "pipe", "ignore"],
+						timeout: 2000,
+					});
+					if (` ${dbGroups.trim()} `.includes(" kvm ")) {
+						hint =
+							"Your user IS already in the kvm group, but this shell inherited old groups from its parent session (e.g. a long-running herdr server). From a fresh WSL shell where `id` includes kvm, run: herdr server stop && herdr";
+					}
+				} catch {
+					// keep default hint
+				}
 				throw new Error(
-					`Hardware virtualization required: "${kvmDevice}" is missing or not readable/writable. ` +
-						`On WSL2/Linux, ensure nested virtualization is enabled and run: sudo usermod -aG kvm "$USER" (then restart herdr / start a fresh login).`,
+					`Hardware virtualization required: "${kvmDevice}" is missing or not readable/writable. ${hint}`,
 				);
 			}
 		}
@@ -736,7 +892,6 @@ export function resolveBackendConfig(
 		}
 	}
 
-	// Select configured custom image (default: pi-sandbox:latest) when installed locally.
 	const envImage = env.PI_SANDBOX_IMAGE?.trim();
 	const configuredImage = envImage || cfg.vm.image || DEFAULT_CUSTOM_IMAGE_TAG;
 

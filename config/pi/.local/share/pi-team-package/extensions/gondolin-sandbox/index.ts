@@ -7,7 +7,9 @@ import {
 	HttpRequestBlockedError,
 	listImageRefs,
 	makePlaceholderFunc,
+	ReadonlyProvider,
 	RealFSProvider,
+	type VirtualProvider,
 	VM,
 } from "@earendil-works/gondolin";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -36,10 +38,12 @@ import {
 	assertSafeWorkspaceDir,
 	type BackendConfig,
 	buildGuestEnv,
+	buildTrustedSkillMounts,
 	evaluateGitHubRepoAccess,
 	GITHUB_SECRET_HOSTS,
 	loadEgressPolicy,
 	loadSandboxConfig,
+	type ReadOnlyHostMount,
 	resolveBackendConfig,
 	resolveGitHubAuth,
 	resolveHostGitIdentity,
@@ -80,16 +84,17 @@ function createGondolinReadOps(
 	localCwd: string,
 	realLocalCwd: string,
 	guestWorkspace: string,
+	skillMounts: readonly ReadOnlyHostMount[],
 ): ReadOperations {
 	return {
 		readFile: async (filePath) =>
-			vm.fs.readFile(toGuestPath(localCwd, guestWorkspace, filePath, realLocalCwd)),
+			vm.fs.readFile(toGuestPath(localCwd, guestWorkspace, filePath, realLocalCwd, skillMounts)),
 		access: async (filePath) => {
-			await vm.fs.access(toGuestPath(localCwd, guestWorkspace, filePath, realLocalCwd));
+			await vm.fs.access(toGuestPath(localCwd, guestWorkspace, filePath, realLocalCwd, skillMounts));
 		},
 		detectImageMimeType: async (filePath) => {
 			const ext = path.posix
-				.extname(toGuestPath(localCwd, guestWorkspace, filePath, realLocalCwd))
+				.extname(toGuestPath(localCwd, guestWorkspace, filePath, realLocalCwd, skillMounts))
 				.toLowerCase();
 			if (ext === ".png") return "image/png";
 			if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
@@ -105,17 +110,21 @@ function createGondolinWriteOps(
 	localCwd: string,
 	realLocalCwd: string,
 	guestWorkspace: string,
+	skillMounts: readonly ReadOnlyHostMount[],
 ): WriteOperations {
 	return {
 		writeFile: async (filePath, content) => {
-			await vm.fs.writeFile(toGuestPath(localCwd, guestWorkspace, filePath, realLocalCwd), content, {
-				encoding: "utf8",
-			});
+			await vm.fs.writeFile(
+				toGuestPath(localCwd, guestWorkspace, filePath, realLocalCwd, skillMounts),
+				content,
+				{ encoding: "utf8" },
+			);
 		},
 		mkdir: async (dirPath) => {
-			await vm.fs.mkdir(toGuestPath(localCwd, guestWorkspace, dirPath, realLocalCwd), {
-				recursive: true,
-			});
+			await vm.fs.mkdir(
+				toGuestPath(localCwd, guestWorkspace, dirPath, realLocalCwd, skillMounts),
+				{ recursive: true },
+			);
 		},
 	};
 }
@@ -125,9 +134,10 @@ function createGondolinEditOps(
 	localCwd: string,
 	realLocalCwd: string,
 	guestWorkspace: string,
+	skillMounts: readonly ReadOnlyHostMount[],
 ): EditOperations {
-	const readOps = createGondolinReadOps(vm, localCwd, realLocalCwd, guestWorkspace);
-	const writeOps = createGondolinWriteOps(vm, localCwd, realLocalCwd, guestWorkspace);
+	const readOps = createGondolinReadOps(vm, localCwd, realLocalCwd, guestWorkspace, skillMounts);
+	const writeOps = createGondolinWriteOps(vm, localCwd, realLocalCwd, guestWorkspace, skillMounts);
 	return {
 		readFile: readOps.readFile,
 		writeFile: writeOps.writeFile,
@@ -140,20 +150,23 @@ function createGondolinLsOps(
 	localCwd: string,
 	realLocalCwd: string,
 	guestWorkspace: string,
+	skillMounts: readonly ReadOnlyHostMount[],
 ): LsOperations {
 	return {
 		exists: async (filePath) => {
 			try {
-				await vm.fs.access(toGuestPath(localCwd, guestWorkspace, filePath, realLocalCwd));
+				await vm.fs.access(
+					toGuestPath(localCwd, guestWorkspace, filePath, realLocalCwd, skillMounts),
+				);
 				return true;
 			} catch {
 				return false;
 			}
 		},
 		stat: async (filePath) =>
-			vm.fs.stat(toGuestPath(localCwd, guestWorkspace, filePath, realLocalCwd)),
+			vm.fs.stat(toGuestPath(localCwd, guestWorkspace, filePath, realLocalCwd, skillMounts)),
 		readdir: async (dirPath) =>
-			vm.fs.listDir(toGuestPath(localCwd, guestWorkspace, dirPath, realLocalCwd)),
+			vm.fs.listDir(toGuestPath(localCwd, guestWorkspace, dirPath, realLocalCwd, skillMounts)),
 	};
 }
 
@@ -203,18 +216,21 @@ function createGondolinFindOps(
 	localCwd: string,
 	realLocalCwd: string,
 	guestWorkspace: string,
+	skillMounts: readonly ReadOnlyHostMount[],
 ): FindOperations {
 	return {
 		exists: async (filePath) => {
 			try {
-				await vm.fs.access(toGuestPath(localCwd, guestWorkspace, filePath, realLocalCwd));
+				await vm.fs.access(
+					toGuestPath(localCwd, guestWorkspace, filePath, realLocalCwd, skillMounts),
+				);
 				return true;
 			} catch {
 				return false;
 			}
 		},
 		glob: async (pattern, cwd, options) => {
-			const root = toGuestPath(localCwd, guestWorkspace, cwd, realLocalCwd);
+			const root = toGuestPath(localCwd, guestWorkspace, cwd, realLocalCwd, skillMounts);
 			const results: string[] = [];
 			await walkGuestFiles(vm, root, async (guestPath, relativePath) => {
 				if (results.length >= options.limit) return false;
@@ -269,10 +285,17 @@ async function executeGondolinGrep(
 	localCwd: string,
 	realLocalCwd: string,
 	guestWorkspace: string,
+	skillMounts: readonly ReadOnlyHostMount[],
 	params: GrepToolInput,
 	signal?: AbortSignal,
 ): Promise<TextToolResult<GrepToolDetails>> {
-	const root = toGuestPath(localCwd, guestWorkspace, params.path ?? ".", realLocalCwd);
+	const root = toGuestPath(
+		localCwd,
+		guestWorkspace,
+		params.path ?? ".",
+		realLocalCwd,
+		skillMounts,
+	);
 	const rootStat = await vm.fs.stat(root, { signal });
 	const rootIsDirectory = rootStat.isDirectory();
 	const matcher = createLineMatcher(params.pattern, params.literal, params.ignoreCase);
@@ -357,13 +380,14 @@ function createGondolinBashOps(
 	localCwd: string,
 	realLocalCwd: string,
 	guestWorkspace: string,
+	skillMounts: readonly ReadOnlyHostMount[],
 	shellPath: string,
 	guestEnv: Record<string, string>,
 ): BashOperations {
 	return {
 		exec: async (command, cwd, { onData, signal, timeout }) => {
 			if (signal?.aborted) throw new Error("aborted");
-			const guestCwd = toGuestPath(localCwd, guestWorkspace, cwd, realLocalCwd);
+			const guestCwd = toGuestPath(localCwd, guestWorkspace, cwd, realLocalCwd, skillMounts);
 			const controller = new AbortController();
 			const onAbort = () => controller.abort();
 			signal?.addEventListener("abort", onAbort, { once: true });
@@ -474,6 +498,7 @@ export default function (pi: ExtensionAPI) {
 	let activeEgressSource = "default";
 	let activeConfigFiles: string[] = [];
 	let activeGhAuthSource: string | null = null;
+	let activeSkillMounts: ReadOnlyHostMount[] = [];
 
 	function currentState(): SandboxStatePayload {
 		return {
@@ -489,6 +514,17 @@ export default function (pi: ExtensionAPI) {
 		pi.events.emit("pi-team:sandbox-state", currentState());
 	});
 
+	function discoverTrustedSkillFiles(): string[] {
+		try {
+			return pi
+				.getCommands()
+				.filter((cmd) => cmd.source === "skill" && typeof cmd.sourceInfo?.path === "string")
+				.map((cmd) => cmd.sourceInfo.path);
+		} catch {
+			return [];
+		}
+	}
+
 	async function startVm(ctx?: ExtensionContext): Promise<VM> {
 		assertSafeWorkspaceDir(realLocalCwd);
 		const sandboxConfig = loadSandboxConfig(process.env);
@@ -501,6 +537,11 @@ export default function (pi: ExtensionAPI) {
 		const egress = loadEgressPolicy(process.env, sandboxConfig);
 		const ghAuth = resolveGitHubAuth(process.env, sandboxConfig);
 		const gitIdentity = resolveHostGitIdentity(realLocalCwd, process.env, sandboxConfig);
+		const skillMounts = buildTrustedSkillMounts(
+			discoverTrustedSkillFiles(),
+			localCwd,
+			realLocalCwd,
+		);
 
 		const { httpHooks, env: hookEnv } = createHttpHooks({
 			allowedHosts: egress.allowedHosts,
@@ -523,27 +564,9 @@ export default function (pi: ExtensionAPI) {
 			...(egress.allowedGitHubRepos.length > 0
 				? {
 						onRequest: async (request: Request) => {
-							let graphqlVariables: Record<string, unknown> | undefined;
-							if (
-								request.method === "POST" &&
-								new URL(request.url).hostname.toLowerCase() === "api.github.com" &&
-								new URL(request.url).pathname === "/graphql"
-							) {
-								try {
-									const body = (await request.clone().json()) as {
-										variables?: Record<string, unknown>;
-									};
-									if (body?.variables && typeof body.variables === "object") {
-										graphqlVariables = body.variables;
-									}
-								} catch {
-									// non-JSON body; let normal checks handle it
-								}
-							}
 							const verdict = evaluateGitHubRepoAccess(
 								request.url,
 								egress.allowedGitHubRepos,
-								graphqlVariables,
 							);
 							if (!verdict.allowed) {
 								throw new HttpRequestBlockedError(
@@ -564,6 +587,13 @@ export default function (pi: ExtensionAPI) {
 			ctx.ui.theme.fg("accent", `Sandbox: starting (${backend.vmm})`),
 		);
 
+		const vfsMounts: Record<string, VirtualProvider> = {
+			[backend.guestWorkspace]: new RealFSProvider(realLocalCwd),
+		};
+		for (const mount of skillMounts) {
+			vfsMounts[mount.guestDir] = new ReadonlyProvider(new RealFSProvider(mount.realHostDir));
+		}
+
 		const created = await VM.create({
 			sessionLabel: `pi ${path.basename(realLocalCwd)}`,
 			sandbox: {
@@ -577,11 +607,7 @@ export default function (pi: ExtensionAPI) {
 			env: guestEnv,
 			dns: { mode: "synthetic" },
 			allowWebSockets: false,
-			vfs: {
-				mounts: {
-					[backend.guestWorkspace]: new RealFSProvider(realLocalCwd),
-				},
-			},
+			vfs: { mounts: vfsMounts },
 		});
 
 		const bashProbe = await created.exec(["/bin/sh", "-lc", "command -v bash || true"], {
@@ -596,6 +622,7 @@ export default function (pi: ExtensionAPI) {
 		activeEgressSource = egress.source;
 		activeConfigFiles = sandboxConfig.loadedFiles;
 		activeGhAuthSource = ghAuth?.source ?? null;
+		activeSkillMounts = skillMounts;
 
 		pi.events.emit("pi-team:sandbox-state", currentState());
 		const ghBadge = activeGhAuthSource ? " +gh" : "";
@@ -673,6 +700,7 @@ export default function (pi: ExtensionAPI) {
 					`Image: ${activeBackend?.imagePath ?? "alpine-base (run scripts/pi-build-image.sh for git+gh+kustomize)"}`,
 					`Backend: ${activeBackend?.vmm ?? "unknown"} (rootfs: ${activeBackend?.rootfsMode ?? "unknown"})`,
 					`Workspace mount: ${realLocalCwd} -> ${activeBackend?.guestWorkspace ?? "/workspace"}`,
+					`Trusted skill mounts (ro): ${activeSkillMounts.length}`,
 					`Guest shell: ${shellPath}`,
 					`GitHub auth (host-substituted placeholder): ${activeGhAuthSource ?? "none (configure [github] in ~/.config/sandbox.toml or sandbox.local.toml)"}`,
 					`GitHub repo allowlist: ${activeAllowedRepos.length > 0 ? activeAllowedRepos.join(", ") : "(none — enforced by token scope)"}`,
@@ -689,7 +717,13 @@ export default function (pi: ExtensionAPI) {
 			const activeVm = await ensureVm(ctx);
 			const workspace = activeBackend!.guestWorkspace;
 			const tool = createReadTool(workspace, {
-				operations: createGondolinReadOps(activeVm, localCwd, realLocalCwd, workspace),
+				operations: createGondolinReadOps(
+					activeVm,
+					localCwd,
+					realLocalCwd,
+					workspace,
+					activeSkillMounts,
+				),
 			});
 			return tool.execute(id, params, signal, onUpdate);
 		},
@@ -701,7 +735,13 @@ export default function (pi: ExtensionAPI) {
 			const activeVm = await ensureVm(ctx);
 			const workspace = activeBackend!.guestWorkspace;
 			const tool = createWriteTool(workspace, {
-				operations: createGondolinWriteOps(activeVm, localCwd, realLocalCwd, workspace),
+				operations: createGondolinWriteOps(
+					activeVm,
+					localCwd,
+					realLocalCwd,
+					workspace,
+					activeSkillMounts,
+				),
 			});
 			return tool.execute(id, params, signal, onUpdate);
 		},
@@ -713,7 +753,13 @@ export default function (pi: ExtensionAPI) {
 			const activeVm = await ensureVm(ctx);
 			const workspace = activeBackend!.guestWorkspace;
 			const tool = createEditTool(workspace, {
-				operations: createGondolinEditOps(activeVm, localCwd, realLocalCwd, workspace),
+				operations: createGondolinEditOps(
+					activeVm,
+					localCwd,
+					realLocalCwd,
+					workspace,
+					activeSkillMounts,
+				),
 			});
 			return tool.execute(id, params, signal, onUpdate);
 		},
@@ -731,6 +777,7 @@ export default function (pi: ExtensionAPI) {
 					localCwd,
 					realLocalCwd,
 					workspace,
+					activeSkillMounts,
 					shellPath,
 					activeGuestEnv,
 				),
@@ -745,7 +792,13 @@ export default function (pi: ExtensionAPI) {
 			const activeVm = await ensureVm(ctx);
 			const workspace = activeBackend!.guestWorkspace;
 			const tool = createLsTool(workspace, {
-				operations: createGondolinLsOps(activeVm, localCwd, realLocalCwd, workspace),
+				operations: createGondolinLsOps(
+					activeVm,
+					localCwd,
+					realLocalCwd,
+					workspace,
+					activeSkillMounts,
+				),
 			});
 			return tool.execute(id, params, signal, onUpdate);
 		},
@@ -757,7 +810,13 @@ export default function (pi: ExtensionAPI) {
 			const activeVm = await ensureVm(ctx);
 			const workspace = activeBackend!.guestWorkspace;
 			const tool = createFindTool(workspace, {
-				operations: createGondolinFindOps(activeVm, localCwd, realLocalCwd, workspace),
+				operations: createGondolinFindOps(
+					activeVm,
+					localCwd,
+					realLocalCwd,
+					workspace,
+					activeSkillMounts,
+				),
 			});
 			return tool.execute(id, params, signal, onUpdate);
 		},
@@ -768,7 +827,15 @@ export default function (pi: ExtensionAPI) {
 		async execute(_id, params, signal, _onUpdate, ctx) {
 			const activeVm = await ensureVm(ctx);
 			const workspace = activeBackend!.guestWorkspace;
-			return executeGondolinGrep(activeVm, localCwd, realLocalCwd, workspace, params, signal);
+			return executeGondolinGrep(
+				activeVm,
+				localCwd,
+				realLocalCwd,
+				workspace,
+				activeSkillMounts,
+				params,
+				signal,
+			);
 		},
 	});
 
@@ -781,6 +848,7 @@ export default function (pi: ExtensionAPI) {
 				localCwd,
 				realLocalCwd,
 				workspace,
+				activeSkillMounts,
 				shellPath,
 				activeGuestEnv,
 			),

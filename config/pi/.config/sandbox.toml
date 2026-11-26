@@ -35,7 +35,14 @@ token_file = "~/.config/sandbox-gh-token"
 use_host_auth = false
 #
 # Host-side GitHub repository allowlist (supports `*` in repo name,
-# e.g. ["my-org/my-repo", "my-org/gitops-*"]). Empty = governed by token scope.
+# e.g. ["my-org/my-repo", "my-org/gitops-*"]).
+# - Must use "owner/repo" syntax; invalid entries fail closed at startup.
+# - When non-empty, GitHub GraphQL (/graphql) is also blocked on the proxy
+#   because GraphQL queries can target arbitrary repos via inline arguments
+#   (git HTTPS and REST API /repos/<owner>/<repo>/... remain allowed).
+# - For full `gh` GraphQL workflows (e.g. `gh pr create`), prefer a GitHub
+#   fine-grained repository-scoped PAT in `token_file` with `allowed_repos = []`,
+#   letting GitHub enforce repo scope server-side across Git, REST, and GraphQL.
 allowed_repos = []
 
 [git]

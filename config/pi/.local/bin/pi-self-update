@@ -92,9 +92,92 @@ elif command -v pi >/dev/null 2>&1; then
   CURRENT_VERSION="$(pi --version 2>/dev/null | head -n 1 | tr -d '[:space:]' || true)"
 fi
 
+write_managed_launcher() {
+  local launcher="$AGENT_DIR/bin/pi"
+  local launcher_tmp="$launcher.tmp.$$"
+  mkdir -p "$AGENT_DIR/bin"
+  cat > "$launcher_tmp" <<'EOF'
+#!/bin/sh
+case "$0" in
+  */*) pi_launcher="$0" ;;
+  *) pi_launcher=$(command -v "$0") || exit 127 ;;
+esac
+while [ -L "$pi_launcher" ]; do
+  pi_link=$(readlink "$pi_launcher") || exit 1
+  case "$pi_link" in
+    /*) pi_launcher="$pi_link" ;;
+    *) pi_launcher=${pi_launcher%/*}/$pi_link ;;
+  esac
+done
+pi_bin_dir=${pi_launcher%/*}
+pi_agent_dir=${pi_bin_dir%/*}
+pi_current_file=$pi_agent_dir/install/current-version
+if ! IFS= read -r pi_current_version < "$pi_current_file"; then
+  printf 'Could not read managed Pi version from %s.\n' "$pi_current_file" >&2
+  exit 1
+fi
+pi_release_bin=$pi_agent_dir/install/releases/$pi_current_version/node_modules/.bin/pi
+if [ ! -x "$pi_release_bin" ]; then
+  printf 'Managed Pi executable is missing: %s\n' "$pi_release_bin" >&2
+  exit 1
+fi
+
+# Mandatory external sandbox preflight for coding sessions.
+# Runs BEFORE exec'ing Pi so a broken/missing Gondolin import or extension
+# cannot be swallowed by Pi's extension loader and fall back to host tools.
+# Bypassed ONLY for non-session CLI subcommands or explicit `PI_SANDBOX_UNSAFE=1` (`pi-unsafe`).
+if [ "${PI_SANDBOX_UNSAFE:-0}" != "1" ]; then
+  case "${1:-}" in
+    install|remove|uninstall|update|list|config|auth|mcp|-v|--version|-h|--help|--list-models)
+      ;;
+    *)
+      pi_xdg_data=${XDG_DATA_HOME:-$HOME/.local/share}
+      pi_team_pkg=${PI_TEAM_PACKAGE_DIR:-$pi_xdg_data/pi-team-package}
+      pi_preflight=$pi_team_pkg/extensions/gondolin-sandbox/preflight.mjs
+      if [ -z "${PI_TEAM_PACKAGE_DIR:-}" ] && [ ! -r "$pi_preflight" ] && [ -r "${PI_CODING_AGENT_DIR:-$pi_agent_dir}/settings.json" ]; then
+        pi_settings_pkg=$(node - "${PI_CODING_AGENT_DIR:-$pi_agent_dir}" <<'NODE' 2>/dev/null || true
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const agentDir = process.argv[2];
+const s = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
+for (const entry of s.packages || []) {
+  const src = typeof entry === "string" ? entry : entry?.source;
+  if (typeof src !== "string" || src.startsWith("npm:") || src.startsWith("git:") || src.includes("://")) continue;
+  const resolved = src.startsWith("~/") ? path.join(os.homedir(), src.slice(2)) : path.resolve(agentDir, src);
+  const pf = path.join(resolved, "extensions", "gondolin-sandbox", "preflight.mjs");
+  if (fs.existsSync(pf)) { process.stdout.write(pf); break; }
+}
+NODE
+)
+        if [ -n "$pi_settings_pkg" ] && [ -r "$pi_settings_pkg" ]; then
+          pi_preflight=$pi_settings_pkg
+        fi
+      fi
+      if [ ! -r "$pi_preflight" ]; then
+        printf '[pi-sandbox] FATAL: Mandatory sandbox preflight missing: %s\n' "$pi_preflight" >&2
+        printf '[pi-sandbox] Refusing to start Pi with host tools (fail-closed).\n' >&2
+        printf '[pi-sandbox] Run scripts/pi-bootstrap.sh, or use `pi-unsafe` if you explicitly intend to run unsandboxed.\n' >&2
+        exit 2
+      fi
+      PI_CODING_AGENT_DIR=${PI_CODING_AGENT_DIR:-$pi_agent_dir} node "$pi_preflight" "$@" || exit $?
+      ;;
+  esac
+fi
+
+PI_MANAGED_INSTALL_ROOT=$pi_agent_dir/install
+export PI_MANAGED_INSTALL_ROOT
+exec "$pi_release_bin" "$@"
+EOF
+  chmod 0755 "$launcher_tmp"
+  mv -f "$launcher_tmp" "$launcher"
+}
+
 MANAGED_RELEASE_BIN="$MANAGED_ROOT/releases/$PINNED_VERSION/node_modules/.bin/pi"
 
 if [[ "$FORCE" -eq 0 && "$CURRENT_VERSION" == "$PINNED_VERSION" && -x "$MANAGED_RELEASE_BIN" && -L "$BIN_DIR/pi" ]]; then
+  # Keep the managed launcher script in sync even when the Pi version itself did not change.
+  write_managed_launcher
   if [[ "$MODE" == "update" && -n "$OFFERED_VERSION" && "$OFFERED_VERSION" != "$PINNED_VERSION" ]]; then
     printf 'Pi is pinned to %s via %s (upstream offered %s).\n' "$PINNED_VERSION" "$PIN_FILE" "$OFFERED_VERSION"
     printf 'To upgrade, bump "piVersion" in pi-pin.json and run: pi-self-update --sync\n'
@@ -185,39 +268,8 @@ NODE
 mv -f "$MARKER_TMP" "$MANAGED_ROOT/managed-install.json"
 
 # Write managed launcher script at ~/.pi/agent/bin/pi.
+write_managed_launcher
 LAUNCHER="$AGENT_DIR/bin/pi"
-LAUNCHER_TMP="$LAUNCHER.tmp.$$"
-cat > "$LAUNCHER_TMP" <<'EOF'
-#!/bin/sh
-case "$0" in
-  */*) pi_launcher="$0" ;;
-  *) pi_launcher=$(command -v "$0") || exit 127 ;;
-esac
-while [ -L "$pi_launcher" ]; do
-  pi_link=$(readlink "$pi_launcher") || exit 1
-  case "$pi_link" in
-    /*) pi_launcher="$pi_link" ;;
-    *) pi_launcher=${pi_launcher%/*}/$pi_link ;;
-  esac
-done
-pi_bin_dir=${pi_launcher%/*}
-pi_agent_dir=${pi_bin_dir%/*}
-pi_current_file=$pi_agent_dir/install/current-version
-if ! IFS= read -r pi_current_version < "$pi_current_file"; then
-  printf 'Could not read managed Pi version from %s.\n' "$pi_current_file" >&2
-  exit 1
-fi
-pi_release_bin=$pi_agent_dir/install/releases/$pi_current_version/node_modules/.bin/pi
-if [ ! -x "$pi_release_bin" ]; then
-  printf 'Managed Pi executable is missing: %s\n' "$pi_release_bin" >&2
-  exit 1
-fi
-PI_MANAGED_INSTALL_ROOT=$pi_agent_dir/install
-export PI_MANAGED_INSTALL_ROOT
-exec "$pi_release_bin" "$@"
-EOF
-chmod 0755 "$LAUNCHER_TMP"
-mv -f "$LAUNCHER_TMP" "$LAUNCHER"
 
 # Activate current version and link ~/.local/bin/pi -> ~/.pi/agent/bin/pi.
 CUR_TMP="$MANAGED_ROOT/current-version.tmp.$$"

@@ -73,10 +73,79 @@ FAIL_OUT2="$(
 )"
 FAIL_RC2=$?
 set -e
-if [[ $FAIL_RC2 -ne 0 ]] && grep -qiE 'FATAL|GONDOLIN_KRUN_RUNNER|Refusing to fall back' <<<"$FAIL_OUT2"; then
+if [[ $FAIL_RC2 -ne 0 ]] && grep -qiE 'FATAL|GONDOLIN_KRUN_RUNNER|Refusing to' <<<"$FAIL_OUT2"; then
   ok "pi refuses to start when krun runner prerequisite is broken (exit $FAIL_RC2)"
 else
   bad "pi did not fail closed on broken krun runner (exit $FAIL_RC2): $FAIL_OUT2"
+fi
+
+set +e
+FAIL_OUT3="$(
+  cd "$WORKSPACE" && \
+  PI_CODING_AGENT_DIR="$AGENT_DIR" \
+  PI_USAGE_LOG_PATH="$USAGE_LOG.failtest3" \
+  pi --no-extensions --mode rpc --no-session </dev/null 2>&1
+)"
+FAIL_RC3=$?
+set -e
+if [[ $FAIL_RC3 -ne 0 ]] && grep -qiE 'FATAL|--no-extensions|Refusing to' <<<"$FAIL_OUT3"; then
+  ok "pi launcher refuses --no-extensions before Pi starts (exit $FAIL_RC3)"
+else
+  bad "pi launcher did not block --no-extensions (exit $FAIL_RC3): $FAIL_OUT3"
+fi
+
+set +e
+FAIL_OUT4="$(
+  cd "$WORKSPACE" && \
+  PI_CODING_AGENT_DIR="$AGENT_DIR" \
+  PI_TEAM_PACKAGE_DIR="$WORK_TMP/missing-package" \
+  PI_USAGE_LOG_PATH="$USAGE_LOG.failtest4" \
+  pi --mode rpc --no-session </dev/null 2>&1
+)"
+FAIL_RC4=$?
+set -e
+if [[ $FAIL_RC4 -ne 0 ]] && grep -qiE 'FATAL|Mandatory sandbox preflight missing|Refusing to' <<<"$FAIL_OUT4"; then
+  ok "pi launcher refuses to start when sandbox package is missing (exit $FAIL_RC4)"
+else
+  bad "pi launcher did not fail closed on missing sandbox package (exit $FAIL_RC4): $FAIL_OUT4"
+fi
+
+# Broken @earendil-works/gondolin import (preflight exists, settings points to it, node_modules absent)
+BROKEN_PKG="$WORK_TMP/broken-pkg"
+BROKEN_AGENT="$WORK_TMP/broken-agent"
+mkdir -p "$BROKEN_PKG/extensions/gondolin-sandbox" "$BROKEN_AGENT"
+cp "$TEAM_PKG_DIR/extensions/gondolin-sandbox/"{preflight.mjs,policy.ts,toml.ts,index.ts} "$BROKEN_PKG/extensions/gondolin-sandbox/"
+printf '{"packages":["%s"]}\n' "$BROKEN_PKG" > "$BROKEN_AGENT/settings.json"
+set +e
+FAIL_OUT4B="$(
+  cd "$WORKSPACE" && \
+  PI_CODING_AGENT_DIR="$BROKEN_AGENT" \
+  PI_TEAM_PACKAGE_DIR="$BROKEN_PKG" \
+  PI_USAGE_LOG_PATH="$USAGE_LOG.failtest4b" \
+  pi --mode rpc --no-session </dev/null 2>&1
+)"
+FAIL_RC4B=$?
+set -e
+if [[ $FAIL_RC4B -ne 0 ]] && grep -qiE 'FATAL|@earendil-works/gondolin|Refusing to' <<<"$FAIL_OUT4B"; then
+  ok "pi launcher refuses to start when @earendil-works/gondolin cannot import (exit $FAIL_RC4B)"
+else
+  bad "pi launcher did not fail closed on broken gondolin import (exit $FAIL_RC4B): $FAIL_OUT4B"
+fi
+
+set +e
+FAIL_OUT5="$(
+  cd "$WORKSPACE" && \
+  PI_CODING_AGENT_DIR="$AGENT_DIR" \
+  PI_SANDBOX_GH_ALLOWED_REPOS="https://github.com/octocat/Hello-World" \
+  PI_USAGE_LOG_PATH="$USAGE_LOG.failtest5" \
+  pi --mode rpc --no-session </dev/null 2>&1
+)"
+FAIL_RC5=$?
+set -e
+if [[ $FAIL_RC5 -ne 0 ]] && grep -qiE 'FATAL|Invalid github\.allowed_repos' <<<"$FAIL_OUT5"; then
+  ok "pi refuses to start on invalid allowed_repos entry (exit $FAIL_RC5)"
+else
+  bad "pi did not fail closed on invalid allowed_repos (exit $FAIL_RC5): $FAIL_OUT5"
 fi
 
 printf '\n=== 3. Live sandboxed Pi session (RPC mode + sandbox.toml + decoy creds/env/egress + git/gh) ===\n'
@@ -200,6 +269,18 @@ try {
     type: "bash",
     command: "curl -sS -i --max-time 8 https://github.com/torvalds/linux.git/info/refs?service=git-upload-pack 2>&1 || true",
   });
+  checks.ghGraphqlBlocked = await send({
+    type: "bash",
+    command: 'curl -sS -i --max-time 8 -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -d \'{"query":"{ repository(owner:\\"torvalds\\", name:\\"linux\\") { id } }"}\' https://api.github.com/graphql 2>&1 || true',
+  });
+  checks.skillMountRead = await send({
+    type: "bash",
+    command: "cat /tmp/pi-skills/*gitops-kustomize/SKILL.md 2>&1",
+  });
+  checks.skillMountReadOnly = await send({
+    type: "bash",
+    command: "echo tamper >> /tmp/pi-skills/*gitops-kustomize/SKILL.md 2>&1",
+  });
   checks.mntC = await send({ type: "bash", command: "ls -la /mnt/c 2>&1" });
   checks.powershell = await send({ type: "bash", command: "powershell.exe -Command 'echo pwned' 2>&1" });
   checks.blockedHost = await send({ type: "bash", command: "curl -sS -i --max-time 8 https://example.com 2>&1 || true" });
@@ -246,7 +327,10 @@ assertCheck("gh auth git-credential returns placeholder only", rc("ghCredHelper"
 assertCheck("git, gh, and kustomize installed in KVM guest image", rc("ghToolsPresent") === 0 && out("ghToolsPresent").includes("git version") && out("ghToolsPresent").includes("gh version"), out("ghToolsPresent"));
 assertCheck("sending GH_TOKEN placeholder to non-GitHub allowlisted host (npmjs.org) is blocked", /403|Forbidden|blocked/i.test(out("ghExfilToNpmBlocked")), out("ghExfilToNpmBlocked").slice(0, 200));
 assertCheck("git clone of allowlisted repo (octocat/Hello-World) succeeds inside VM", rc("ghCloneAllowed") === 0 && out("ghCloneAllowed").includes("/tmp/test-clone/README"), out("ghCloneAllowed"));
-assertCheck("access to non-allowlisted GitHub repo (torvalds/linux) blocked by repo guard", /403|Forbidden|allowedGitHubRepos/i.test(out("ghRepoBlocked")), out("ghRepoBlocked").slice(0, 200));
+assertCheck("access to non-allowlisted GitHub repo (torvalds/linux) blocked by repo guard", /403|Forbidden|allowed_repos/i.test(out("ghRepoBlocked")), out("ghRepoBlocked").slice(0, 200));
+assertCheck("GitHub GraphQL blocked under allowed_repos (prevents inline-arg bypass)", /403|Forbidden|GraphQL/i.test(out("ghGraphqlBlocked")), out("ghGraphqlBlocked").slice(0, 200));
+assertCheck("trusted skill gitops-kustomize/SKILL.md readable inside VM", rc("skillMountRead") === 0 && out("skillMountRead").includes("GitOps Kustomize Workflow"), out("skillMountRead").slice(0, 200));
+assertCheck("trusted skill mount is strictly read-only inside VM", rc("skillMountReadOnly") !== 0, out("skillMountReadOnly").slice(0, 200));
 assertCheck("listing /mnt/c fails inside VM", rc("mntC") !== 0, out("mntC"));
 assertCheck("powershell.exe unreachable inside VM", rc("powershell") !== 0 && !out("powershell").includes("pwned"), out("powershell"));
 assertCheck("non-allowlisted host (example.com) blocked", /403|Forbidden|denied|blocked/i.test(out("blockedHost")) && !out("blockedHost").includes("Example Domain"), out("blockedHost").slice(0, 200));
@@ -259,7 +343,7 @@ if (failures > 0) process.exit(1);
 NODE
 RPC_STATUS=$?
 if [[ $RPC_STATUS -eq 0 ]]; then
-  pass=$((pass + 17))
+  pass=$((pass + 20))
 else
   fail=$((fail + 1))
 fi

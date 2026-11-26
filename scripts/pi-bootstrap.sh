@@ -77,9 +77,10 @@ fi
 # clobbering personal settings (defaultModel, theme, etc.).
 SETTINGS_DEST="$AGENT_DIR/settings.json"
 SETTINGS_TEMPLATE="$TEAM_PKG_DIR/templates/settings.template.json"
-node - "$SETTINGS_DEST" "$SETTINGS_TEMPLATE" "$TEAM_PKG_DIR/pi-pin.json" <<'NODE'
+node - "$SETTINGS_DEST" "$SETTINGS_TEMPLATE" "$TEAM_PKG_DIR/pi-pin.json" "$TEAM_PKG_DIR" "$HOME" <<'NODE'
 const fs = require("node:fs");
-const [destPath, tplPath, pinPath] = process.argv.slice(2);
+const path = require("node:path");
+const [destPath, tplPath, pinPath, resolvedTeamPkgDir, homeDir] = process.argv.slice(2);
 const template = JSON.parse(fs.readFileSync(tplPath, "utf8"));
 const pin = JSON.parse(fs.readFileSync(pinPath, "utf8"));
 
@@ -113,15 +114,33 @@ const merged = {
   selfUpdateCommand: template.selfUpdateCommand,
 };
 
-// Reconcile pinned package list: keep any extra user packages, update/add pinned specs.
+// Express the resolved team package path portably with `~/` when under $HOME,
+// otherwise keep the resolved absolute path (supports custom XDG_DATA_HOME / PI_TEAM_PACKAGE_DIR).
+const absPkgDir = path.resolve(resolvedTeamPkgDir);
+const absHome = path.resolve(homeDir);
+const relFromHome = path.relative(absHome, absPkgDir);
+const teamPkgSource =
+  relFromHome && !relFromHome.startsWith("..") && !path.isAbsolute(relFromHome)
+    ? `~/${relFromHome.split(path.sep).join("/")}`
+    : absPkgDir;
+
+// Reconcile pinned package list: keep any extra user packages, update/add pinned specs,
+// and replace any previous local pi-team-package path rather than loading both.
 const desiredPackages = [
-  "~/.local/share/pi-team-package",
+  teamPkgSource,
   ...(Array.isArray(pin.thirdPartyPackages) ? pin.thirdPartyPackages : []),
 ];
+
+const isLocalTeamPkgPath = (src) => {
+  if (src.startsWith("npm:") || src.startsWith("git:") || src.includes("://")) return false;
+  const normalized = src.replace(/\\/g, "/").replace(/\/+$/, "");
+  return path.posix.basename(normalized) === "pi-team-package";
+};
 
 const pkgIdentity = (entry) => {
   const src = typeof entry === "string" ? entry : entry?.source;
   if (typeof src !== "string") return "";
+  if (isLocalTeamPkgPath(src)) return "local:pi-team-package";
   if (src.startsWith("npm:")) {
     const rest = src.slice(4);
     const idx = rest.lastIndexOf("@");
