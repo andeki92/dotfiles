@@ -8,8 +8,8 @@
 !config/*/.local/
 !config/*/.local/**
 
-# Claude worktrees
-.claude/worktrees
+# Claude Code's per-project state (worktrees, local settings, locks)
+/.claude/
 
 # Rex: each machine's own projects, and the server's state, which lands here
 # if stow links all of ~/.config/rex on a machine that had none
@@ -19,6 +19,10 @@ config/rex/.config/rex/.claude/
 
 # Skill symlinks auto-installed by third-party CLI installers (e.g. hf)
 config/claude/.claude/skills/hf-cli
+
+# The Claude app's skill sync: its synced copies and its trash
+config/claude/.claude/skills/.trash/
+config/claude/.claude/skills/synced/
 
 # Homebrew's lock for trust.json (brew trust writes both under ~/.config/homebrew)
 config/brew/.config/homebrew/trust.json.lock
