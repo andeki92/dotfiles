@@ -6,9 +6,11 @@ default = "c"
 # Claude Code exactly as `c` starts it, Code Mode and all: claude-via-c, beside
 # this file, loads `c` and runs it. The Claude adapter starts the program
 # CLAUDE_CODE_EXECUTABLE names; zsh expands $HOME, which TOML can't. Extra
-# arguments, such as `rex-acp c -- -w 123-flaky-tests`, reach claude.
+# arguments, such as `rex-acp c -- -w 123-flaky-tests`, reach claude. It starts
+# in Auto, where the account's models offer it, rather than Default.
 [agents.c]
 command = ["zsh", "-fc", 'CLAUDE_CODE_EXECUTABLE="$HOME/.config/rex-acp/claude-via-c" exec rex-acp claude-agent -- "$@"', "c"]
+mode = "auto"
 
 # What `c` runs, without Code Mode: Claude Code on the latest Opus at high effort, with the latest
 # Fable as advisor. Tracking on, so flag-gated features such as the advisor work.
